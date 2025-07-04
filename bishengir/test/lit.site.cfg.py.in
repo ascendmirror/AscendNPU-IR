@@ -1,0 +1,24 @@
+@LIT_SITE_CFG_IN_HEADER@
+
+import sys
+
+ON = 1
+OFF = 0
+
+config.host_cc = "@HOST_CC@"
+config.host_cxx = "@HOST_CXX@"
+
+config.llvm_tools_dir = lit_config.substitute("@LLVM_TOOLS_DIR@")
+config.llvm_shlib_ext = "@SHLIBEXT@"
+
+config.mlir_tools_dir = "@MLIR_TOOLS_DIR@"
+
+config.bishengir_obj_root = "@BISHENGIR_BINARY_DIR@"
+config.bishengir_tools_dir = "@BISHENGIR_TOOLS_DIR@"
+config.bishengir_src_root = "@BISHENGIR_SRC_DIR@"
+
+import lit.llvm
+lit.llvm.initialize(lit_config, config)
+
+# Let the main config do the real work.
+lit_config.load_config(config, "@BISHENGIR_SRC_DIR@/test/lit.cfg.py")
