@@ -14,13 +14,14 @@
    ├── lib
      └── libBiShengIR.so     // used to build bishengir dialects
    └── bin
+     └── bishengir-compile   // used to compile `.mlir` to binary
      └── bishengir-yaml-gen  // used to generate files from yaml
    ```
 
 2. Set environment variable to the installed path:
 
   ```bash
-  export BISHENG_IR_INSTALL_PATH = ...
+  export BISHENG_IR_INSTALL_PATH= ...
   ```
 
 ### Building BiShengIR as an external LLVM Project

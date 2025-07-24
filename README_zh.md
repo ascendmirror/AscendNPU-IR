@@ -14,13 +14,14 @@
    ├── lib
      └── libBiShengIR.so     // used to build bishengir dialects
    └── bin
+     └── bishengir-compile   // used to compile `.mlir` to binary
      └── bishengir-yaml-gen  // used to generate files from yaml
    ```
 
 2. 将环境变量设置为安装路径：
 
   ```bash
-  export BISHENG_IR_INSTALL_PATH = ...
+  export BISHENG_IR_INSTALL_PATH= ...
   ```
 
 

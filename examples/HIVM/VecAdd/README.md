@@ -29,7 +29,7 @@ export ASCEND_HOME_PATH=/usr/local/ascend-toolkit/latest
 3. Build the project. After building, the executable `hivm-vec-add` should appear in `./bin` directory.
 4. Build the device binary using `bishengir-compile`
     ```bash
-    bishengir-compile add.mlir -enable-hivm-compile -enable-lir-compile -o kernel.o
+    bishengir-compile add.mlir -enable-hivm-compile -o kernel.o
     ```
 5. Execute `hivm-vec-add`
     ```bash

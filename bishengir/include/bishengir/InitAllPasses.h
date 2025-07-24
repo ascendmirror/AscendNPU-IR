@@ -21,6 +21,7 @@
 #define BISHENGIR_INITALLPASSES_H
 
 #include "bishengir/Conversion/Passes.h"
+#include "bishengir/Dialect/HIVM/Pipelines/Passes.h"
 
 namespace bishengir {
 
@@ -29,6 +30,9 @@ namespace bishengir {
 inline void registerAllPasses() {
   // Conversion passes
   bishengir::registerConversionPasses();
+
+  // Dialect pipelines
+  mlir::hivm::registerConvertToHIVMPipelines();
 }
 
 } // namespace bishengir
