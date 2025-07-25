@@ -49,8 +49,6 @@ def MarkOp : Op<Annotation_Dialect, "mark", [Pure, MemoryEffects<[MemWrite]>]> {
   let builders = [
     OpBuilder<(ins "Value":$src)>
   ];
-  let hasCanonicalizer = 1;
-  let hasFolder = 1;
   let extraClassDeclaration = [{
     /// Return whether the `annotation.mark` op is annotated
     /// by a key-value pair with the target `key`.
