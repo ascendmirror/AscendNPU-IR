@@ -60,3 +60,8 @@
 ### Building an end-to-end example
 
 Please refer to the `examples` directory.
+
+## Sample Security Disclaimer  
+
+- **[AscendNPU IR Examples](./examples/)** are designed to provide minimal implementations for quickly getting started with, developing, and debugging AscendNPU IR functionalities. Their primary goal is to demonstrate the core features of AscendNPU IR with the briefest code, **rather than offering production-level security guarantees**. Security in these samples (such as input validation and boundary checks) are relatively limited.  
+- AscendNPU IR does not recommend using the sample code directly in production, nor does it guarantee the security of such usage. If users apply the example code from the `examples` directory in their actual business scenarios and encounter security issues, they shall assume full responsibility.
