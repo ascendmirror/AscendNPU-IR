@@ -31,6 +31,7 @@ include "mlir/Interfaces/ViewLikeInterface.td"
 // HIVM Dialect operations.
 //===----------------------------------------------------------------------===//
 
+#ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
 def GetBlockIdxOp : HIVM_Op<"get_block_idx", [Pure, CubeVectorCoreTypeTrait]> {
   let summary = "Get block idx of the current device thread used for parallelization.";
   let description = [{
@@ -70,9 +71,14 @@ def GetSubBlockNumOp : HIVM_Op<"get_sub_block_num", [Pure, CubeVectorCoreTypeTra
   let results = (outs I64:$result);
   let assemblyFormat = "attr-dict `->` type($result)";
 }
+#endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
 
 def PointerCastOp : HIVM_Op<"pointer_cast",
-  [CubeVectorCoreTypeTrait, AttrSizedOperandSegments]> {
+  [AttrSizedOperandSegments
+#ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
+    ,CubeVectorCoreTypeTrait
+#endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
+  ]> {
   let summary = "HIVM pointer cast op at specific i64 addr";
   let description = [{
     The specific i64 addrs are stored in `$addrs`, which is variadic.
@@ -111,6 +117,7 @@ def PointerCastOp : HIVM_Op<"pointer_cast",
   }];
 }
 
+#ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
 def BitcastOp : HIVM_Op<"bitcast",
   [AlwaysSpeculatable, Elementwise, SameOperandsAndResultShape,
    NoMemoryEffect, Pure]> {
@@ -137,11 +144,13 @@ def SetFFTSBaseAddrOp : HIVM_Op<"set_ffts_base_addr", [CubeVectorCoreTypeTrait]>
     attr-dict $ffts_base_addr
   }];
 }
+#endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
 
 //===----------------------------------------------------------------------===//
 // HIVM Debug op definitions.
 //===----------------------------------------------------------------------===//
 
+#ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
 def PrintOp :
   HIVM_Op<"print", 
           [MemoryEffects<[MemRead, MemWrite]>,
@@ -185,5 +194,6 @@ def FinishPrintOp : HIVM_Op<"finish_print",
     attr-dict
   }];
 }
+#endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
 
 #endif // BISHENGIR_DIALECT_HIVM_IR_HIVMOPS_TD

@@ -18,7 +18,12 @@
 #ifndef BISHENGIR_DIALECT_HIVM_IR_HIVM_H
 #define BISHENGIR_DIALECT_HIVM_IR_HIVM_H
 
+#include "bishengir/Config/bishengir-config.h"
+
+#if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
 #include "bishengir/Interfaces/AggregatedOpInterface.h"
+#endif
+
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/LLVMIR/LLVMTypes.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -56,9 +61,11 @@
 // HIVM Trait and Interface
 //===----------------------------------------------------------------------===//
 
+#if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
 #include "bishengir/Dialect/HIVM/IR/HIVMTraits.h"
 
 #include "bishengir/Dialect/HIVM/IR/HIVMInterfaces.h"
+#endif
 
 //===----------------------------------------------------------------------===//
 // HIVM Dialect Operations
@@ -67,16 +74,20 @@
 #define GET_OP_CLASSES
 #include "bishengir/Dialect/HIVM/IR/HIVMOps.h.inc"
 
+#if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
 #define GET_OP_CLASSES
 #include "bishengir/Dialect/HIVM/IR/HIVMDMAOps.h.inc"
 
 #define GET_OP_CLASSES
 #include "bishengir/Dialect/HIVM/IR/HIVMVectorOps.h.inc"
+#endif
 
 #define GET_OP_CLASSES
 #include "bishengir/Dialect/HIVM/IR/HIVMSynchronizationOps.h.inc"
 
+#if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
 #define GET_OP_CLASSES
 #include "bishengir/Dialect/HIVM/IR/HIVMMacroOps.h.inc"
+#endif
 
 #endif // BISHENGIR_DIALECT_HIVM_IR_HIVM_H

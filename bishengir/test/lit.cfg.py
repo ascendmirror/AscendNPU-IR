@@ -84,3 +84,6 @@ llvm_config.add_tool_substitutions(tools, tool_dirs)
 # This option avoids to accidentally reuse variable across -LABEL match,
 # it can be explicitly opted-in by prefixing the variable name with $
 config.environment["FILECHECK_OPTS"] = "-enable-var-scope --allow-unused-prefixes=false"
+
+if config.bishengir_standalone_ir_build:
+  config.available_features.add('bishengir_standalone_ir_build')

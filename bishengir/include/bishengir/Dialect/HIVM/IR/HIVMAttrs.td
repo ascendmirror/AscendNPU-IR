@@ -101,8 +101,11 @@ def HIVM_AddressSpaceEnum : HIVM_I32Enum<
     HIVM_AddressSpace_UB
   ]>;
 
-def HIVM_AddressSpaceAttr : HIVM_Attr<"AddressSpace", "address_space",
-   [DeclareAttrInterfaceMethods<DeviceMappingAttrInterface>]> {
+def HIVM_AddressSpaceAttr : HIVM_Attr<"AddressSpace", "address_space"
+#ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
+   ,[DeclareAttrInterfaceMethods<DeviceMappingAttrInterface>]
+#endif
+   > {
   let parameters = (ins EnumParameter<HIVM_AddressSpaceEnum>:$address_space);
   let assemblyFormat = "`<` params `>`";
   let description = [{
@@ -356,12 +359,22 @@ def HIVM_EventAttr : HIVM_Attr<"Event", "event"> {
 
 def HIVM_ALL_CUBE : I32EnumAttrCase<"ALL_CUBE", 0>;
 def HIVM_ALL_VECTOR : I32EnumAttrCase<"ALL_VECTOR", 1>;
+#ifdef BISHENGIR_BUILD_STANDALONE_IR_ONLY
+def HIVM_BARRIER_CUBE : I32EnumAttrCase<"BARRIER_CUBE", 2>;
+def HIVM_BARRIER_VECTOR : I32EnumAttrCase<"BARRIER_VECTOR", 3>;
+def HIVM_ALL : I32EnumAttrCase<"ALL", 4>;
+#else
 def HIVM_ALL : I32EnumAttrCase<"ALL", 2>;
+#endif
 
 def HIVM_SyncBlockModeEnum : HIVM_I32Enum<
   "SyncBlockMode", "HIVM SyncBlockMode", [
     HIVM_ALL_CUBE,
     HIVM_ALL_VECTOR,
+#ifdef BISHENGIR_BUILD_STANDALONE_IR_ONLY
+    HIVM_BARRIER_CUBE,
+    HIVM_BARRIER_VECTOR,
+#endif
     HIVM_ALL
   ]>;
 
@@ -482,6 +495,7 @@ def HIVM_DataLayoutEnum : HIVM_I32Enum<
     HIVM_DataLayoutND
   ]>;
 
+#ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
 def HIVM_DataLayoutAttr : HIVM_Attr<"DataLayout", "data_layout"> {
   let parameters = (ins
     EnumParameter<HIVM_DataLayoutEnum>:$data_layout,
@@ -502,6 +516,7 @@ def HIVM_DataLayoutAttr : HIVM_Attr<"DataLayout", "data_layout"> {
     `<` $data_layout (`,` `transpose` `=` $transpose^)? (`,` `fractalSizes` `=` $fractalSizes^)? `>`
   }];
 }
+#endif
 
 //===----------------------------------------------------------------------===//
 // Fixpipe

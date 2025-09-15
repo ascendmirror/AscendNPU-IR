@@ -34,6 +34,28 @@ namespace hivm {
 /// get operation core type
 FailureOr<TCoreType> getCoreType(Operation *op);
 
+//===----------------------------------------------------------------------===//
+// Printing/parsing for EventID
+//===----------------------------------------------------------------------===//
+
+ParseResult
+parseEventID(OpAsmParser &parser, EventAttr &eventIDAttr,
+             std::optional<OpAsmParser::UnresolvedOperand> &eventIDValue);
+
+void printEventID(OpAsmPrinter &printer, Operation *op, EventAttr eventIDAttr,
+                  Value eventIDValue);
+
+//===----------------------------------------------------------------------===//
+// Printing/parsing for FlagID
+//===----------------------------------------------------------------------===//
+
+ParseResult
+parseFlagID(OpAsmParser &parser, IntegerAttr &flagIDAttr,
+            std::optional<OpAsmParser::UnresolvedOperand> &flagIDValue);
+
+void printFlagID(OpAsmPrinter &printer, Operation *op, IntegerAttr flagIDAttr,
+                 Value flagIDValue);
+
 } // namespace hivm
 } // namespace mlir
 

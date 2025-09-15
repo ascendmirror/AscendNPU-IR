@@ -20,19 +20,25 @@
 #ifndef BISHENGIR_INITALLPASSES_H
 #define BISHENGIR_INITALLPASSES_H
 
+#include "bishengir/Config/bishengir-config.h"
+
+#if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
 #include "bishengir/Conversion/Passes.h"
 #include "bishengir/Dialect/HIVM/Pipelines/Passes.h"
+#endif
 
 namespace bishengir {
 
 // This function may be called to register the bishengir-specific MLIR passes
 // with the global registry.
 inline void registerAllPasses() {
+#if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
   // Conversion passes
   bishengir::registerConversionPasses();
 
   // Dialect pipelines
   mlir::hivm::registerConvertToHIVMPipelines();
+#endif
 }
 
 } // namespace bishengir

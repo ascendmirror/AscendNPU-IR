@@ -12,7 +12,7 @@
 
 /*!
  * \file AnnotationDialect.cpp
- * \brief MLIR dialect for Annotation implementation
+ * \brief BiShengIR Annotation Dialect implementation
  */
 
 #include "bishengir/Dialect/Annotation/IR/Annotation.h"

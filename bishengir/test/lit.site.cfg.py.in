@@ -17,6 +17,8 @@ config.bishengir_obj_root = "@BISHENGIR_BINARY_DIR@"
 config.bishengir_tools_dir = "@BISHENGIR_TOOLS_DIR@"
 config.bishengir_src_root = "@BISHENGIR_SRC_DIR@"
 
+config.bishengir_standalone_ir_build = @BISHENGIR_BUILD_STANDALONE_IR_ONLY@
+
 import lit.llvm
 lit.llvm.initialize(lit_config, config)
 

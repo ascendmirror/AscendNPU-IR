@@ -33,8 +33,11 @@ include "mlir/IR/BuiltinAttributes.td"
 
 class HIVM_SynchronizationOp<string mnemonic, list<Trait> traits = []> :
   HIVM_Op<mnemonic, !listconcat(
-    [DeclareOpInterfaceMethods<HIVMInferCoreTypeInterface,
+    [
+#ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
+      DeclareOpInterfaceMethods<HIVMInferCoreTypeInterface,
       ["inferCoreType"]>
+#endif
     ], traits)> {
 }
 

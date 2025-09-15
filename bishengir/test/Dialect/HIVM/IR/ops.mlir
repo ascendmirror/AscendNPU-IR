@@ -1,3 +1,4 @@
+// UNSUPPORTED: bishengir_standalone_ir_build
 // RUN: bishengir-opt -allow-unregistered-dialect %s -split-input-file | FileCheck %s
 // Verify the printed output can be parsed.
 // RUN: bishengir-opt -allow-unregistered-dialect %s -split-input-file | bishengir-opt -allow-unregistered-dialect | FileCheck %s

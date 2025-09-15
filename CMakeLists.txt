@@ -6,19 +6,24 @@ option(BISHENGIR_BUILD_EXAMPLES
 set(BISHENG_IR_INSTALL_PATH "" CACHE STRING
       "install path for pre-built required for bishengir")
 
-if(${BISHENG_IR_INSTALL_PATH} STREQUAL "")
-  message(FATAL_ERROR "Must provide the path to pre-built.")
+option(BISHENGIR_BUILD_STANDALONE_IR_ONLY
+  "Experimental feature. If set, only build the IR in a standalone manner." OFF)
+
+if(BISHENG_IR_INSTALL_PATH STREQUAL "")
+  if(NOT BISHENGIR_BUILD_STANDALONE_IR_ONLY)
+    message(FATAL_ERROR "Must provide the path to pre-built.")
+  endif()
 endif()
 
 set(MLIR_MAIN_SRC_DIR ${LLVM_MAIN_SRC_DIR}/../mlir)
 set(MLIR_MAIN_INCLUDE_DIR ${MLIR_MAIN_SRC_DIR}/include)
 set(MLIR_CMAKE_DIR ${MLIR_MAIN_SRC_DIR}/cmake/modules)
-set(MLIR_TABLEGEN_OUTPUT_DIR ${LLVM_BINARY_DIR}/tools/mlir/include)
+set(MLIR_INCLUDE_DIR ${LLVM_BINARY_DIR}/tools/mlir/include)
 
 set(BISHENGIR_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/bishengir)
 set(BISHENGIR_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 set(BISHENGIR_MAIN_INCLUDE_DIR ${BISHENGIR_SRC_DIR}/include)
-set(BISHENGIR_TABLEGEN_OUTPUT_DIR ${LLVM_BINARY_DIR}/tools/bishengir/bishengir/include)
+set(BISHENGIR_INCLUDE_DIR ${BISHENGIR_BINARY_DIR}/bishengir/include)
 set(BISHENGIR_TOOLS_DIR ${CMAKE_BINARY_DIR}/bin)
 set(BISHENG_IR_LIBS ${BISHENG_IR_INSTALL_PATH}/lib/libBiShengIR.so)
 set(BISHENG_IR_YAML_GEN_EXE ${BISHENG_IR_INSTALL_PATH}/bin/bishengir-yaml-gen)
@@ -40,11 +45,15 @@ include(AddMLIR)
 include(AddMLIRPython)
 include(AddBiShengIR)
 
+configure_file(
+  ${BISHENGIR_MAIN_INCLUDE_DIR}/bishengir/Config/bishengir-config.h.cmake
+  ${BISHENGIR_INCLUDE_DIR}/bishengir/Config/bishengir-config.h)
+
 include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${MLIR_MAIN_INCLUDE_DIR})
-include_directories(${MLIR_TABLEGEN_OUTPUT_DIR})
+include_directories(${MLIR_INCLUDE_DIR})
 include_directories(${BISHENGIR_MAIN_INCLUDE_DIR})
-include_directories(${BISHENGIR_TABLEGEN_OUTPUT_DIR})
+include_directories(${BISHENGIR_INCLUDE_DIR})
 link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 

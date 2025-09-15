@@ -38,10 +38,14 @@ def HIVM_Dialect : Dialect {
   let cppNamespace = "::mlir::hivm";
   let dependentDialects = [
     "arith::ArithDialect",
+#ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
     "bishengir::memref_ext::MemRefExtDialect",
+#endif
     "math::MathDialect",
     "memref::MemRefDialect",
+#ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
     "hacc::HACCDialect",
+#endif
     "tensor::TensorDialect"
   ];
   let useDefaultAttributePrinterParser = 1;
