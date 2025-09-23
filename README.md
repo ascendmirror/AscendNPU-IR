@@ -1,62 +1,44 @@
-# The AscendNPU IR (BiSheng IR) Project
+![AscendNPU IR README](./docs/pic/ascendnpu-ir-in-cann.png "ascendnpu-ir-in-cann.png")
 
-## Where The AscendNPU IR (BiSheng IR) Is In CANN
+## 🎯 Introduction
 
-![](./doc/pic/ascendnpu-ir-in-cann.png)
+AscendNPU IR (AscendNPU Intermediate Representation) is built on MLIR (Multi-Level Intermediate Representation). It serves as an intermediate representation for compiling Ascend-compatible operators and provides comprehensive Ascend expression capabilities. It enhances the computational efficiency of Ascend AI processors through compilation optimization and supports deep tuning via ecosystem frameworks.
 
-## Using AscendNPU IR (BiSheng IR)
+AscendNPU IR offers multi-level abstraction interfaces: it provides a series of high-level abstraction interfaces encapsulate Ascend computation, data movement, and synchronization instructions. The compilation optimizations automatically detect hardware architecture, map hardware-agnostic expressions to underlying instructions to enhance operator development ease. Additionally, it provides fine-grained performance control interfaces, enabling precise control over on-chip memory addresses, pipeline synchronization insertion points, ping-pong pipeline optimization activation, and allowing granular performance control.
 
-### Installing pre-builts that are required to build BiShengIR
+AscendNPU IR supports flexible integration with ecosystem frameworks and efficiently enabling Ascend AI processors through open interfaces via the open-source community.
 
-1. Extract the package (available in the [release page](https://gitee.com/ascend/ascendnpu-ir/releases)) containing the pre-builts corresponding to your target machine to any location. After install, it should contain the following contents:
+## 🔍 Repository Structure
+Key directories within the AscendNPU IR repository are as follows:
+```
+├── bishengir            // Source code directory
+│   ├── cmake
+│   ├── include          // Header files
+│   ├── lib              // Source file
+│   ├── test             // Test cases
+│   |  └── Integration   // E2E use cases
+│   └── tools            // Binary tools
+├── build-tools          // Build tools
+├── CMakeLists.txt
+├── docs                 // Documentation
+├── LICENSE
+├── NOTICE
+├── README.md
+└── README_zh.md
+```
 
-   ```bash
-   ├── lib
-     └── libBiShengIR.so     // used to build bishengir dialects
-   └── bin
-     └── bishengir-compile   // used to compile `.mlir` to binary
-     └── bishengir-yaml-gen  // used to generate files from yaml
-   ```
+## ⚡️ Quick Start
 
-2. Set environment variable to the installed path:
+For build instructions, see: [How to Build](./docs/HowToBuild.md)
 
-  ```bash
-  export BISHENG_IR_INSTALL_PATH= ...
-  ```
+For an example of building E2E cases, see: [README.md](./bishengir/test/Integration/README.md)
 
-### Building BiShengIR as an external LLVM Project
+| Example Name | Guide |
+|------|------|
+| HIVM VecAdd |  [VecAdd README.md](./bishengir/test/Integration/HIVM/VecAdd/README.md) |
 
-1. Find the version of LLVM that BiShengIR builds against. Check `cmake/llvm-release-tag.txt` to see the current version.
-  
-    For example, if it says: "llvm.19.1.7", it means that the version of BiShengIR you have builds against [LLVM](https://github.com/llvm/llvm-project/tree/llvmorg-19.1.7) release `llvmorg-19.1.7`.
+## 📝 Version Compatibility Notes
+Please refer to the relevant sections of the [CANN Community Edition Documentation](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/800alpha003/softwareinst/instg/instg_0001.html) for installation and preparation of Ascend hardware, CANN software, and corresponding deep learning frameworks.
 
-2. `git checkout` LLVM at this revision. Optionally, make additional modifications to LLVM.
-
-3. Add `bishengir` project as a third-party submodule to LLVM.
-
-    ```bash
-    git submodule add https://gitee.com/ascend/ascendnpu-ir.git third-party/bishengir
-    ```
-
-4. [Build LLVM](https://llvm.org/docs/CMake.html). This is an example cmake config:
-
-    ```bash
-    cd ${HOME}/llvm-project  # your clone of LLVM.
-    mkdir build
-    cd build
-    cmake -G Ninja -DCMAKE_BUILD_TYPE=Release ../llvm \
-      -DLLVM_ENABLE_PROJECTS="mlir;llvm" \
-      -DLLVM_EXTERNAL_PROJECTS="bishengir" \
-      -DLLVM_EXTERNAL_BISHENGIR_SOURCE_DIR=${HOME}/llvm-project/third-party/bishengir \
-      -DBISHENG_IR_INSTALL_PATH=${BISHENG_IR_INSTALL_PATH}
-    ```
-
-5. You can build the "check-bishengir" target to build and run unit testcases:
-
-   ```bash
-   cmake --build . --target "check-bishengir"
-   ```
-
-### Building an end-to-end example
-
-Please refer to the `examples` directory.
+## 📄 License
+[Apache License v2.0](LICENSE)
