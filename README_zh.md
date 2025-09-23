@@ -1,63 +1,44 @@
-# AscendNPU IR（BiSheng IR）项目
+![AscendNPU IR定位](./docs/pic/ascendnpu-ir-in-cann.png "ascendnpu-ir-in-cann.png")
 
-## AscendNPU IR（BiSheng IR）在CANN中的位置
+## 🎯 项目介绍
 
-![](./doc/pic/ascendnpu-ir-in-cann.png)
+AscendNPU IR（AscendNPU Intermediate Representation）是基于MLIR（Multi-Level Intermediate Representation）构建的，面向昇腾亲和算子编译时使用的中间表示，提供昇腾完备表达能力，通过编译优化提升昇腾AI处理器计算效率，支持通过生态框架使能昇腾AI处理器与深度调优。
 
-## 使用AscendNPU IR（BiSheng IR）
+AscendNPU IR提供多级抽象接口：提供一系列高层抽象接口，屏蔽昇腾计算、搬运、同步指令细节，编译优化自动感知硬件架构，将硬件无关表达映射到底层指令，提升算子开发易用性；同时提供细粒度性能控制接口，能够精准控制片上内存地址、流水同步插入位置以及是否使能乒乓流水优化等，允许性能细粒度控制。
 
-### 安装构建BiSheng IR所需的预编译组件
+AscendNPU IR通过开源社区开放接口，支持生态框架灵活对接，高效使能昇腾AI处理器。
 
-1. 将包含与您的目标机器对应的预编译组件的包（可在[发布页面](https://gitee.com/ascend/ascendnpu-ir/releases)获取）解压到任意位置。在安装后，它应当包含如下内容：
+## 🔍 仓库结构
+AscendNPU IR仓关键目录如下所示：
+```
+├── bishengir            // 源码目录
+│   ├── cmake
+│   ├── include          // 头文件
+│   ├── lib              // 源文件
+│   ├── test             // 测试用例
+│   |  └── Integration   // 端到端用例
+│   └── tools            // 二进制工具
+├── build-tools          // 构建工具
+├── CMakeLists.txt
+├── docs                 // 文档
+├── LICENSE
+├── NOTICE
+├── README.md
+└── README_zh.md
+```
 
-   ```bash
-   ├── lib
-     └── libBiShengIR.so     // used to build bishengir dialects
-   └── bin
-     └── bishengir-compile   // used to compile `.mlir` to binary
-     └── bishengir-yaml-gen  // used to generate files from yaml
-   ```
+## ⚡️ 快速上手
 
-2. 将环境变量设置为安装路径：
+编译构建指南请见：[How to Build](./docs/HowToBuild_zh.md)
 
-  ```bash
-  export BISHENG_IR_INSTALL_PATH= ...
-  ```
+构建端到端用例示例请见：[README_zh.md](./bishengir/test/Integration/README_zh.md)
 
+| 示例名称 | 构建指南 |
+|------|------|
+| HIVM VecAdd |  [VecAdd README_zh.md](./bishengir/test/Integration/HIVM/VecAdd/README_zh.md) |
 
-### 将BiSheng IR构建为外部LLVM项目
+## 📝 版本配套说明
+请参考[CANN社区版文档](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/800alpha003/softwareinst/instg/instg_0001.html)相关章节，对昇腾硬件、CANN软件及相应深度学习框架进行安装准备。
 
-1. 查找构建BiSheng IR所依赖的LLVM版本。请查看`cmake/llvm-release-tag.txt`文件获取当前版本信息。
-  
-    例如，若显示"llvm.19.1.7"，意味着您当前版本的BiSheng IR需要基于[LLVM](https://github.com/llvm/llvm-project/tree/llvmorg-19.1.7)的`llvmorg-19.1.7`发行版构建。
-
-2. 使用`git checkout`命令签出到此版本。根据需要，您可以对LLVM进行额外修改。
-
-3. 将`bishengir`项目作为第三方子模块添加到LLVM
-
-    ```bash
-    git submodule add https://gitee.com/ascend/ascendnpu-ir.git third-party/bishengir
-    ```
-
-4. [构建LLVM](https://llvm.org/docs/CMake.html)。例如，您可以运行以下命令：
-
-    ```bash
-    cd ${HOME}/llvm-project  # your clone of LLVM.
-    mkdir build
-    cd build
-    cmake -G Ninja -DCMAKE_BUILD_TYPE=Release ../llvm \
-      -DLLVM_ENABLE_PROJECTS="mlir;llvm" \
-      -DLLVM_EXTERNAL_PROJECTS="bishengir" \
-      -DLLVM_EXTERNAL_BISHENGIR_SOURCE_DIR=${HOME}/llvm-project/third-party/bishengir \
-      -DBISHENG_IR_INSTALL_PATH=${BISHENG_IR_INSTALL_PATH}
-    ```
-
-5. 执行以下命令来编译和执行单元测试：
-
-   ```bash
-   cmake --build . --target "check-bishengir"
-   ```
-
-### 如何构建端到端用例
-
-请查看 `examples` 目录。
+## 📄 许可证书
+[Apache License v2.0](LICENSE)

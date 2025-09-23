@@ -1,21 +1,23 @@
-/**
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 1.0 (the
- * "License"). Please refer to the License for details. You may not use this
- * file except in compliance with the License. THIS SOFTWARE IS PROVIDED ON AN
- * "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS
- * FOR A PARTICULAR PURPOSE. See LICENSE in the root of the software repository
- * for the full text of the License.
- */
-
-/*!
- * \file HIVMSynchronizationOps.td
- * \brief HIVM dialect Sync. Ops.
- * \details This is the definition file for HIVM dialect
- *          synchronization operations.
- */
+//===- HIVMSynchronizationOps.td - HIVM dialect Sync. Ops. -*- tablegen -*-===//
+//
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//===----------------------------------------------------------------------===//
+//
+// This is the definition file for HIVM dialect synchronization operations.
+//
+//===----------------------------------------------------------------------===//
 
 #ifndef BISHENGIR_DIALECT_HIVM_IR_HIVMSYNCHRONIZATIONOPS_TD
 #define BISHENGIR_DIALECT_HIVM_IR_HIVMSYNCHRONIZATIONOPS_TD
@@ -33,11 +35,8 @@ include "mlir/IR/BuiltinAttributes.td"
 
 class HIVM_SynchronizationOp<string mnemonic, list<Trait> traits = []> :
   HIVM_Op<mnemonic, !listconcat(
-    [
-#ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
-      DeclareOpInterfaceMethods<HIVMInferCoreTypeInterface,
+    [DeclareOpInterfaceMethods<HIVMInferCoreTypeInterface,
       ["inferCoreType"]>
-#endif
     ], traits)> {
 }
 
@@ -89,12 +88,18 @@ def SyncBlockOp : HIVM_SynchronizationOp<"sync_block"> {
   let summary = "hivm sync block between different kernels.";
   let description = [{
     There are three sync block modes:
-      - ALL_CUBE : All vectors are synchronized to a same point.
+      - ALL_CUBE : All cube are synchronized to a same point.
                    `tcube_pipe` needs to be set to the pipe that
                    the cube core is waiting for.
-      - ALL_VECTOR : All cube are synchronized to a same point.
+      - ALL_VECTOR : All vector are synchronized to a same point.
                    `tvector_pipe` needs to be set to the pipe that the
                    vector core is waiting for.
+      - BARRIER_CUBE : Used for cube-cube synchronization, it's going to
+                   be lowered to a barrie.pipe_all and would only be
+                   copied the aic kernel.
+      - BARRIER_VECTOR : Used for cube-cube synchronization, it's going to
+                   be lowered to a barrie.pipe_all and  would only be
+                   copied the aiv kernel.
       - ALL : All aic/aiv are synchronized to same point.
               `tvector_pipe` needs to be set to the pipe that the
               vector core is waiting for.
@@ -106,13 +111,13 @@ def SyncBlockOp : HIVM_SynchronizationOp<"sync_block"> {
         back to the block in the group to do synchronization.
   }];
   let arguments = (ins HIVM_SyncBlockModeAttr:$sync_block_mode,
-                       Builtin_IntegerAttr:$flag_id,
+                       OptionalAttr<Builtin_IntegerAttr>:$flag_id,
                        Optional<I64>:$ffts_base_addr,
                        OptionalAttr<HIVM_PipeAttr>:$tcube_pipe,
                        OptionalAttr<HIVM_PipeAttr>:$tvector_pipe
   );
   let assemblyFormat = [{
-    attr-dict `[` $sync_block_mode `,` $flag_id`]`
+    attr-dict `[` $sync_block_mode (`,` $flag_id^)?`]`
     (`ffts_base_addr` `=` $ffts_base_addr^)?
     (`tcube_pipe` `=` $tcube_pipe^)?
     (`tvector_pipe` `=` $tvector_pipe^)?
@@ -170,6 +175,75 @@ def SyncBlockWaitOp : HIVM_SynchronizationOp<"sync_block_wait"> {
     ::mlir::OpFoldResult getFlagId();
   }];
   let hasVerifier = 1;
+}
+
+def CreateSyncBlockLockOp
+    : HIVM_Op<"create_sync_block_lock"> {
+  let summary = "create sync block lock operation.";
+  let description = [{
+    The `create_sync_block_lock` operation allocates a region of lock memory,
+    which is used to make the code between lock and unlock execute in order among blocks.
+    Example:
+
+    ```mlir
+      hivm.hir.create_sync_block_lock() : memref<1xi64>
+      hivm.hir.create_sync_block_lock() from %arg : from memref<?xi8> to memref<1xi64>
+    ```
+  }];
+  let arguments = (ins Optional<AnyMemRef>:$lockArg);
+  let results = (outs Res<AnyMemRef, "",
+                        [MemAlloc<DefaultResource, 0, FullEffect>]>:$memref);
+
+  let assemblyFormat = [{
+    (`from` $lockArg^)?
+        attr-dict `:` (`from` type($lockArg)^ `to`)? type($memref)
+  }];
+
+  let hasVerifier = 1;
+}
+
+def SyncBlockLockOp
+  : HIVM_Op<"sync_block_lock"> {
+  let summary = "sync block lock operation.";
+  let description = [{
+    The sync_block_lock operation will not release until the lock_var equals the block idx.
+    Example:
+
+    ```mlir
+      hivm.hir.sync_block_lock lock_var(%lock : memref<1xi64>)
+    ```
+  }];
+  let arguments = (ins MemRefRankOf<[I64], [1]>:$lock_var);
+
+  let assemblyFormat = [{
+    attr-dict `lock_var` `(` $lock_var `:` type($lock_var) `)`
+  }];
+
+  let extraClassDeclaration = [{
+    static StringRef getOpName() { return "sync_block_lock"; }
+  }];
+}
+
+def SyncBlockUnlockOp
+  : HIVM_Op<"sync_block_unlock"> {
+  let summary = "sync block unlock operation.";
+  let description = [{
+    The `sync_block_lock` operation will increase and release the lock_var.
+    Example:
+
+    ```mlir
+      hivm.hir.sync_block_unlock lock_var(%lock : memref<1xi64>)
+    ```
+  }];
+  let arguments = (ins MemRefRankOf<[I64], [1]>:$lock_var);
+
+  let assemblyFormat = [{
+    attr-dict `lock_var` `(` $lock_var `:` type($lock_var) `)`
+  }];
+
+  let extraClassDeclaration = [{
+    static StringRef getOpName() { return "sync_block_unlock"; }
+  }];
 }
 
 #endif // BISHENGIR_DIALECT_HIVM_IR_HIVMSYNCHRONIZATIONOPS_TD

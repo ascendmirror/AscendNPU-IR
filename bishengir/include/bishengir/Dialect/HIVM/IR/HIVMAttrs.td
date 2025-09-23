@@ -1,20 +1,23 @@
-/**
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 1.0 (the
- * "License"). Please refer to the License for details. You may not use this
- * file except in compliance with the License. THIS SOFTWARE IS PROVIDED ON AN
- * "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS
- * FOR A PARTICULAR PURPOSE. See LICENSE in the root of the software repository
- * for the full text of the License.
- */
-
-/*!
- * \file HIVMAttrs.td
- * \brief HIVM dialect attributes definitions
- * \details This is the definition file for HIVM dialect attributes.
- */
+//===- HIVMAttrs.td - HIVM dialect attributes definitions --*- tablegen -*-===//
+//
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//===----------------------------------------------------------------------===//
+//
+// This is the definition file for HIVM dialect attributes.
+//
+//===----------------------------------------------------------------------===//
 
 #ifndef BISHENGIR_DIALECT_HIVM_IR_HIVMATTRS_TD
 #define BISHENGIR_DIALECT_HIVM_IR_HIVMATTRS_TD
@@ -79,6 +82,48 @@ def HIVM_IteratorTypeEnum : HIVM_I32Enum<
   ]>;
 
 //===----------------------------------------------------------------------===//
+// Data Layout
+//===----------------------------------------------------------------------===//
+
+def HIVM_DataLayoutDotAND : I32EnumAttrCase<"DOTA_ND", 1, "dotA_ND">;
+def HIVM_DataLayoutDotBND : I32EnumAttrCase<"DOTB_ND", 2, "dotB_ND">;
+def HIVM_DataLayoutDotCND : I32EnumAttrCase<"DOTC_ND", 3, "dotC_ND">;
+def HIVM_DataLayoutnZ : I32EnumAttrCase<"nZ", 4, "nZ">;
+def HIVM_DataLayoutzN : I32EnumAttrCase<"zN", 5, "zN">;
+def HIVM_DataLayoutND : I32EnumAttrCase<"ND", 6, "ND">;
+
+def HIVM_DataLayoutEnum : HIVM_I32Enum<
+  "DataLayout", "HIVM data layout", [
+    HIVM_DataLayoutDotAND,
+    HIVM_DataLayoutDotBND,
+    HIVM_DataLayoutDotCND,
+    HIVM_DataLayoutnZ,
+    HIVM_DataLayoutzN,
+    HIVM_DataLayoutND
+  ]>;
+
+def HIVM_DataLayoutAttr : HIVM_Attr<"DataLayout", "data_layout"> {
+  let parameters = (ins
+    EnumParameter<HIVM_DataLayoutEnum>:$data_layout,
+    OptionalParameter<"std::optional<bool>">:$transpose,
+    OptionalParameter<"std::optional<DenseI64ArrayAttr>">:$fractalSizes
+  );
+  let description = [{
+    HIVM data layout mapping attribute. Maps to DOTA_ND, DOTB_ND, DOTC_ND, zN, nZ and ND.
+      - `transpose`: Indicates that the layout is transposed.
+                     Only valid and must be present for DOTA_ND and DOTB_ND layout.
+  }];
+  let builders = [
+    AttrBuilder<(ins "hivm::DataLayout":$data_layout)>,
+    AttrBuilder<(ins "hivm::DataLayout":$data_layout, "std::optional<bool>":$transpose)>
+  ];
+  let genVerifyDecl = 1;
+  let assemblyFormat = [{
+    `<` $data_layout (`,` `transpose` `=` $transpose^)? (`,` `fractalSizes` `=` $fractalSizes^)?`>`
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // Address Space
 //===----------------------------------------------------------------------===//
 
@@ -101,11 +146,8 @@ def HIVM_AddressSpaceEnum : HIVM_I32Enum<
     HIVM_AddressSpace_UB
   ]>;
 
-def HIVM_AddressSpaceAttr : HIVM_Attr<"AddressSpace", "address_space"
-#ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
-   ,[DeclareAttrInterfaceMethods<DeviceMappingAttrInterface>]
-#endif
-   > {
+def HIVM_AddressSpaceAttr : HIVM_Attr<"AddressSpace", "address_space",
+   [DeclareAttrInterfaceMethods<DeviceMappingAttrInterface>]> {
   let parameters = (ins EnumParameter<HIVM_AddressSpaceEnum>:$address_space);
   let assemblyFormat = "`<` params `>`";
   let description = [{
@@ -233,6 +275,12 @@ def HIVM_TCoreTypeAttr : HIVM_Attr<"TCoreType", "tcore_type"> {
   }];
 }
 
+def HIVM_TPartOfMixAttr : HIVM_Attr<"TPartOfMix", "part_of_mix"> {
+  let description = [{
+      HIVM function is a part of mix kernel.
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // Pad Mode for LoadOp
 //===----------------------------------------------------------------------===//
@@ -354,27 +402,52 @@ def HIVM_EventAttr : HIVM_Attr<"Event", "event"> {
 }
 
 //===----------------------------------------------------------------------===//
+// Unit Flag Mode
+//===----------------------------------------------------------------------===//
+
+def HIVM_UNIT_FLAG_DISABLED : I32EnumAttrCase<"DISABLED", 0>;
+def HIVM_UNIT_FLAG_RESERVED : I32EnumAttrCase<"RESERVED", 1>;
+def HIVM_UNIT_FLAG_ENABLED_WITHOUT_UPDATE : I32EnumAttrCase<"ENABLED_WITHOUT_UPDATE", 2>;
+def HIVM_UNIT_FLAG_ENABLED_WITH_UPDATE : I32EnumAttrCase<"ENABLED_WITH_UPDATE", 3>;
+def HIVM_UNIT_FLAG_ENABLED_ONLY_LAST_ITER : I32EnumAttrCase<"ENABLED_ONLY_LAST_ITER", 4>;
+def HIVM_UNIT_FLAG_ENABLED_ONLY_FIRST_ITER : I32EnumAttrCase<"ENABLED_ONLY_FIRST_ITER", 5>;
+def HIVM_UNIT_FLAG_ENABLED_ONLY_FIRST_AND_LAST_ITERS : I32EnumAttrCase<"ENABLED_ONLY_FIRST_AND_LAST_ITERS", 6>;
+
+def HIVM_UnitFlagEnum : HIVM_I32Enum<
+  "UNIT_FLAG", "Unit Flag Mode for Synchronization", [
+    HIVM_UNIT_FLAG_DISABLED,
+    HIVM_UNIT_FLAG_RESERVED,
+    HIVM_UNIT_FLAG_ENABLED_WITHOUT_UPDATE,
+    HIVM_UNIT_FLAG_ENABLED_WITH_UPDATE,
+    HIVM_UNIT_FLAG_ENABLED_ONLY_LAST_ITER,
+    HIVM_UNIT_FLAG_ENABLED_ONLY_FIRST_ITER,
+    HIVM_UNIT_FLAG_ENABLED_ONLY_FIRST_AND_LAST_ITERS
+  ]>;
+
+def HIVM_UnitFlagAttr : HIVM_Attr<"UnitFlag", "unit_flag"> {
+  let parameters = (ins EnumParameter<HIVM_UnitFlagEnum>:$unit_flag);
+  let assemblyFormat = "`<` params `>`";
+  let description = [{
+    HIVM unit flag attribute for synchronization.
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // Sync Block Mode
 //===----------------------------------------------------------------------===//
 
 def HIVM_ALL_CUBE : I32EnumAttrCase<"ALL_CUBE", 0>;
 def HIVM_ALL_VECTOR : I32EnumAttrCase<"ALL_VECTOR", 1>;
-#ifdef BISHENGIR_BUILD_STANDALONE_IR_ONLY
 def HIVM_BARRIER_CUBE : I32EnumAttrCase<"BARRIER_CUBE", 2>;
 def HIVM_BARRIER_VECTOR : I32EnumAttrCase<"BARRIER_VECTOR", 3>;
 def HIVM_ALL : I32EnumAttrCase<"ALL", 4>;
-#else
-def HIVM_ALL : I32EnumAttrCase<"ALL", 2>;
-#endif
 
 def HIVM_SyncBlockModeEnum : HIVM_I32Enum<
   "SyncBlockMode", "HIVM SyncBlockMode", [
     HIVM_ALL_CUBE,
     HIVM_ALL_VECTOR,
-#ifdef BISHENGIR_BUILD_STANDALONE_IR_ONLY
     HIVM_BARRIER_CUBE,
     HIVM_BARRIER_VECTOR,
-#endif
     HIVM_ALL
   ]>;
 
@@ -427,6 +500,7 @@ def HIVM_ReduceOp_ANY : I32EnumAttrCase<"any", 7>;
 def HIVM_ReduceOp_ALL : I32EnumAttrCase<"all", 8>;
 def HIVM_ReduceOp_XORI : I32EnumAttrCase<"xori", 9>;
 def HIVM_ReduceOp_ORI : I32EnumAttrCase<"ori", 10>;
+def HIVM_ReduceOp_ANDI : I32EnumAttrCase<"andi", 11>;
 def HIVM_ReduceOp_NONE : I32EnumAttrCase<"none", 0>;
 
 def HIVM_ReduceOpEnum : HIVM_I32Enum<
@@ -441,6 +515,7 @@ def HIVM_ReduceOpEnum : HIVM_I32Enum<
     HIVM_ReduceOp_ALL,
     HIVM_ReduceOp_XORI,
     HIVM_ReduceOp_ORI,
+    HIVM_ReduceOp_ANDI,
     HIVM_ReduceOp_NONE
   ]>;
 
@@ -460,13 +535,23 @@ def HIVM_ATOMIC_NONE : I32EnumAttrCase<"NONE", 0, "none">;
 def HIVM_ATOMIC_ADD : I32EnumAttrCase<"ADD", 1, "add">;
 def HIVM_ATOMIC_MAX : I32EnumAttrCase<"MAX", 2, "max">;
 def HIVM_ATOMIC_MIN : I32EnumAttrCase<"MIN", 3, "min">;
+def HIVM_ATOMIC_AND : I32EnumAttrCase<"AND", 4, "and">;
+def HIVM_ATOMIC_OR : I32EnumAttrCase<"OR", 5, "or">;
+def HIVM_ATOMIC_XOR : I32EnumAttrCase<"XOR", 6, "xor">;
+def HIVM_ATOMIC_CAS : I32EnumAttrCase<"CAS", 7, "or">;
+def HIVM_ATOMIC_XCHG : I32EnumAttrCase<"XCHG", 8, "xor">;
 
 def HIVM_AtomicKindEnum : HIVM_I32Enum<
   "AtomicKind", "Atomic Operation Kind for StoreOp", [
     HIVM_ATOMIC_NONE,
     HIVM_ATOMIC_ADD,
     HIVM_ATOMIC_MAX,
-    HIVM_ATOMIC_MIN
+    HIVM_ATOMIC_MIN,
+    HIVM_ATOMIC_AND,
+    HIVM_ATOMIC_OR,
+    HIVM_ATOMIC_XOR,
+    HIVM_ATOMIC_CAS,
+    HIVM_ATOMIC_XCHG,
   ]>;
 
 def HIVM_AtomicKindAttr : HIVM_I32EnumAttr<"atomic_kind", HIVM_AtomicKindEnum> {
@@ -476,47 +561,117 @@ def HIVM_AtomicKindAttr : HIVM_I32EnumAttr<"atomic_kind", HIVM_AtomicKindEnum> {
 }
 
 //===----------------------------------------------------------------------===//
-// Data Layout
+// Alignment Kind
 //===----------------------------------------------------------------------===//
 
-def HIVM_DataLayoutDotAND : I32EnumAttrCase<"DOTA_ND", 1, "dotA_ND">;
-def HIVM_DataLayoutDotBND : I32EnumAttrCase<"DOTB_ND", 2, "dotB_ND">;
-def HIVM_DataLayoutDotCND : I32EnumAttrCase<"DOTC_ND", 3, "dotC_ND">;
-def HIVM_DataLayoutnZ : I32EnumAttrCase<"nZ", 4, "nZ">;
-def HIVM_DataLayoutzN : I32EnumAttrCase<"zN", 5, "zN">;
-def HIVM_DataLayoutND : I32EnumAttrCase<"ND", 6, "ND">;
-def HIVM_DataLayoutEnum : HIVM_I32Enum<
-  "DataLayout", "HIVM data layout", [
-    HIVM_DataLayoutDotAND,
-    HIVM_DataLayoutDotBND,
-    HIVM_DataLayoutDotCND,
-    HIVM_DataLayoutnZ,
-    HIVM_DataLayoutzN,
-    HIVM_DataLayoutND
-  ]>;
+def HIVM_ALIGNMENT_ALIGN : I32EnumAttrCase<"ALIGN", 0, "align">;
+def HIVM_ALIGNMENT_UNALIGNED : I32EnumAttrCase<"UNALIGNED", 1, "unaligned">;
+def HIVM_ALIGNMENT_UNKNOWN : I32EnumAttrCase<"UNKNOWN", 2, "unknown">;
 
-#ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
-def HIVM_DataLayoutAttr : HIVM_Attr<"DataLayout", "data_layout"> {
-  let parameters = (ins
-    EnumParameter<HIVM_DataLayoutEnum>:$data_layout,
-    OptionalParameter<"std::optional<bool>">:$transpose,
-    OptionalParameter<"std::optional<DenseI64ArrayAttr>">:$fractalSizes
-  );
-  let description = [{
-    HIVM data layout mapping attribute. Maps to DOTA_ND, DOTB_ND, DOTC_ND, zN, nZ and ND.
-      - `transpose`: Indicates that the layout is transposed.
-                     Only valid and must be present for DOTA_ND and DOTB_ND layout.
-  }];
+def HIVM_AlignKindEnum : HIVM_I32Enum<"AlignKind", "alignment kind information", [
+  HIVM_ALIGNMENT_ALIGN,
+  HIVM_ALIGNMENT_UNALIGNED,
+  HIVM_ALIGNMENT_UNKNOWN
+]>;
+
+def HIVM_AlignKindAttr : HIVM_I32EnumAttr<"align_kind", HIVM_AlignKindEnum> {
+  let description = "HIVM alignment kind attribute.";
+}
+
+//===----------------------------------------------------------------------===//
+// Axis Kind
+//===----------------------------------------------------------------------===//
+
+def HIVM_AXIS_FIRST : I32EnumAttrCase<"FIRST", 0, "first">;
+def HIVM_AXIS_MIDDLE : I32EnumAttrCase<"MIDDLE", 1, "middle">;
+def HIVM_AXIS_LAST : I32EnumAttrCase<"LAST", 2, "last">;
+
+def HIVM_AxisKindEnum : HIVM_I32Enum<"AxisKind", "hivm op axis kind information", [
+  HIVM_AXIS_FIRST,
+  HIVM_AXIS_MIDDLE,
+  HIVM_AXIS_LAST
+]>;
+
+def HIVM_AxisKindAttr : HIVM_I32EnumAttr<"axis_kind", HIVM_AxisKindEnum> {
+  let description = "HIVM op axis kind attribute.";
+}
+
+//===----------------------------------------------------------------------===//
+// Block Mapping
+//===----------------------------------------------------------------------===//
+
+def DimX : I64EnumAttrCase<"DimX", 0, "x">;
+
+def MappingIdEnum : I64EnumAttr<"MappingId", "Mapping ids for loop mapping", [DimX]> {
+  let cppNamespace = "::mlir::hivm";
+}
+
+def HIVM_BlockMappingAttr
+    : HIVM_Attr<"HIVMBlockMapping", "block",
+                [DeclareAttrInterfaceMethods<DeviceMappingAttrInterface>]> {
+  let parameters = (ins OptionalParameter<"std::optional<int32_t>">:$order);
+  let assemblyFormat = "(`<` `linear_dim` `=` $order^ `>`)?";
   let builders = [
-    AttrBuilder<(ins "hivm::DataLayout":$data_layout)>,
-    AttrBuilder<(ins "hivm::DataLayout":$data_layout, "std::optional<bool>":$transpose)>
+    AttrBuilder<(ins), "return $_get($_ctxt, std::nullopt);">
   ];
-  let genVerifyDecl = 1;
-  let assemblyFormat = [{
-    `<` $data_layout (`,` `transpose` `=` $transpose^)? (`,` `fractalSizes` `=` $fractalSizes^)? `>`
+}
+
+def HIVM_SubBlockMappingAttr : HIVM_Attr<"HIVMSubBlockMapping", "sub_block", [
+  DeclareAttrInterfaceMethods<DeviceMappingAttrInterface>
+]> {
+  let parameters = (ins EnumParameter<MappingIdEnum>:$sub_block);
+  let assemblyFormat = "`<` params `>`";
+  let description = [{
+    HIVM sub block mapping attribute for the cv block dim ratio of mix func.
   }];
 }
-#endif
+
+//===----------------------------------------------------------------------===//
+// Data Cache
+//===----------------------------------------------------------------------===//
+
+def HIVM_DATACACHE_ALL : I32EnumAttrCase<"ALL", 0, "all">;
+def HIVM_DATACACHE_UB : I32EnumAttrCase<"UB", 1, "ub">;
+def HIVM_DATACACHE_OUT : I32EnumAttrCase<"OUT", 2, "out">;
+def HIVM_DATACACHE_ATOMIC : I32EnumAttrCase<"ATOMIC", 3, "atomic">;
+
+def HIVM_DataCacheKindEnum : HIVM_I32Enum<
+  "DataCacheKind", "hivm data cache kind", [
+    HIVM_DATACACHE_ALL,
+    HIVM_DATACACHE_UB,
+    HIVM_DATACACHE_OUT,
+    HIVM_DATACACHE_ATOMIC
+  ]>;
+
+def HIVM_DataCacheKindAttr : HIVM_I32EnumAttr<"DataCacheKind", HIVM_DataCacheKindEnum> {
+  let description = "HIVM data cache kind attribute.";
+}
+
+def HIVM_DCCI_SINGLE_CACHE_LINE : I32EnumAttrCase<"SINGLE_CACHE_LINE", 0, "single_cache_line">;
+def HIVM_DCCI_ALL_CACHE_LINES : I32EnumAttrCase<"ALL_CACHE_LINES", 1, "all_cache_lines">;
+
+def HIVM_DCCIModeEnum : HIVM_I32Enum<
+  "DCCIMode", "hivm dcci mode", [
+    HIVM_DCCI_SINGLE_CACHE_LINE,
+    HIVM_DCCI_ALL_CACHE_LINES
+  ]>;
+
+def HIVM_DCCIModeAttr : HIVM_I32EnumAttr<"DCCIMode", HIVM_DCCIModeEnum> {
+  let description = "HIVM DCCI mode attribute.";
+}
+
+//===----------------------------------------------------------------------===//
+// Plan Memory Mode
+//===----------------------------------------------------------------------===//
+
+def HIVM_LOCALMEMPLAN : I32EnumAttrCase<"LOCAL_MEM_PLAN", 0>;
+def HIVM_GLOBALWORKSPACEPLAN : I32EnumAttrCase<"GLOBAL_WORKSPACE_PLAN", 1>;
+
+def HIVM_MemPlanModeEnum : HIVM_I32Enum<
+  "MemPlanMode", "Mem Plan Mode", [
+    HIVM_LOCALMEMPLAN,
+    HIVM_GLOBALWORKSPACEPLAN
+]>;
 
 //===----------------------------------------------------------------------===//
 // Fixpipe
@@ -589,9 +744,9 @@ def HIVM_DescalePerChannel : I32EnumAttrCase<"DescalePerChannel", 1>;
 // Padding using one scale num
 def HIVM_DescalePerTensor : I32EnumAttrCase<"DescalePerTensor", 2>;
 def HIVM_DescaleModeEnum : HIVM_I32Enum<"DescaleMode", "descale mode for matmul", [
-    HIVM_DescaleNull,
-    HIVM_DescalePerChannel,
-    HIVM_DescalePerTensor
+  HIVM_DescaleNull,
+  HIVM_DescalePerChannel,
+  HIVM_DescalePerTensor
 ]>;
 
 def HIVM_DescaleModeAttr : HIVM_I32EnumAttr<"descale_mode", HIVM_DescaleModeEnum> {
@@ -605,11 +760,24 @@ def HIVM_LocalMatmul_PerChannelAdd : I32EnumAttrCase<"PerChannelAdd", 1>;
 def HIVM_LocalMatmul_PerChannelAddWithSplitK : I32EnumAttrCase<"PerChannelAddWithSplitK", 2>;
 def HIVM_LocalMatmul_ElementwiseAdd : I32EnumAttrCase<"ElementwiseAdd", 3>;
 def HIVM_LocalMatmul_BiasModeEnum : HIVM_I32Enum<"MatmulBiasMode", "bias mode for local matmul op", [
-    HIVM_LocalMatmul_NoBias,
-    HIVM_LocalMatmul_PerChannelAdd,
-    HIVM_LocalMatmul_PerChannelAddWithSplitK,
-    HIVM_LocalMatmul_ElementwiseAdd
+  HIVM_LocalMatmul_NoBias,
+  HIVM_LocalMatmul_PerChannelAdd,
+  HIVM_LocalMatmul_PerChannelAddWithSplitK,
+  HIVM_LocalMatmul_ElementwiseAdd
 ]>;
+
+//===----------------------------------------------------------------------===//
+// Metadata
+//===----------------------------------------------------------------------===//
+
+def HIVM_StorageAligned : HIVM_Attr<"StorageAligned", "storage_aligned"> {
+  let description = [{
+    If a module is tagged with this attribute, it means that all of the operations
+    within all device functions in this module are aligned.
+    If a function is tagged with this attribute, it means that all of the operations
+    in this function are aligned.
+  }];
+}
 
 //===----------------------------------------------------------------------===//
 // Misc.
@@ -644,6 +812,14 @@ def HIVM_AllocAlignValueInByteAttr :
   HIVM_Attr<"AllocAlignValueInByte", "alloc_align_value_in_byte"> {
   let description = [{
     HIVM alloc align value in bytes.
+  }];
+}
+
+def HIVM_FuncDynMemrefArgsAttr
+    : HIVM_Attr<"HIVMFuncDynMemrefArgs", "func_dyn_memref_args"> {
+  let description = [{
+    HIVM FuncDynMemrefArgs to mark the index array of dynamic
+    memref arguments of function.
   }];
 }
 
