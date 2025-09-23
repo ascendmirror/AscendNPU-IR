@@ -1,4 +1,5 @@
 add_bishengir_conversion_library(BiShengIRTensorToHFusion
+
   TensorToHFusion.cpp
 
   ADDITIONAL_HEADER_DIRS
@@ -9,6 +10,11 @@ add_bishengir_conversion_library(BiShengIRTensorToHFusion
 
   LINK_COMPONENTS
   Core
-)
 
-target_link_libraries(BiShengIRTensorToHFusion PRIVATE ${BISHENG_IR_LIBS})
+  LINK_LIBS PUBLIC
+  MLIRTensorDialect
+  MLIRFuncDialect
+  BiShengIRHFusionDialect
+  MLIRRewrite
+  MLIRPass
+)
