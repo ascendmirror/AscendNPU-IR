@@ -1,29 +1,24 @@
-/**
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 1.0 (the
- * "License"). Please refer to the License for details. You may not use this
- * file except in compliance with the License. THIS SOFTWARE IS PROVIDED ON AN
- * "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS
- * FOR A PARTICULAR PURPOSE. See LICENSE in the root of the software repository
- * for the full text of the License.
- */
-
-/*!
- * \file HIVM.h
- * \brief Hybrid Intelligence Virtual Machine Dialect
- */
+//===- HIVM.h - Hybrid Intelligence Virtual Machine Dialect -----*- C++ -*-===//
+//
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//===----------------------------------------------------------------------===//
 
 #ifndef BISHENGIR_DIALECT_HIVM_IR_HIVM_H
 #define BISHENGIR_DIALECT_HIVM_IR_HIVM_H
 
-#include "bishengir/Config/bishengir-config.h"
-
-#if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
 #include "bishengir/Interfaces/AggregatedOpInterface.h"
-#endif
-
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/LLVMIR/LLVMTypes.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -61,11 +56,9 @@
 // HIVM Trait and Interface
 //===----------------------------------------------------------------------===//
 
-#if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
 #include "bishengir/Dialect/HIVM/IR/HIVMTraits.h"
 
 #include "bishengir/Dialect/HIVM/IR/HIVMInterfaces.h"
-#endif
 
 //===----------------------------------------------------------------------===//
 // HIVM Dialect Operations
@@ -74,20 +67,79 @@
 #define GET_OP_CLASSES
 #include "bishengir/Dialect/HIVM/IR/HIVMOps.h.inc"
 
-#if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
 #define GET_OP_CLASSES
 #include "bishengir/Dialect/HIVM/IR/HIVMDMAOps.h.inc"
 
 #define GET_OP_CLASSES
+#include "bishengir/Dialect/HIVM/IR/HIVMMacroOps.h.inc"
+
+#define GET_OP_CLASSES
 #include "bishengir/Dialect/HIVM/IR/HIVMVectorOps.h.inc"
-#endif
 
 #define GET_OP_CLASSES
 #include "bishengir/Dialect/HIVM/IR/HIVMSynchronizationOps.h.inc"
 
-#if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
-#define GET_OP_CLASSES
-#include "bishengir/Dialect/HIVM/IR/HIVMMacroOps.h.inc"
-#endif
+namespace mlir {
+class TypeConverter;
+
+namespace hivm {
+//===----------------------------------------------------------------------===//
+// Printing/parsing for EventID
+//===----------------------------------------------------------------------===//
+
+ParseResult
+parseEventID(OpAsmParser &parser, EventAttr &eventIDAttr,
+             std::optional<OpAsmParser::UnresolvedOperand> &eventIDValue);
+
+void printEventID(OpAsmPrinter &printer, Operation *op, EventAttr eventIDAttr,
+                  Value eventIDValue);
+
+//===----------------------------------------------------------------------===//
+// Printing/parsing for FlagID
+//===----------------------------------------------------------------------===//
+
+ParseResult
+parseFlagID(OpAsmParser &parser, IntegerAttr &flagIDAttr,
+            std::optional<OpAsmParser::UnresolvedOperand> &flagIDValue);
+
+void printFlagID(OpAsmPrinter &printer, Operation *op, IntegerAttr flagIDAttr,
+                 Value flagIDValue);
+
+namespace detail {
+
+//===----------------------------------------------------------------------===//
+// Printing/parsing for Structured Op
+//===----------------------------------------------------------------------===//
+
+/// Printer and Parser for HIVM Ops that follows Destination Style Op Interface
+/// \note Only applicable for ops that only have input and init operands.
+ParseResult parseHIVMStructuredDPSOp(OpAsmParser &parser,
+                                     OperationState &result);
+void printHIVMStructuredDPSOp(OpAsmPrinter &p, Operation *op, ValueRange inputs,
+                              ValueRange outputs);
+
+/// Return the elementType as string for library call name.
+std::string getTypeName(Location loc, Type type);
+} // namespace detail
+
+/// Populates rules for lowering HIVM AddressSpaceAttribute to integer
+/// values.
+void populateHIVMAddressSpaceAttributeConversions(TypeConverter &typeConverter);
+
+/// Get HIVM Address Space Attr from input type.
+AddressSpaceAttr getHIVMAddressSpaceAttr(Type type);
+
+/// Get HIVM Address Space from input type.
+AddressSpace getHIVMAddressSpace(Type type);
+
+/// Judge whether input type has HIVM Address Space.
+std::optional<AddressSpace> getOptionalHIVMAddressSpace(Type type);
+
+constexpr llvm::StringLiteral kMultibufferUnrollAttrName =
+    "multibuffer_unroll_factor";
+constexpr llvm::StringLiteral kPipelinedLoopCoreTypeAttrName =
+    "hivm.loop_core_type";
+} // namespace hivm
+} // namespace mlir
 
 #endif // BISHENGIR_DIALECT_HIVM_IR_HIVM_H

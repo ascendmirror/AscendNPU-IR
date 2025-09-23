@@ -3,8 +3,12 @@ add_bishengir_dialect_library(BiShengIRAnnotationDialect
   AnnotationOps.cpp
 
   ADDITIONAL_HEADER_DIRS
-  ${BISHENGIR_MAIN_INCLUDE_DIR}/bishengir/Dialect/Annotation
+  ${MLIR_MAIN_INCLUDE_DIR}/mlir/Dialect/Annotation
 
   DEPENDS
-  MLIRAnnotationOpsIncGen
-)
+  BiShengIRAnnotationOpsIncGen
+
+  LINK_LIBS PUBLIC
+  MLIRDialect
+  MLIRIR
+  )
