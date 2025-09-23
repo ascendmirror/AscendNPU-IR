@@ -1,5 +1,9 @@
 set(LLVM_TARGET_DEFINITIONS Passes.td)
-mlir_tablegen(Passes.h.inc -gen-pass-decls -name Conversion)
+if(BISHENGIR_ENABLE_TORCH_CONVERSIONS)
+  mlir_tablegen(Passes.h.inc -gen-pass-decls -name Conversion -DBISHENGIR_ENABLE_TORCH_CONVERSIONS)
+else()
+  mlir_tablegen(Passes.h.inc -gen-pass-decls -name Conversion)
+endif()
 
 add_public_tablegen_target(BiShengIRConversionPassIncGen)
 add_dependencies(mlir-headers BiShengIRConversionPassIncGen)

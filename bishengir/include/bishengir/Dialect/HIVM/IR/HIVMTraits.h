@@ -1,25 +1,25 @@
-/**
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 1.0 (the
- * "License"). Please refer to the License for details. You may not use this
- * file except in compliance with the License. THIS SOFTWARE IS PROVIDED ON AN
- * "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS
- * FOR A PARTICULAR PURPOSE. See LICENSE in the root of the software repository
- * for the full text of the License.
- */
-
-/*!
- * \file HIVMTraits.h
- * \brief HIVM dialect trait definitions
- * \details This is the definition file for HIVM dialect traits.
- */
+//===- HIVMTraits.h - HIVM dialect trait definitions ------------*- C++ -*-===//
+//
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//===----------------------------------------------------------------------===//
 
 #ifndef BISHENGIR_DIALECT_HIVM_IR_HIVMTRAITS_H
 #define BISHENGIR_DIALECT_HIVM_IR_HIVMTRAITS_H
 
 #include "mlir/IR/OpDefinition.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace mlir {
 namespace hivm {
@@ -41,6 +41,14 @@ SmallVector<IteratorType> getIteratorTypesArrayForElemwiseOp(Operation *op);
 /// and transpose attr otherwise
 ArrayRef<int64_t> getPermutationArray(Operation *op);
 
+/// Return the broadcast loop dims in vBrc,
+/// and broadcast attr otherwise
+ArrayRef<int64_t> getBroadcastArray(Operation *op);
+
+/// Returns the list of inline-broadcasted axes for the operand.
+SmallVector<int64_t> getInlinedBroadcastableAxes(const Operation *op,
+                                                 const OpOperand *opOperand);
+
 /// Return the iterator types of HIVM Elemwise Ops.
 LogicalResult
 setIteratorTypesArrayForElemwiseOp(Operation *op,
@@ -56,7 +64,7 @@ LogicalResult verifyHIVMOpSameOperandsAndResultRank(Operation *op);
 LogicalResult verifyBroadcastableOTF(Operation *op);
 LogicalResult verifyTransposableOTF(Operation *op);
 LogicalResult verifyVectorOnlyTrait(Operation *op, int idx);
-LogicalResult verifyScalarOnlyTrait(Operation *op, int idx);
+LogicalResult verifyScalarOnlyHWTrait(Operation *op, int idx);
 } // namespace impl
 
 //===----------------------------------------------------------------------===//
@@ -141,13 +149,13 @@ public:
   }
 };
 
-template <int idx> class ScalarOnlyTrait {
+template <int idx> class ScalarOnlyHWTrait {
 public:
   template <typename ConcreteType>
-  class Impl : public TraitBase<ConcreteType, ScalarOnlyTrait<idx>::Impl> {
+  class Impl : public TraitBase<ConcreteType, ScalarOnlyHWTrait<idx>::Impl> {
   public:
     static LogicalResult verifyTrait(Operation *op) {
-      return impl::verifyScalarOnlyTrait(op, idx);
+      return impl::verifyScalarOnlyHWTrait(op, idx);
     }
   };
 };
@@ -163,6 +171,15 @@ public:
   };
 };
 
+/// @see: HIVMTraits.td
+template <typename ConcreteType>
+class UniformReassociationFlattenTrait
+    : public TraitBase<ConcreteType, UniformReassociationFlattenTrait> {};
+
+/// @see: HIVMTraits.td
+template <typename ConcreteType>
+class CollapsibleConsecutiveTargetDimsTrait
+    : public TraitBase<ConcreteType, CollapsibleConsecutiveTargetDimsTrait> {};
 } // namespace OpTrait
 } // namespace mlir
 
