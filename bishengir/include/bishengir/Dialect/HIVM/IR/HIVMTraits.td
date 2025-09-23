@@ -1,20 +1,23 @@
-/**
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 1.0 (the
- * "License"). Please refer to the License for details. You may not use this
- * file except in compliance with the License. THIS SOFTWARE IS PROVIDED ON AN
- * "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS
- * FOR A PARTICULAR PURPOSE. See LICENSE in the root of the software repository
- * for the full text of the License.
- */
-
-/*!
- * \file HIVMTraits.td
- * \brief HIVM dialect trait definitions
- * \details This is the definition file for HIVM dialect traits.
- */
+//===- HIVMTraits.td - HIVM dialect trait definitions -------*- tablegen-*-===//
+//
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//===----------------------------------------------------------------------===//
+//
+// This is the definition file for HIVM dialect traits.
+//
+//===----------------------------------------------------------------------===//
 
 #ifndef BISHENGIR_DIALECT_HIVM_IR_HIVMTRAITS_TD
 #define BISHENGIR_DIALECT_HIVM_IR_HIVMTRAITS_TD
@@ -23,6 +26,10 @@ include "bishengir/Dialect/HIVM/IR/HIVMInterfaces.td"
 
 include "mlir/IR/OpBase.td"
 include "mlir/IR/DialectBase.td"
+
+//===----------------------------------------------------------------------===//
+// HIVM Dialect operation traits.
+//===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
 // HIVM Dialect operation traits.
@@ -68,8 +75,8 @@ class VectorOnlyTrait<int idx>
 /// Op Trait for operation with operands that only support
 /// scalar-typed inputs (for simplicity, consider non-shaped
 /// types as scalar-typed).
-class ScalarOnlyTrait<int idx>
-    : ParamNativeOpTrait<"ScalarOnlyTrait", !cast<string>(idx)>;
+class ScalarOnlyHWTrait<int idx>
+    : ParamNativeOpTrait<"ScalarOnlyHWTrait", !cast<string>(idx)>;
 
 /// Op Trait for operation with operands that only support certain element types.
 class OperElemTypeConstraints<list<int> indices,
@@ -103,7 +110,7 @@ class OperElemTypeConstraints<list<int> indices,
 ///      dimensions to be broadcasted.
 ///   3. (B1) Op has buffer semantic.
 ///   4. (B2) Dimensions in `broadcast` are unique.
-///   5. (B3) For all `d` in `broadcast`, `0 <= d < rank(dst) -1`.
+///   5. (B3) For all `d` in `broadcast`, `0 <= d < rank(dst)`.
 ///   6. For all `d` in `axes(dst)`:
 ///       - (B4) If `d` is in `broadcast`, for all `src_i` for `i` in [1, N]:
 ///              `dim(src_i, d) = 1 || dim(src_i, d) = dim(dst, d)`.
@@ -160,5 +167,20 @@ class CoreTypeTrait<string CoreType>
 def VectorCoreTypeTrait : CoreTypeTrait<"TCoreType::VECTOR">;
 def CubeCoreTypeTrait : CoreTypeTrait<"TCoreType::CUBE">;
 def CubeVectorCoreTypeTrait : CoreTypeTrait<"TCoreType::CUBE_OR_VECTOR">;
+
+/// Operations with this trait can have their dimensions collapsed (flattened)
+/// uniformly across all their operands and results. This implies that the same
+/// grouping of dimensions (reassociation) can be applied to every tensor
+/// involved in the operation.
+def UniformReassociationFlattenTrait : NativeOpTrait<"UniformReassociationFlattenTrait", [HIVMStructuredOpInterface]>;
+
+/// A marker trait for operations that must preserve the rank and individuality
+/// of their target dimensions during flattening.
+/// For example, a permutation operation might be target-preserving. If it
+/// permutes dimensions `b` and `c`, these two dimensions cannot be collapsed
+/// together, even if they are adjacent. This trait enforces that each target
+/// dimension forms its own reassociation group
+def CollapsibleConsecutiveTargetDimsTrait
+    : NativeOpTrait<"CollapsibleConsecutiveTargetDimsTrait", [HIVMStructuredOpInterface, UniformReassociationFlattenTrait]>;
 
 #endif // BISHENGIR_DIALECT_HIVM_IR_HIVMTRAITS_TD

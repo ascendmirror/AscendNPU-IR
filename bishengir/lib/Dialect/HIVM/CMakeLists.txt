@@ -1,3 +1,4 @@
-if(BISHENGIR_BUILD_STANDALONE_IR_ONLY)
-  add_subdirectory(IR)
-endif()
+add_subdirectory(IR)
+add_subdirectory(Pipelines)
+add_subdirectory(Transforms)
+add_subdirectory(Utils)

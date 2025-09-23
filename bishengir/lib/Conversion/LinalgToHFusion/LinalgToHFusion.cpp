@@ -1,19 +1,19 @@
-/**
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 1.0 (the
- * "License"). Please refer to the License for details. You may not use this
- * file except in compliance with the License. THIS SOFTWARE IS PROVIDED ON AN
- * "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS
- * FOR A PARTICULAR PURPOSE. See LICENSE in the root of the software repository
- * for the full text of the License.
- */
-
-/*!
- * \file LinalgToHFusion.cpp
- * \brief Conversion from Linalg to HFusion dialect
- */
+//===- LinalgToHFusion.cpp - conversion from Linalg to HFusion dialect ----===//
+//
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//===----------------------------------------------------------------------===//
 
 #include "bishengir/Conversion/LinalgToHFusion/LinalgToHFusion.h"
 #include "bishengir/Dialect/HFusion/IR/HFusion.h"
@@ -27,6 +27,7 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/TypeRange.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -48,7 +49,8 @@ struct LinalgMapToHFusionPattern : OpRewritePattern<linalg::MapOp> {
     if (!mapper.hasOneBlock())
       return failure();
     Block &block = mapper.front();
-    if (block.getOperations().size() != 2)
+    if (block.getOperations().size() !=
+        2) // only process maximum operations inside linalg map of 2
       return failure();
     auto &mapped = *block.getOperations().begin();
     auto callOp = dyn_cast<func::CallOp>(mapped);
@@ -208,6 +210,16 @@ struct LinalgMapToHFusionPattern : OpRewritePattern<linalg::MapOp> {
           ValueRange{op.getInit()}, ArrayRef{fnAttr});
       return success();
     }
+    if (funcName.starts_with("__hmf_roundf")) {
+      auto roundingAttr =
+          rewriter.getAttr<hfusion::RoundModeAttr>(hfusion::RoundMode::ROUND);
+      auto modeAttr = rewriter.getNamedAttr(
+          hfusion::RoundModeAttr::getMnemonic(), roundingAttr);
+      rewriter.replaceOpWithNewOp<hfusion::CastOp>(
+          op, TypeRange(op.getResult()), ValueRange(op.getInputs()[0]),
+          ValueRange(op.getInit()), modeAttr);
+      return success();
+    }
     return failure();
   }
 };
@@ -304,11 +316,34 @@ struct AtomicLinalgGenericToHFusionStorePattern
       atomicKind = AtomicKindAttr::get(context, AtomicKind::MAX);
     } else if (atomicRef.ends_with("min")) {
       atomicKind = AtomicKindAttr::get(context, AtomicKind::MIN);
+    } else if (atomicRef.ends_with("and")) {
+      atomicKind = AtomicKindAttr::get(context, AtomicKind::AND);
+    } else if (atomicRef.ends_with("xor")) {
+      atomicKind = AtomicKindAttr::get(context, AtomicKind::XOR);
+    } else if (atomicRef.ends_with("or")) {
+      atomicKind = AtomicKindAttr::get(context, AtomicKind::OR);
+    } else if (atomicRef.ends_with("cas")) {
+      atomicKind = AtomicKindAttr::get(context, AtomicKind::CAS);
+    } else if (atomicRef.ends_with("exch")) {
+      atomicKind = AtomicKindAttr::get(context, AtomicKind::XCHG);
     } else {
       op.emitOpError("unsupported atomic operation: ");
       llvm_unreachable("Not implemented");
     }
-
+    if (atomicKind == AtomicKindAttr::get(context, AtomicKind::CAS)) {
+      rewriter.create<hfusion::AtomicCasOp>(
+          op.getLoc(), TypeRange(),
+          ValueRange{op.getInputs()[1], op.getInputs()[2]}, op.getInputs()[0]);
+      rewriter.eraseOp(op);
+      return success();
+    }
+    if (atomicKind == AtomicKindAttr::get(context, AtomicKind::XCHG)) {
+      rewriter.create<hfusion::AtomicXchgOp>(op.getLoc(), TypeRange(),
+                                             ValueRange{op.getInputs()[1]},
+                                             op.getInputs()[0]);
+      rewriter.eraseOp(op);
+      return success();
+    }
     // hivm.copy only accept tensor/tensor or memref/memref as input/output
     // and the atomicRMW Op might be masked
     // need to turn the input tensor into the same type the dst memref has

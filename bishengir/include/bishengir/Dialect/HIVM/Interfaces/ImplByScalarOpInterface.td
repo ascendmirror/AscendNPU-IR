@@ -1,20 +1,23 @@
-/**
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 1.0 (the
- * "License"). Please refer to the License for details. You may not use this
- * file except in compliance with the License. THIS SOFTWARE IS PROVIDED ON AN
- * "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS
- * FOR A PARTICULAR PURPOSE. See LICENSE in the root of the software repository
- * for the full text of the License.
- */
-
-/*!
- * \file ImplByScalarOpInterface.td
- * \brief Ops to decompose to scalar
- * \details This is the definition file for the ImplByScalarOpInterface.
- */
+//===- ImplByScalarOpInterface.td - Ops to decompose -------*- tablegen -*-===//
+//
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//===----------------------------------------------------------------------===//
+//
+// This is the definition file for the ImplByScalarOpInterface.
+//
+//===----------------------------------------------------------------------===//
 
 #ifndef BISHENGIR_DIALECT_HIVM_INTERFACES_IMPLBYSCALAROPINTERFACE_TD
 #define BISHENGIR_DIALECT_HIVM_INTERFACES_IMPLBYSCALAROPINTERFACE_TD
@@ -28,7 +31,7 @@ def ImplByScalarOpInterface : OpInterface<"ImplByScalarOpInterface"> {
   let cppNamespace = "::mlir::hivm";
   let methods = [
     InterfaceMethod<
-      /*desc=*/[{ 
+      /*desc=*/[{
         Method to lower the operation to scalar loops.
       }],
       /*retType=*/"mlir::FailureOr<mlir::SmallVector<mlir::Value>>",
@@ -48,5 +51,5 @@ def ImplByScalarOpInterface : OpInterface<"ImplByScalarOpInterface"> {
     >
   ];
 }
-#endif // BISHENGIR_DIALECT_HIVM_INTERFACES_IMPLBYSCALAROPINTERFACE_TD
 
+#endif // BISHENGIR_DIALECT_HIVM_INTERFACES_IMPLBYSCALAROPINTERFACE_TD

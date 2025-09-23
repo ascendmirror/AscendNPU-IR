@@ -1,35 +1,37 @@
-/**
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 1.0 (the
- * "License"). Please refer to the License for details. You may not use this
- * file except in compliance with the License. THIS SOFTWARE IS PROVIDED ON AN
- * "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS
- * FOR A PARTICULAR PURPOSE. See LICENSE in the root of the software repository
- * for the full text of the License.
- */
-
-/*!
- * \file bishengir-config.h.cmake
- * \brief BiShengIR Configuration
- */
+//===- bishengir-config.h - BiShengIR configuration --------------*- C -*-===*//
+//
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//===----------------------------------------------------------------------===//
 
 /* This file enumerates variables from the BiShengIR configuration so that they
    can be in exported headers and won't override package specific directives.
-   Defining the variables here is preferable over specifying them in CMake files
-   via `target_compile_definitions` because it is easier to ensure that they are
-   defined consistently across all targets: They are guaranteed to be 0/1
-   variables thanks to #cmakedefine01, so we can test with `#if` and find
-   missing definitions or includes with `-Wundef`. With `#ifdef`, these mistakes
-   can go unnoticed.
-
    This is a C header that can be included in the bishengir-c headers. */
 
 #ifndef BISHENGIR_CONFIG_H
 #define BISHENGIR_CONFIG_H
 
-/* Experimental feature. If set, only build the IR in a standalone manner. */
-#cmakedefine01 BISHENGIR_BUILD_STANDALONE_IR_ONLY
+/* If set, enable conversion and compile from Torch Dialect. */
+#cmakedefine01 BISHENGIR_ENABLE_TORCH_CONVERSIONS
+
+/* If set, enables BiShengIR pass manager command line options to MLIR. */
+#cmakedefine01 BISHENGIR_ENABLE_PM_CL_OPTIONS
+
+/* If set, disable features that are currently unpublished. */
+#cmakedefine01 BISHENGIR_PUBLISH
+
+/* If set, enable BiShengIR CPU Runner. */
+#cmakedefine01 MLIR_ENABLE_EXECUTION_ENGINE
 
 #endif
