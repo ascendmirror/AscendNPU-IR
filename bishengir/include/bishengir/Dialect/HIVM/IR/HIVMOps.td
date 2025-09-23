@@ -1,20 +1,23 @@
-/**
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 1.0 (the
- * "License"). Please refer to the License for details. You may not use this
- * file except in compliance with the License. THIS SOFTWARE IS PROVIDED ON AN
- * "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS
- * FOR A PARTICULAR PURPOSE. See LICENSE in the root of the software repository
- * for the full text of the License.
- */
-
-/*!
- * \file HIVMOps.td
- * \brief HIVM dialect operation definitions
- * \details This is the definition file for HIVM dialect operations.
- */
+//===- HIVMOps.td - HIVM dialect operation definitions -----*- tablegen -*-===//
+//
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//===----------------------------------------------------------------------===//
+//
+// This is the definition file for HIVM dialect operations.
+//
+//===----------------------------------------------------------------------===//
 
 #ifndef BISHENGIR_DIALECT_HIVM_IR_HIVMOPS_TD
 #define BISHENGIR_DIALECT_HIVM_IR_HIVMOPS_TD
@@ -31,7 +34,6 @@ include "mlir/Interfaces/ViewLikeInterface.td"
 // HIVM Dialect operations.
 //===----------------------------------------------------------------------===//
 
-#ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
 def GetBlockIdxOp : HIVM_Op<"get_block_idx", [Pure, CubeVectorCoreTypeTrait]> {
   let summary = "Get block idx of the current device thread used for parallelization.";
   let description = [{
@@ -71,14 +73,51 @@ def GetSubBlockNumOp : HIVM_Op<"get_sub_block_num", [Pure, CubeVectorCoreTypeTra
   let results = (outs I64:$result);
   let assemblyFormat = "attr-dict `->` type($result)";
 }
-#endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
+
+def SetMaskNormOp : HIVM_Op<"set_mask_norm"> {
+  let summary = "hivm set mask norm";
+  let assemblyFormat = "attr-dict";
+}
+
+def DCCIOp : HIVM_Op<"dcci"> {
+  let summary = "hivm dcci op ";
+  let description = [{
+    This op cleans(writes back) and invalidates one cacheline or the entire data cache
+  }];
+  let arguments = (ins HIVM_DCCIModeAttr:$mode,
+      HIVM_DataCacheKindAttr:$dataCacheKind, Optional<AnyMemRef>:$ptr);
+  let assemblyFormat = [{
+    attr-dict `(` $mode `,` $dataCacheKind (`,` $ptr^ `:` type($ptr))? `)`
+  }];
+}
+
+def ConvertLayoutOp : HIVM_Op<"convert_layout",
+   [Pure,
+    ViewLikeOpInterface,
+    SameOperandsAndResultElementType,
+    DeclareOpInterfaceMethods<HIVMInferCoreTypeInterface, ["inferCoreType"]>]> {
+  let summary = "HIVM layout conversion operation.";
+  let description = [{
+    The `convert_layout` operation converts a memref with one layout
+    to another. The data is not copied or modified.
+  }];
+
+  let arguments = (ins AnyRankedOrUnrankedMemRef:$source,
+                       HIVM_DataLayoutAttr:$srcLayout,
+                       HIVM_DataLayoutAttr:$dstLayout);
+  let results = (outs AnyRankedOrUnrankedMemRef:$result);
+
+  let assemblyFormat = [{
+    $source attr-dict `:` functional-type(operands, results)
+  }];
+
+  let extraClassDeclaration = [{
+    Value getViewSource() { return getSource(); }
+  }];
+}
 
 def PointerCastOp : HIVM_Op<"pointer_cast",
-  [AttrSizedOperandSegments
-#ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
-    ,CubeVectorCoreTypeTrait
-#endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
-  ]> {
+  [CubeVectorCoreTypeTrait, AttrSizedOperandSegments]> {
   let summary = "HIVM pointer cast op at specific i64 addr";
   let description = [{
     The specific i64 addrs are stored in `$addrs`, which is variadic.
@@ -117,7 +156,6 @@ def PointerCastOp : HIVM_Op<"pointer_cast",
   }];
 }
 
-#ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
 def BitcastOp : HIVM_Op<"bitcast",
   [AlwaysSpeculatable, Elementwise, SameOperandsAndResultShape,
    NoMemoryEffect, Pure]> {
@@ -144,56 +182,41 @@ def SetFFTSBaseAddrOp : HIVM_Op<"set_ffts_base_addr", [CubeVectorCoreTypeTrait]>
     attr-dict $ffts_base_addr
   }];
 }
-#endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
 
 //===----------------------------------------------------------------------===//
 // HIVM Debug op definitions.
 //===----------------------------------------------------------------------===//
 
-#ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
-def PrintOp :
-  HIVM_Op<"print", 
+def DebugOp :
+  HIVM_Op<"debug", 
           [MemoryEffects<[MemRead, MemWrite]>,
            DeclareOpInterfaceMethods<HIVMInferCoreTypeInterface, ["inferCoreType"]>]>,
-  Arguments<(ins StrAttr:$prefix,
+  Arguments<(ins StrAttr:$debugtype,
+                 StrAttr:$prefix,
                  BoolAttr:$hex,
                  AnyTypeOf<[AnyInteger, AnyFloat, TensorOrMemref]>:$arg,
                  OptionalAttr<HIVM_TCoreTypeAttr>:$tcoretype)> {
-  let summary = "Device-side print for debugging";
-  let description = [{
-    `hivm.hir.print` takes a literal string `prefix` and an argument of
-    scalar, tensor, or memref that should be printed. The arg `hex` configs
-    if printing in hex format, and the optional arg `tcoretype` specifies the core type of this operation.
-  }];
+  let summary = "Device-side debugging";
   let assemblyFormat = [{
-    $prefix attr-dict $arg `:` type($arg)
+    attr-dict $arg `:` type($arg)
   }];
   let extraClassDeclaration = [{
-    static StringRef getOpName() { return "print"; }
+    static StringRef getOpName() { return "debug"; }
   }];
 }
 
-def InitPrintOp : HIVM_Op<"init_print",
-                          [CubeVectorCoreTypeTrait]> {
-  let summary = "Init func for the device-side print";
-  let description = [{
-    `hivm.hir.init_print` prepares for `hivm.hir.print`
-  }];
+def InitDebugOp : HIVM_Op<"init_debug", [CubeVectorCoreTypeTrait]> {
+  let summary = "Init func for device-side debugging";
   let assemblyFormat = [{
     attr-dict
   }];
 }
 
-def FinishPrintOp : HIVM_Op<"finish_print",
-                          [CubeVectorCoreTypeTrait]> {
-  let summary = "Finish func for the device-side print";
-  let description = [{
-    `hivm.hir.finish_print` prepares for `hivm.hir.print`
-  }];
+def FinishDebugOp : HIVM_Op<"finish_debug", [CubeVectorCoreTypeTrait]> {
+  let summary = "Finish func for device-side debugging";
   let assemblyFormat = [{
     attr-dict
   }];
 }
-#endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
 
 #endif // BISHENGIR_DIALECT_HIVM_IR_HIVMOPS_TD

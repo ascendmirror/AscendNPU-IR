@@ -1,20 +1,23 @@
-/**
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 1.0 (the
- * "License"). Please refer to the License for details. You may not use this
- * file except in compliance with the License. THIS SOFTWARE IS PROVIDED ON AN
- * "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS
- * FOR A PARTICULAR PURPOSE. See LICENSE in the root of the software repository
- * for the full text of the License.
- */
-
-/*!
- * \file BiShengIRAttrs.td
- * \brief BiShengIR general attr defs.
- * \details This is the definition file for BiShengIR general attributes.
- */
+//===- BiShengIRAttrs.td - BiShengIR general attr defs. ----*- tablegen -*-===//
+//
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//===----------------------------------------------------------------------===//
+//
+// This is the definition file for BiShengIR general attributes.
+//
+//===----------------------------------------------------------------------===//
 
 #ifndef BISHENGIR_INTERFACES_BISHENGIRATTRS_TD
 #define BISHENGIR_INTERFACES_BISHENGIRATTRS_TD
@@ -37,7 +40,11 @@ def BiShengIR_DecomposePhase_Enum : BiShengIR_I32Enum<
     I32EnumAttrCase<"NO_CONSTRAINT", 0>,
     I32EnumAttrCase<"AFTER_HFUSION_FLATTEN", 1>,
     I32EnumAttrCase<"BEFORE_HIVM_STRIDE_ALIGNMENT", 2>,
-    I32EnumAttrCase<"AFTER_HIVM_STRIDE_ALIGNMENT", 3>
+    I32EnumAttrCase<"AFTER_RECOGNIZE_DEINTERLEAVE", 3>,
+    I32EnumAttrCase<"AFTER_RECOGNIZE_BROADCAST", 4>,
+    I32EnumAttrCase<"AFTER_HIVM_STRIDE_ALIGNMENT", 5>,
+    I32EnumAttrCase<"AFTER_INFER_HIVM_DATA_LAYOUT", 6>,
+    I32EnumAttrCase<"AFTER_HIVM_FLATTEN_OPS", 7>
 ]>;
 
 #endif //BISHENGIR_INTERFACES_BISHENGIRATTRS_TD

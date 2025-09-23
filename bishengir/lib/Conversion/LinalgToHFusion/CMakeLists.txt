@@ -9,6 +9,17 @@ add_bishengir_conversion_library(BiShengIRLinalgToHFusion
 
   LINK_COMPONENTS
   Core
-)
 
-target_link_libraries(BiShengIRLinalgToHFusion PRIVATE ${BISHENG_IR_LIBS})
+  LINK_LIBS PUBLIC
+  BiShengIRDialectUtils
+  BiShengIRMathExtDialect
+  BiShengIRTensorDialect
+  MLIRArithDialect
+  MLIRMathDialect
+  MLIRFuncDialect
+  MLIRLinalgDialect
+  BiShengIRHFusionDialect
+  MLIRTransformUtils
+  MLIRRewrite
+  MLIRPass
+)
