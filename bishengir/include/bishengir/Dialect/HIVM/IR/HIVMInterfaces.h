@@ -1,39 +1,52 @@
-/**
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 1.0 (the
- * "License"). Please refer to the License for details. You may not use this
- * file except in compliance with the License. THIS SOFTWARE IS PROVIDED ON AN
- * "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS
- * FOR A PARTICULAR PURPOSE. See LICENSE in the root of the software repository
- * for the full text of the License.
- */
-
-/*!
- * \file HIVMInterfaces.h
- * \brief HIVM dialect interface definitions
- */
+//===- HIVMInterfaces.h - HIVM dialect interface definitions ----*- C++ -*-===//
+//
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//===----------------------------------------------------------------------===//
 
 #ifndef BISHENGIR_DIALECT_HIVM_IR_HIVMINTERFACES_H
 #define BISHENGIR_DIALECT_HIVM_IR_HIVMINTERFACES_H
 
 #include "bishengir/Dialect/HIVM/Interfaces/ExtraBufferOpInterface.h"
+#include "bishengir/Dialect/HIVM/Interfaces/FlattenInterface.h"
 #include "bishengir/Dialect/HIVM/Interfaces/ImplByScalarOpInterface.h"
 #include "bishengir/Dialect/HIVM/Interfaces/OpLayoutInterface.h"
 #include "bishengir/Dialect/HIVM/Interfaces/OpPipeInterface.h"
 #include "bishengir/Interfaces/AggregatedOpInterface.h"
 
 #include "mlir/IR/Operation.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 namespace mlir {
 namespace hivm {
 /// Forward declarations.
 class HIVMStructuredOp;
+class HIVMUnitFlagEnabled;
 enum class TCoreType : uint32_t;
 enum class IteratorType : uint32_t;
 enum class AddressSpace : uint32_t;
+enum class AlignKind : uint32_t;
+
+/// Deduce Alignment information for DPS Op's init operand.
+///
+/// If operand has memref semantic, we try to deduce the information from the
+/// memref type. Otherwise, we look for annotations on the tied result value. If
+/// there is conflicting annotations, a warning is produced.
+AlignKind deduceAlignmentForDPSInitOperand(OpOperand &operand);
+AlignKind deduceAlignmentForMemRefType(MemRefType vecType);
+bool hasHWUnsupportedScalarOperandImpl(HIVMStructuredOp op);
 
 namespace detail {
 
@@ -65,6 +78,15 @@ SmallVector<Type> getHIVMOperandTypesImpl(Operation *op,
 
 // Return mask of continuous axes of an operation
 BitVector getContiguousAxesImpl(Operation *op);
+BitVector getContiguousAxesImpl(ArrayRef<Type> shapedTypes);
+
+// Return mask of unit axes of an operation
+BitVector getUnitAxesMaskImpl(MemRefType type);
+BitVector getUnitAxesMaskImpl(ArrayRef<Type> types);
+BitVector getUnitAxesMaskImpl(Operation *op);
+
+// Return mask of permuted axes of an operation
+BitVector getPermutedAxesMaskImpl(Operation *op);
 
 // Implementation to get input operands with or without extra buffer.
 SmallVector<OpOperand *>
@@ -77,6 +99,16 @@ SmallVector<Value> getTargetSpaceOperandsImpl(Operation *op,
 
 // check if the operand is vector only at a specific index
 bool isVectorOnlyOperandImpl(Operation *op, size_t idx);
+
+/// Verify that `op` conforms to the invariants of StructuredOpInterface
+LogicalResult verifyStructuredOpInterface(Operation *op);
+
+Value getUnitFlagModeLibValueImpl(HIVMUnitFlagEnabled op,
+                                  PatternRewriter &rewriter);
+
+ArrayAttr getIndexingMapsImpl(HIVMStructuredOp op);
+
+ArrayAttr getIndexingMapsElementwiseImpl(HIVMStructuredOp op);
 
 } // namespace detail
 } // namespace hivm

@@ -1,22 +1,21 @@
-/**
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 1.0 (the
- * "License"). Please refer to the License for details. You may not use this
- * file except in compliance with the License. THIS SOFTWARE IS PROVIDED ON AN
- * "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS
- * FOR A PARTICULAR PURPOSE. See LICENSE in the root of the software repository
- * for the full text of the License.
- */
-
-/*!
- * \file HIVMSynchronizationOps.cpp
- * \brief HIVM dialect synchronization ops implementation.
- */
+//===- HIVMSynchronizationOps.cpp - HIVM diaelct Sync. Ops Implementation -===//
+//
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//===----------------------------------------------------------------------===//
 
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
-#include "bishengir/Dialect/HIVM/IR/HIVMImpl.h"
 
 #include <set>
 
@@ -72,7 +71,6 @@ hivm::parseFlagID(OpAsmParser &parser, IntegerAttr &flagIDAttr,
   int64_t integer;
   if (failed(parser.parseInteger(integer)))
     return failure();
-
   flagIDAttr = IntegerAttr::get(parser.getBuilder().getI64Type(), integer);
   return success();
 }
@@ -96,6 +94,7 @@ LogicalResult SetFlagOp::verify() {
   if (eventIDAttr.has_value() && eventID != TypedValue<IntegerType>{}) {
     return emitOpError("Only one Event ID is supported!");
   }
+
   if (!eventIDAttr.has_value() && eventID == TypedValue<IntegerType>{}) {
     return emitOpError("Event ID is needed!");
   }
@@ -112,6 +111,7 @@ LogicalResult WaitFlagOp::verify() {
   if (eventIDAttr.has_value() && eventID != TypedValue<IntegerType>{}) {
     return emitOpError("Only one Event ID is supported!");
   }
+
   if (!eventIDAttr.has_value() && eventID == TypedValue<IntegerType>{}) {
     return emitOpError("Event ID is needed!");
   }
@@ -130,13 +130,13 @@ OpFoldResult SyncBlockSetOp::getFlagId() {
 }
 
 LogicalResult SyncBlockSetOp::verify() {
-  auto flagIdAttr = getStaticFlagId();
+  auto flagIdIDAttr = getStaticFlagId();
   auto flagIdValue = getDynamicFlagId();
-  if (flagIdAttr.has_value() && flagIdValue != TypedValue<IntegerType>{}) {
+  if (flagIdIDAttr.has_value() && flagIdValue != TypedValue<IntegerType>{}) {
     return emitOpError("Only one flag ID is supported!");
   }
 
-  if (!flagIdAttr.has_value() && flagIdValue == TypedValue<IntegerType>{}) {
+  if (!flagIdIDAttr.has_value() && flagIdValue == TypedValue<IntegerType>{}) {
     return emitOpError("Flag ID is needed!");
   }
   return success();
@@ -147,15 +147,11 @@ void SyncBlockSetOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                            PipeAttr pipe, OpFoldResult flag_id) {
   if (auto attr = dyn_cast_if_present<Attribute>(flag_id)) {
     build(odsBuilder, odsState, tcore_type, tpipe, pipe,
-          /*static_flag_id=*/cast<IntegerAttr>(attr),
-          /*dynamic_flag_id=*/nullptr, /*ffts_base_addr=*/nullptr,
+          cast<IntegerAttr>(attr), nullptr, nullptr,
           /*tsync_instr_mode=*/{});
   } else {
-    build(odsBuilder, odsState, tcore_type, tpipe, pipe,
-          /*static_flag_id=*/nullptr,
-          /*dynamic_flag_id=*/flag_id.get<Value>(),
-          /*ffts_base_addr=*/nullptr,
-          /*tsync_instr_mode=*/{});
+    build(odsBuilder, odsState, tcore_type, tpipe, pipe, nullptr,
+          flag_id.get<Value>(), nullptr, /*tsync_instr_mode=*/{});
   }
 }
 
@@ -163,16 +159,13 @@ void SyncBlockSetOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                            TCoreTypeAttr tcore_type, PipeAttr tpipe,
                            PipeAttr pipe, OpFoldResult flag_id,
                            Value ffts_base_addr,
-                           SyncBlockInstrModeAttr tsync_instr_mode) {
+                           hivm::SyncBlockInstrModeAttr tsync_instr_mode) {
   if (auto attr = dyn_cast_if_present<Attribute>(flag_id)) {
     build(odsBuilder, odsState, tcore_type, tpipe, pipe,
-          /*static_flag_id=*/cast<IntegerAttr>(attr),
-          /*dynamic_flag_id=*/nullptr, ffts_base_addr, tsync_instr_mode);
+          cast<IntegerAttr>(attr), nullptr, ffts_base_addr, tsync_instr_mode);
   } else {
-    build(odsBuilder, odsState, tcore_type, tpipe, pipe,
-          /*static_flag_id=*/nullptr,
-          /*dynamic_flag_id=*/flag_id.get<Value>(), ffts_base_addr,
-          tsync_instr_mode);
+    build(odsBuilder, odsState, tcore_type, tpipe, pipe, nullptr,
+          flag_id.get<Value>(), ffts_base_addr, tsync_instr_mode);
   }
 }
 
@@ -188,13 +181,13 @@ OpFoldResult SyncBlockWaitOp::getFlagId() {
 }
 
 LogicalResult SyncBlockWaitOp::verify() {
-  auto flagIdAttr = getStaticFlagId();
+  auto flagIdIDAttr = getStaticFlagId();
   auto flagIdValue = getDynamicFlagId();
-  if (flagIdAttr.has_value() && flagIdValue != TypedValue<IntegerType>{}) {
+  if (flagIdIDAttr.has_value() && flagIdValue != TypedValue<IntegerType>{}) {
     return emitOpError("Only one flag ID is supported!");
   }
 
-  if (!flagIdAttr.has_value() && flagIdValue == TypedValue<IntegerType>{}) {
+  if (!flagIdIDAttr.has_value() && flagIdValue == TypedValue<IntegerType>{}) {
     return emitOpError("Flag ID is needed!");
   }
   return success();
@@ -205,11 +198,10 @@ void SyncBlockWaitOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                             PipeAttr pipe, OpFoldResult flag_id) {
   if (auto attr = dyn_cast_if_present<Attribute>(flag_id)) {
     build(odsBuilder, odsState, tcore_type, tpipe, pipe,
-          /*static_flag_id=*/cast<IntegerAttr>(attr),
-          /*dynamic_flag_id=*/nullptr);
+          cast<IntegerAttr>(attr), nullptr);
   } else {
-    build(odsBuilder, odsState, tcore_type, tpipe, pipe,
-          /*static_flag_id=*/nullptr, /*dynamic_flag_id=*/flag_id.get<Value>());
+    build(odsBuilder, odsState, tcore_type, tpipe, pipe, nullptr,
+          flag_id.get<Value>());
   }
 }
 
@@ -218,42 +210,56 @@ void SyncBlockWaitOp::build(OpBuilder &odsBuilder, OperationState &odsState,
 //===----------------------------------------------------------------------===//
 
 LogicalResult SyncBlockOp::verify() {
-  auto syncBlockMode = getSyncBlockModeAttr().getSyncMode();
-  if (syncBlockMode == SyncBlockMode::BARRIER_CUBE ||
-      syncBlockMode == SyncBlockMode::BARRIER_VECTOR) {
+  auto synBlockMode = getSyncBlockModeAttr().getSyncMode();
+  if (synBlockMode == SyncBlockMode::BARRIER_CUBE ||
+      synBlockMode == SyncBlockMode::BARRIER_VECTOR) {
     if (getTvectorPipeAttr() != nullptr) {
       return emitOpError("tvector_pipe should not be defined!");
     }
     if (getTcubePipeAttr() != nullptr) {
-      return emitOpError("tcube_pip should not be defined!");
+      return emitOpError("tcube_pipe should not be defined!");
     }
   }
-  if (syncBlockMode == SyncBlockMode::ALL_CUBE) {
+  if (synBlockMode == SyncBlockMode::ALL_CUBE) {
     if (getTcubePipeAttr() == nullptr) {
-      return emitOpError("tcube_pipe should defined!");
+      return emitOpError("tcube_pipe should be defined!");
     }
     if (getTcubePipeAttr().getPipe() != PIPE::PIPE_FIX) {
       return emitOpError("TPipe is illegal. TPipe of ALL_CUBE is PIPE_FIX!");
     }
   }
-  if (syncBlockMode == SyncBlockMode::ALL_VECTOR) {
+  if (synBlockMode == SyncBlockMode::ALL_VECTOR) {
     if (getTvectorPipeAttr() == nullptr) {
       return emitOpError("tvector_pipe should be defined!");
     }
     if (getTvectorPipeAttr().getPipe() != PIPE::PIPE_MTE3) {
-      return emitOpError("TPipe is illegal. TPipe of ALL_CUBE is PIPE_MTE3!");
+      return emitOpError("TPipe is illegal. TPipe of ALL_VECTOR is PIPE_MTE3!");
     }
   }
-  if (syncBlockMode == SyncBlockMode::ALL) {
+
+  if (synBlockMode == SyncBlockMode::ALL) {
     if (getTcubePipeAttr() == nullptr || getTvectorPipeAttr() == nullptr) {
-      return emitOpError("tvector_pipe and tcube_pipe should be defined!");
+      return emitOpError("tvector_pipe and  tcube_pipe should be defined!");
     }
     if (getTcubePipeAttr().getPipe() != PIPE::PIPE_FIX) {
-      return emitOpError("Cube pipe is illegal. Cube pipe is PIPE_FIX!");
+      return emitOpError("Cube Pipe is illegal. Cube pipe is PIPE_FIX!");
     }
     if (getTvectorPipeAttr().getPipe() != PIPE::PIPE_MTE3) {
-      return emitOpError("Vector pipe is illegal. Vector pipe is PIPE_MTE3!");
+      return emitOpError("Vector Pipe is illegal. Vector pipe is PIPE_MTE3!");
     }
   }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// CreateSyncBlockLockOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult CreateSyncBlockLockOp::verify() {
+  MemRefType type = getType();
+  if (type.getNumDynamicDims() > 0)
+    return this->emitOpError(
+        "'create_sync_block_lock' op should only support static shape");
+
   return success();
 }

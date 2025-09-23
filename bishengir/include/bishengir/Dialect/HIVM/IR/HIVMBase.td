@@ -1,21 +1,24 @@
-/**
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 1.0 (the
- * "License"). Please refer to the License for details. You may not use this
- * file except in compliance with the License. THIS SOFTWARE IS PROVIDED ON AN
- * "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS
- * FOR A PARTICULAR PURPOSE. See LICENSE in the root of the software repository
- * for the full text of the License.
- */
-
-/*!
- * \file HIVMBase.td
- * \brief HIVM dialect base support
- * \details This is the definition file for base Hybrid Intelligence Virtual
- *          Machine (HIVM) support.
- */
+//===- HIVMBase.td - HIVM dialect base support -------------*- tablegen -*-===//
+//
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//===----------------------------------------------------------------------===//
+//
+// This is the definition file for base Hybrid Intelligence Virtual
+// Machine (HIVM) support.
+//
+//===----------------------------------------------------------------------===//
 
 #ifndef BISHENGIR_DIALECT_HIVM_IR_HIVMBASE_TD
 #define BISHENGIR_DIALECT_HIVM_IR_HIVMBASE_TD
@@ -37,17 +40,11 @@ def HIVM_Dialect : Dialect {
   }];
   let cppNamespace = "::mlir::hivm";
   let dependentDialects = [
-    "arith::ArithDialect",
-#ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
-    "bishengir::memref_ext::MemRefExtDialect",
-#endif
-    "math::MathDialect",
-    "memref::MemRefDialect",
-#ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
-    "hacc::HACCDialect",
-#endif
+    "arith::ArithDialect", "bishengir::memref_ext::MemRefExtDialect",
+    "math::MathDialect", "memref::MemRefDialect", "hacc::HACCDialect",
     "tensor::TensorDialect"
   ];
+  let hasCanonicalizer = 1;
   let useDefaultAttributePrinterParser = 1;
 }
 
@@ -75,21 +72,8 @@ class HIVM_StructuredOp<string mnemonic, list<Trait> traits = []>
       !listconcat([
         HIVMStructuredOpInterface,
         MemoryEffectsOpInterface,
-        DeclareOpInterfaceMethods<HIVMStructuredOpInterface>,
-      ], traits)> {
-  // C++ functions that are required for parellel structured ops.
-  code parallelIndexingMapsDecl = [{
-    ArrayAttr getIndexingMaps() {
-      MLIRContext *context = getContext();
-      AffineMap scalarMap = AffineMap::get(getNumParallelLoops(), 0, context);
-      AffineMap tensorMap = AffineMap::getMultiDimIdentityMap(
-        getNumParallelLoops(), context);
-      SmallVector<AffineMap> indexingMaps;
-      for (OpOperand &opOperand : getOperation()->getOpOperands())
-        indexingMaps.push_back(getRank(&opOperand) == 0 ? scalarMap : tensorMap);
-      return Builder(getContext()).getAffineMapArrayAttr(indexingMaps);
-    }
-  }];
-}
+        DeclareOpInterfaceMethods<FlattenInterface>,
+        DeclareOpInterfaceMethods<HIVMStructuredOpInterface>
+      ], traits)>;
 
 #endif // BISHENGIR_DIALECT_HIVM_IR_HIVMBASE_TD
