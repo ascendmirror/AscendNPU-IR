@@ -1,21 +1,23 @@
-/**
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 1.0 (the
- * "License"). Please refer to the License for details. You may not use this
- * file except in compliance with the License. THIS SOFTWARE IS PROVIDED ON AN
- * "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS
- * FOR A PARTICULAR PURPOSE. See LICENSE in the root of the software repository
- * for the full text of the License.
- */
-
-/*!
- * \file HIVMInterfaces.td
- * \brief HIVM dialect interface definitions
- * \details This is the definition file for the interface for HIVM
- *          dialect operations.
- */
+//===- HIVMInterfaces.td - HIVM dialect interfaces defs ----*- tablegen -*-===//
+//
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//===----------------------------------------------------------------------===//
+//
+// This is the definition file for the interface for HIVM dialect operations.
+//
+//===----------------------------------------------------------------------===//
 
 #ifndef BISHENGIR_DIALECT_HIVM_IR_HIVMINTERFACES_TD
 #define BISHENGIR_DIALECT_HIVM_IR_HIVMINTERFACES_TD
@@ -26,6 +28,7 @@ include "mlir/Interfaces/DestinationStyleOpInterface.td"
 include "bishengir/Interfaces/AggregatedOpInterface.td"
 include "bishengir/Dialect/HIVM/Interfaces/ImplByScalarOpInterface.td"
 include "bishengir/Dialect/HIVM/Interfaces/ExtraBufferOpInterface.td"
+include "bishengir/Dialect/HIVM/Interfaces/FlattenInterface.td"
 include "bishengir/Dialect/HIVM/Interfaces/OpPipeInterface.td"
 
 def HIVMCoreTypeInterface : OpInterface<"CoreTypeInterface"> {
@@ -72,6 +75,7 @@ def HIVMStructuredOpInterface : OpInterface<"HIVMStructuredOp",
     [DestinationStyleOpInterface, // for buferization
      OpPipeInterface,             // for sync analysis
      HIVMCoreTypeInterface,       // for mix kernel related analysis
+     FlattenInterface             // for HIVM flattening
     ]> {
   let cppNamespace = "::mlir::hivm";
   let description = [{
@@ -105,6 +109,31 @@ def HIVMStructuredOpInterface : OpInterface<"HIVMStructuredOp",
         return ConcreteOp::template hasTrait<mlir::OpTrait::BroadcastableOTF>();
       }]
     >,
+    StaticInterfaceMethod<
+      /*desc=*/[{
+        Return the broadcast attribute name.
+      }],
+      /*retTy=*/"std::string",
+      /*methodName=*/"getBroadcastAttrString",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return "broadcast";
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the list of inline-broadcasted axes for the operand.
+        Directly return inline-broadcasted axes of op when set opOperand nullptr.
+      }],
+      /*retTy=*/"mlir::SmallVector<int64_t>",
+      /*methodName=*/"getInlinedBroadcastableAxes",
+      /*args=*/(ins "OpOperand* ":$opOperand),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+          return ::mlir::hivm::detail::getInlinedBroadcastableAxes($_op, opOperand);
+      }]
+    >,
     InterfaceMethod<
       /*desc=*/[{
         Return whether the op support inline transpose.
@@ -115,6 +144,46 @@ def HIVMStructuredOpInterface : OpInterface<"HIVMStructuredOp",
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         return ConcreteOp::template hasTrait<mlir::OpTrait::TransposableOTF>();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns whether the op supports inline broadcast and has a broadcast array.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"existInlineBroadcastLoopDims",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+          if (!$_op.isInlineBroadcastable())
+            return false;
+          return !$_op.getBroadcastArray().empty();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns whether the op support inline transpose and has a permutation array.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"existInlineTransposeLoopDims",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+          if (!$_op.isInlineTransposable())
+            return false;
+          return !$_op.getPermutationArray().empty();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns whether the op has a hardware-unsupported scalar operand.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"hasHWUnsupportedScalarOperand",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+          return mlir::hivm::hasHWUnsupportedScalarOperandImpl($_op);
       }]
     >,
     //===------------------------------------------------------------------===//
@@ -207,6 +276,18 @@ def HIVMStructuredOpInterface : OpInterface<"HIVMStructuredOp",
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         return ::mlir::hivm::detail::getPermutationArray($_op);
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the broadcast array.
+      }],
+      /*retTy=*/"mlir::ArrayRef<int64_t>",
+      /*methodName=*/"getBroadcastArray",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return ::mlir::hivm::detail::getBroadcastArray($_op);
       }]
     >,
     InterfaceMethod<
@@ -367,6 +448,30 @@ def HIVMStructuredOpInterface : OpInterface<"HIVMStructuredOp",
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         return ::mlir::hivm::detail::getContiguousAxesImpl($_op);
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+       Get mask unit dimension of this current op
+      }],
+      /*retTy=*/"mlir::BitVector",
+      /*methodName=*/"getUnitAxesMask",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return ::mlir::hivm::detail::getUnitAxesMaskImpl($_op);
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+       Get mask permuted dimension of this current op
+      }],
+      /*retTy=*/"mlir::BitVector",
+      /*methodName=*/"getPermutedAxesMask",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return ::mlir::hivm::detail::getPermutedAxesMaskImpl($_op);
       }]
     >,
     /// Need to implement this for every concrete op
@@ -559,7 +664,7 @@ def HIVMStructuredOpInterface : OpInterface<"HIVMStructuredOp",
       }]
     >,
   ];
-
+  let verify = [{ return detail::verifyStructuredOpInterface($_op); }];
   let extraClassDeclaration = [{
     /// Return the flat list of all operand dimension sizes in the order they
     /// appear in the operands.
@@ -588,6 +693,52 @@ def HIVMStructuredOpInterface : OpInterface<"HIVMStructuredOp",
     /// Return the index in the indexingMaps vector that corresponds to this `opOperand`
     int64_t getIndexingMapIndex(OpOperand *opOperand);
   }];
+}
+
+def HIVMUnitFlagEnabledInterface : OpInterface<"HIVMUnitFlagEnabled"> {
+  let cppNamespace = "::mlir::hivm";
+  let description = [{
+    unit-flag enabled operators interface.
+  }];
+  let methods = [
+    //===------------------------------------------------------------------===//
+    // Operation property handling.
+    //===------------------------------------------------------------------===//
+    InterfaceMethod<
+      /*desc=*/[{
+        Return unit-flag input value. It should be manually added to the 
+        Operator input arguments named 'unit_flag_mode' and assembly format. 
+      }],
+      /*retTy=*/"::std::optional<::mlir::hivm::UnitFlagAttr>",
+      /*methodName=*/"getUnitFlagModeValue",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/""
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return unit-flag input value. It should be manually added to the 
+        Operator input arguments named 'unit_flag_mode' and assembly format. 
+      }],
+      /*retTy=*/"::std::optional<::mlir::Value>",
+      /*methodName=*/"getUnitFlagModeCondition",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/""
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return unit-flag mode value needed to be passed to the standard library 
+        call. It should be one of the possible values for unit-flag (0b00, 0b10, 0b11).
+      }],
+      /*retTy=*/"::mlir::Value",
+      /*methodName=*/"getUnitFlagModeLibValue",
+      /*args=*/(ins "::mlir::PatternRewriter&":$rewriter),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return ::mlir::hivm::detail::getUnitFlagModeLibValueImpl($_op, rewriter);
+      }]
+    >];
 }
 
 #endif // BISHENGIR_DIALECT_HIVM_IR_HIVMINTERFACES_TD

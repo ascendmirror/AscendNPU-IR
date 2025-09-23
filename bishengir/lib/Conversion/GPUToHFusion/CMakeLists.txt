@@ -9,6 +9,16 @@ add_bishengir_conversion_library(BiShengIRGPUToHFusion
 
   LINK_COMPONENTS
   Core
-)
 
-target_link_libraries(BiShengIRGPUToHFusion PRIVATE ${BISHENG_IR_LIBS})
+  LINK_LIBS PUBLIC
+  BiShengIRDialectUtils
+  MLIRArithDialect
+  MLIRMathDialect
+  MLIRFuncDialect
+  MLIRLinalgDialect
+  MLIRGPUDialect
+  BiShengIRHFusionDialect
+  MLIRTransformUtils
+  MLIRRewrite
+  MLIRPass
+)
