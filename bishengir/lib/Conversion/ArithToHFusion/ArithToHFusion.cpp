@@ -1,19 +1,19 @@
-/**
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 1.0 (the
- * "License"). Please refer to the License for details. You may not use this
- * file except in compliance with the License. THIS SOFTWARE IS PROVIDED ON AN
- * "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS
- * FOR A PARTICULAR PURPOSE. See LICENSE in the root of the software repository
- * for the full text of the License.
- */
-
-/*!
- * \file ArithToHFusion.cpp
- * \brief Conversion from Arith to HFusion dialect
- */
+//===- ArithToHFusion.cpp - conversion from Arith to HFusion dialect ------===//
+//
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//===----------------------------------------------------------------------===//
 
 #include "bishengir/Conversion/ArithToHFusion/ArithToHFusion.h"
 #include "bishengir/Dialect/HFusion/IR/HFusion.h"
@@ -126,6 +126,50 @@ struct ElementwiseOpToHFusionBinary : OpRewritePattern<BinaryOp> {
     return success();
   }
 };
+
+template <typename BinaryOp>
+struct MulIExtendedOpLowering : OpRewritePattern<BinaryOp> {
+  using OpRewritePattern<BinaryOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(BinaryOp op,
+                                PatternRewriter &rewriter) const final {
+    if (!operateOnTensors(op))
+      return failure();
+    Value lhs = op.getLhs();
+    Value rhs = op.getRhs();
+    auto resultType = op.getLow().getType();
+
+    auto mulExtOp = rewriter.create<hfusion::MulExtOp>(op->getLoc(), resultType,
+                                                       resultType, lhs, rhs);
+
+    rewriter.replaceOp(op, mulExtOp);
+    return success();
+  }
+};
+
+namespace {
+struct BitcastOpToHFusionBitcastOp : OpRewritePattern<arith::BitcastOp> {
+  using OpRewritePattern<arith::BitcastOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(arith::BitcastOp op,
+                                PatternRewriter &rewriter) const final {
+    if (!operateOnTensors(op))
+      return failure();
+    Value input = op.getOperand();
+    Value output = op.getResult();
+    ShapedType inputType = dyn_cast_if_present<ShapedType>(input.getType());
+    Type outputElemType = getElementTypeOrSelf(output.getType());
+
+    auto bitcastOutputOp = mlir::tensor::createTensorEmptyOpWithTargetElemType(
+        rewriter, op->getLoc(), input, outputElemType);
+    auto bitcastOp = rewriter.create<hfusion::BitcastOp>(
+        op->getLoc(), TypeRange{inputType.clone(outputElemType)},
+        ValueRange{input}, ValueRange{bitcastOutputOp});
+
+    rewriter.replaceOp(op, bitcastOp);
+    return success();
+  }
+};
+} // namespace
 
 inline bool isOverFlowMode(Type inType, Type outType) {
   const bool isF32ToI16 = inType.isF32() && outType.isInteger(16);
@@ -323,10 +367,7 @@ struct ConstantSplatOpToLinalgFillPattern
   }
 };
 
-/// @brief
-// conversions are applied:
-// arith ops to linalg/hfusion unary/binary ops
-void mlir::hfusion::populateArithToHFusionConversionPatterns(
+void mlir::hfusion::populateArithToLinalgConversionPatterns(
     RewritePatternSet &patterns) {
   patterns.add<
       ElementwiseOpToLinalgBinary<arith::AddFOp, linalg::BinaryFn::add>,
@@ -346,6 +387,12 @@ void mlir::hfusion::populateArithToHFusionConversionPatterns(
       ElementwiseOpToLinalgBinary<arith::MinUIOp,
                                   linalg::BinaryFn::min_unsigned>,
       ElementwiseOpToLinalgUnary<arith::NegFOp, linalg::UnaryFn::negf>,
+      ConstantSplatOpToLinalgFillPattern>(patterns.getContext());
+}
+
+void mlir::hfusion::populateArithToHFusionConversionPatterns(
+    RewritePatternSet &patterns) {
+  patterns.add<
       ElementwiseOpToHFusionBinary<arith::AndIOp, hfusion::BinaryFn::vand>,
       ElementwiseOpToHFusionBinary<arith::OrIOp, hfusion::BinaryFn::vor>,
       ElementwiseOpToHFusionBinary<arith::XOrIOp, hfusion::BinaryFn::vxor>,
@@ -375,7 +422,9 @@ void mlir::hfusion::populateArithToHFusionConversionPatterns(
       ElementwiseOpToHFusionCompare<arith::CmpFOp>,
       ElementwiseOpToHFusionCompare<arith::CmpIOp>,
       ElementwiseOpToHFusionSelect<arith::SelectOp>,
-      ConstantSplatOpToLinalgFillPattern>(patterns.getContext());
+      MulIExtendedOpLowering<arith::MulSIExtendedOp>,
+      MulIExtendedOpLowering<arith::MulUIExtendedOp>,
+      BitcastOpToHFusionBitcastOp>(patterns.getContext());
 }
 
 namespace {
@@ -403,6 +452,7 @@ void ArithToHFusionConversionPass::runOnOperation() {
   });
 
   RewritePatternSet patterns(&getContext());
+  populateArithToLinalgConversionPatterns(patterns);
   populateArithToHFusionConversionPatterns(patterns);
   if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
     signalPassFailure();
