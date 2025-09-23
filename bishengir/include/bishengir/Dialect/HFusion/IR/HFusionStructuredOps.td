@@ -1,21 +1,24 @@
-/**
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 1.0 (the
- * "License"). Please refer to the License for details. You may not use this
- * file except in compliance with the License. THIS SOFTWARE IS PROVIDED ON AN
- * "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS
- * FOR A PARTICULAR PURPOSE. See LICENSE in the root of the software repository
- * for the full text of the License.
- */
-
-/*!
- * \file HFusionStructuredOps.td
- * \brief HFusion structured ops
- * \details This is the operation definition file for structured
- *          operations on buffers.
- */
+//===- HFusionStructuredOps.td - HFusion library ops -------*- tablegen -*-===//
+//
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//===----------------------------------------------------------------------===//
+//
+// This is the operation definition file for structured operations on buffers
+// that correspond to underlying library calls.
+//
+//===----------------------------------------------------------------------===//
 
 #ifndef BISHENGIR_DIALECT_HFUSION_IR_HFUSIONSTRUCTUREDOPS_TD
 #define BISHENGIR_DIALECT_HFUSION_IR_HFUSIONSTRUCTUREDOPS_TD
@@ -101,6 +104,9 @@ def ReduceWithIndexOp : HFusionStructuredBase_Op<"reduce_with_index",
         "ArrayRef<int64_t>":$dimensions)
     >
   ];
+  let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
+  let hasCanonicalizer = 1;
   let extraClassDeclaration = structuredOpsBaseDecls # [{
     // Declare functions necessary for DestinationStyleOpInterface.
     ::mlir::MutableOperandRange getDpsInitsMutable();
@@ -108,14 +114,10 @@ def ReduceWithIndexOp : HFusionStructuredBase_Op<"reduce_with_index",
     // Declare functions necessary for LinalgStructuredInterface.
     SmallVector<utils::IteratorType> getIteratorTypesArray();
     ArrayAttr getIndexingMaps();
-    std::string getLibraryCallName();
     static std::function<void(mlir::ImplicitLocOpBuilder &, mlir::Block &,
                               mlir::ArrayRef<mlir::NamedAttribute>)>
     getRegionBuilder();
   }];
-  let hasCustomAssemblyFormat = 1;
-  let hasVerifier = 1;
-  let hasCanonicalizer = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -161,7 +163,6 @@ def ArangeOp : HFusionStructuredBase_Op<"arange", [AttrSizedOperandSegments,
                                     SmallVectorImpl<Value> & strides);
     static void getOffsetFromValue(OpBuilder & builder, Location loc,
                                    Value & offset);
-    std::string getLibraryCallName();
   }];
 
   let hasCustomAssemblyFormat = 1;
@@ -225,7 +226,6 @@ def GatherOp
     // Declare functions necessary for LinalgStructuredInterface.
     SmallVector<utils::IteratorType> getIteratorTypesArray();
     ArrayAttr getIndexingMaps();
-    std::string getLibraryCallName();
     static std::function<void(mlir::ImplicitLocOpBuilder &, mlir::Block &,
                               mlir::ArrayRef<mlir::NamedAttribute>)>
     getRegionBuilder();

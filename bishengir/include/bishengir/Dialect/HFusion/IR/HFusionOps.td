@@ -1,20 +1,23 @@
-/**
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 1.0 (the
- * "License"). Please refer to the License for details. You may not use this
- * file except in compliance with the License. THIS SOFTWARE IS PROVIDED ON AN
- * "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS
- * FOR A PARTICULAR PURPOSE. See LICENSE in the root of the software repository
- * for the full text of the License.
- */
-
-/*!
- * \file HFusionOps.td
- * \brief HFusion op definitions
- * \details This is the operation definition file for HFusion operations.
- */
+//===- HFusionOps.td - HFusion op definitions --------------*- tablegen -*-===//
+//
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//===----------------------------------------------------------------------===//
+//
+// This is the operation definition file for hybrid fusion operations.
+//
+//===----------------------------------------------------------------------===//
 
 #ifndef BISHENGIR_DIALECT_HFUSION_IR_HFUSIONOPS_TD
 #define BISHENGIR_DIALECT_HFUSION_IR_HFUSIONOPS_TD
@@ -57,6 +60,19 @@ def PrintOp : HFusion_Op<"print">,
   }];
 }
 
+def AssertOp : HFusion_Op<"assert">,
+  Arguments<(ins StrAttr:$msg,
+                 AnyTypeOf<[AnyInteger, AnyRankedTensor]>:$cond)> {
+  let summary = "Device-side assert for debugging";
+  let description = [{
+    `hfusion.assert` takes a literal string `msg` and an argument of
+    scalar or tensor that should be asserted.
+  }];
+  let assemblyFormat = [{
+    $msg attr-dict $cond `:` type($cond)
+  }];
+}
+
 def BarrierOp : HFusion_Op<"barrier"> {
   let summary = "Synchronizes all pipelines of a core.";
   let description = [{
@@ -66,11 +82,53 @@ def BarrierOp : HFusion_Op<"barrier"> {
 }
 
 //===----------------------------------------------------------------------===//
+// SymbolicDimOp
+//===----------------------------------------------------------------------===//
+
+def SymbolicDimOp : HFusion_Op<"symbolic_dim", [Pure]> {
+  let summary = "Symbolic dimension reference returning an index";
+  let description = [{
+    The "symbolic_dim" operation references a symbolic dimension by name
+    (via a symbol attribute) and returns it as an `index`-typed value.
+  }];
+
+  let arguments = (ins SymbolRefAttr:$symbolName);
+  let results = (outs Index:$result);
+
+  //   %0 = hfusion.symbolic_dim @SymName : index
+  let assemblyFormat = "$symbolName attr-dict `:` type($result)";
+}
+
+//===----------------------------------------------------------------------===//
+// MulExtOp
+//===----------------------------------------------------------------------===//
+
+def MulExtOp : HFusion_Op<"mulext", [Pure, Commutative,
+    AllTypesMatch<["lhs", "rhs", "low", "high"]>]> {
+  let summary = [{
+    extended signed integer multiplication operation
+  }];
+
+  let description = [{
+    Performs (2*N)-bit multiplication on sign-extended operands. Returns two
+    N-bit results: the low and the high halves of the product. The low half has
+    the same value as the result of regular multiplication with the same operands.
+  }];
+
+  let arguments = (ins SignlessIntegerLike:$lhs, SignlessIntegerLike:$rhs);
+  let results = (outs SignlessIntegerLike:$low, SignlessIntegerLike:$high);
+
+  let assemblyFormat = "$lhs `,` $rhs attr-dict `:` type($lhs)";
+
+}
+
+//===----------------------------------------------------------------------===//
 // InterleaveOp
 //===----------------------------------------------------------------------===//
 
 def InterleaveOp : HFusion_Op<"interleave", [Pure, Commutative,
                                              SameOperandsAndResultRank,
+                                             DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
                                              AllTypesMatch<["input"]>]> {
   let summary = [{
       Constructs one tensor by interleaving n input tensors.
@@ -98,6 +156,7 @@ def InterleaveOp : HFusion_Op<"interleave", [Pure, Commutative,
 
 def DeinterleaveOp : HFusion_Op<"deinterleave", [Pure, Commutative,
                                                  SameOperandsAndResultRank,
+                                                 DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
                                                  AllTypesMatch<["output"]>]> {
   let summary = [{
     Constructs two tensors by deinterleaving an input tensor
@@ -204,5 +263,206 @@ def IsFiniteOp : HFusion_Op<"isfinite", [Pure, SameOperandsAndResultRank,
   let results = (outs RankedTensorOf<[I1]>:$output);
   let assemblyFormat = "$input attr-dict `:` type($input) `->` type($output)";
 }
+
+//===----------------------------------------------------------------------===//
+// CumsumOp
+//===----------------------------------------------------------------------===//
+
+def CumsumOp : HFusion_Op<"cumsum",
+    [Pure, SameOperandsAndResultRank, AllTypesMatch<["output"]>]> {
+  let summary = [{
+    Calculate cumulative sum on a certain dim of the input tensor
+  }];
+  let description = [{
+    The cumsum operation calculates cumulative sum on a certain dim of the input
+    tensor.
+    Currently only support one cumulation dim.
+  }];
+  let arguments = (ins RankedTensorOf<[BF16, F16, F32, I8, I16, I32, I64]>:$input,
+                       ConfinedAttr<DenseI64ArrayAttr,
+                      [DenseArrayStrictlySorted<DenseI64ArrayAttr>]>:$cum_dims);
+  let results = (outs RankedTensorOf<[BF16, F16, F32, I8, I16, I32, I64]>:$output);
+  let assemblyFormat = "$input attr-dict `:` type($input) `cum_dims` `=` $cum_dims `->` type($output)";
+  let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// CumprodOp
+//===----------------------------------------------------------------------===//
+
+def CumprodOp : HFusion_Op<"cumprod",
+    [Pure, SameOperandsAndResultRank, AllTypesMatch<["output"]>]> {
+  let summary = [{
+    Calculate cumulative product on a certain dim of the input tensor
+  }];
+  let description = [{
+    The cumsum operation calculates cumulative product on a certain dim of
+    the input tensor.
+    Currently only support one cumulation dim.
+  }];
+  let arguments = (ins RankedTensorOf<[BF16, F16, F32, I8, I16, I32, I64]>:$input,
+                       ConfinedAttr<DenseI64ArrayAttr,
+                      [DenseArrayStrictlySorted<DenseI64ArrayAttr>]>:$cum_dims);
+  let results = (outs RankedTensorOf<[BF16, F16, F32, I8, I16, I32, I64]>:$output);
+  let assemblyFormat = "$input attr-dict `:` type($input) `cum_dims` `=` $cum_dims `->` type($output)";
+  let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// AtomicCasOp
+//===----------------------------------------------------------------------===//
+
+def AtomicCasOp : HFusion_Op<"atomic_cas",
+    [SameOperandsAndResultRank, AllTypesMatch<["output"]>, DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+  let summary = [{
+    Atomic Compare-And-Swap (CAS) Op
+  }];
+  let description = [{
+    Compare-And-Swap (CAS) is an atomic operation that consists of three operands:
+    Memory location (V), Expected old value (A), New value (B).
+    The semantics of the operation are: the value of V is updated to B,
+    only if the value of memory location V is equal to the expected old value A. 
+    The operation returns the original value of V regardless of whether it is updated or not.
+
+    Constraints:
+      1. The input and output must have the same rank
+         and the same element type.
+
+    Arguments:
+      * `src0`: expected old value
+      * `src1`: new value
+      * `dst`: memory location in GM
+
+    Examples:
+    ```mlir
+    hfusion.atomic_cas ins(%src0, %src1 : memref<?xf32>, memref<?xf32>) outs(%dst : memref<?xf32>)
+    %result = hfusion.atomic_cas ins(%src0, %src1 : tensor<?xf32>, tensor<?xf32>) outs(%dst : tensor<?xf32>) -> tensor<?xf32>
+    ```
+  }];
+  let arguments = (ins Variadic<AnyTypeOf<[TensorOrMemref]>>:$input,
+                       TensorOrMemref:$dst);
+  let results = (outs Variadic<AnyTypeOf<[TensorOrMemref]>>:$output);
+  let assemblyFormat = [{ attr-dict `ins` `(` $input `:` type($input) `)`
+                       `outs` `(` $dst `:` type($dst) `)`
+                       (`->` type($output)^)?
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// AtomicXchgOp
+//===----------------------------------------------------------------------===//
+
+def AtomicXchgOp : HFusion_Op<"atomic_xchg",
+    [SameOperandsAndResultRank, AllTypesMatch<["output"]>, DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+  let summary = [{
+    Atomic Exchange Op
+  }];
+  let description = [{
+      Atomic exchange is an atomic operation that consists of three steps:
+      1. Read the current value of the specified memory address
+      2. Write the new value to the memory address
+      3. Return the old value read previously
+      The whole process is atomic, that is, it will not be interrupted by other threads during the operation.
+
+      Constraints:
+        1. The input memref and output memref must have the same rank
+          and the same element type.
+
+      Arguments:
+        * `src`: new value
+        * `dst`: memory location in GM
+
+      Examples:
+      ```mlir
+      hfusion.atomic_xchg ins(%src : memref<?xf32>) outs(%dst : memref<?xf32>)
+      %result = hfusion.atomic_xchg ins(%src : tensor<?xf32>) outs(%dst : tensor<?xf32>) -> tensor<?xf32>
+      ```
+  }];
+  let arguments = (ins Variadic<AnyTypeOf<[TensorOrMemref]>>:$input,
+                       TensorOrMemref:$dst);
+  let results = (outs Variadic<AnyTypeOf<[TensorOrMemref]>>:$output);
+  let assemblyFormat = [{ attr-dict `ins` `(` $input `:` type($input) `)`
+                       `outs` `(` $dst `:` type($dst) `)`
+                       (`->` type($output)^)?
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// SortOp
+//===----------------------------------------------------------------------===//
+def SortOp : HFusion_Op<"sort",
+    [SameOperandsAndResultRank, AllTypesMatch<["output"]>]> {
+  let summary = [{
+    Sort Op
+  }];
+  let description = [{
+    Sort the sorting axis of `src` in ascending or descending order, and output
+    the sorted value and the index corresponding to the value.
+
+    Constraints:
+      1. The input vector and output vector must have the same rank.
+      2. Currently only tail axis sorting is supported.
+
+    Arguments:
+      * `src`: the tensor/memref from which to be sorted
+      * `dst_value`: the tensor/memref to store the sorted value
+      * `dst_index`: the tensor/memref to store the index corresponding to dst_value
+      * `descending`: determines whether to sort in ascending or descending
+                      order. The default is false, which means ascending order
+      * `sort_axis`: Axis to be sorted
+
+    Examples:
+      ```mlir
+      %result = hfusion.sort ins(%src : tensor<?xf32>) descending = true sort_axis = 0 -> tensor<?xf32>
+      ```
+  }];
+  let arguments = (ins TensorOrMemref:$src,
+                       DefaultValuedOptionalAttr<BoolAttr, "false">:$descending,
+                       I64Attr:$sort_axis);
+  let results = (outs Variadic<AnyRankedTensor>:$result);
+  let assemblyFormat = [{
+    attr-dict `ins` `(` $src `:` type($src) `)`
+    `descending` `=` $descending
+    `sort_axis` `=` $sort_axis
+    (`->` type($result)^)?
+  }];
+  let hasVerifier = 1;
+  let extraClassDeclaration = [{
+    // Get Signed Sort Axis
+    int64_t getSignedSortAxis();
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// HistogramOp
+//===----------------------------------------------------------------------===//
+def HistogramOp : HFusion_Op<"histogram", [
+    DeclareOpInterfaceMethods<BiShengIRAggregatedOpInterface,
+                              ["decomposeOperation"]>
+  ]> {
+  let summary = "Compute histogram of an integer tensor with optional mask";
+  let description = [{
+    For each element of the input tensor, increment the corresponding bin in
+    the output histogram. The number of bins is a compile-time constant
+    (`I64Attr`) and the output must be a 1D tensor of length = num_bins.
+    If a mask tensor is provided, only elements with mask[i] = true are counted.
+  }];
+
+  let arguments = (ins
+    AnyRankedTensor:$input,
+    I64Attr:$num_bins,
+    Optional<RankedTensorOf<[I1]>>:$mask
+  );
+
+  let results = (outs
+    RankedTensorOf<[I8, I16, I32, I64]>:$output
+  );
+
+  let hasVerifier = 1;
+  let assemblyFormat =
+    "$input `,` $num_bins (`,` $mask^)? attr-dict `:` "
+    "type($input) (`,` type($mask)^)? `->` type($output)";
+}
+
 
 #endif // BISHENGIR_DIALECT_HFUSION_IR_HFUSIONOPS_TD
