@@ -413,6 +413,7 @@ void mlir::hfusion::populateArithToHFusionConversionPatterns(
       ElementwiseOpToHFusionCast<arith::TruncFOp>,
       ElementwiseOpToHFusionCast<arith::ExtFOp>,
       ElementwiseOpToHFusionCast<arith::FPToSIOp>,
+      ElementwiseOpToHFusionCast<arith::FPToUIOp>,
       ElementwiseOpToHFusionCast<arith::SIToFPOp>,
       ElementwiseOpToHFusionCast<arith::UIToFPOp>,
       ElementwiseOpToHFusionCast<arith::ExtSIOp>,
