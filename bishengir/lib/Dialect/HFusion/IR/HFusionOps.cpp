@@ -2330,8 +2330,8 @@ LogicalResult SortOp::verify() {
 // HistogramOp
 //===----------------------------------------------------------------------===//
 LogicalResult HistogramOp::verify() {
-  auto inTy = getInput().getType().dyn_cast<RankedTensorType>();
-  auto outTy = getOutput().getType().dyn_cast<RankedTensorType>();
+  auto inTy = mlir::dyn_cast<RankedTensorType>(getInput().getType());
+  auto outTy = mlir::dyn_cast<RankedTensorType>(getOutput().getType());
   Value mask = getMask();
 
   // Input/output must be ranked tensors
@@ -2340,7 +2340,7 @@ LogicalResult HistogramOp::verify() {
 
   // Input element type must be i32 or i64
   Type inEltTy = inTy.getElementType();
-  if (!inEltTy.isa<IntegerType>() ||
+  if (!mlir::isa<IntegerType>(inEltTy) ||
       (inEltTy.getIntOrFloatBitWidth() != 32 &&
        inEltTy.getIntOrFloatBitWidth() != 64))
     return emitOpError() << "input element type must be i32 or i64";
@@ -2353,7 +2353,7 @@ LogicalResult HistogramOp::verify() {
 
   // Output element type must be i32 or i64
   Type outEltTy = outTy.getElementType();
-  if (!outEltTy.isa<IntegerType>() ||
+  if (!mlir::isa<IntegerType>(outEltTy) ||
       (outEltTy.getIntOrFloatBitWidth() != 32 &&
        outEltTy.getIntOrFloatBitWidth() != 64))
     return emitOpError() << "output element type must be i32 or i64";
@@ -2366,7 +2366,7 @@ LogicalResult HistogramOp::verify() {
 
   // If mask is provided, it must match input shape
   if (mask) {
-    auto maskTy = mask.getType().dyn_cast<RankedTensorType>();
+    auto maskTy = mlir::dyn_cast<RankedTensorType>(mask.getType());
     if (!maskTy)
       return emitOpError() << "mask must be a ranked tensor";
     if (maskTy.getElementType() != IntegerType::get(getContext(), 1))
@@ -2385,10 +2385,9 @@ FailureOr<SmallVector<Value>> HistogramOp::decomposeOperation(OpBuilder &b) {
   Location loc = getLoc();
 
   Value input = getInput();
-  int64_t bins = getNumBins();
   Value mask = getMask();
-  auto inTy = input.getType().cast<RankedTensorType>();
-  auto outTy = getOutput().getType().cast<RankedTensorType>();
+  auto inTy = mlir::dyn_cast<RankedTensorType>(input.getType());
+  auto outTy = mlir::dyn_cast<RankedTensorType>(getOutput().getType());
 
   Type outEltTy = outTy.getElementType();
   Type idxTy = b.getIndexType();
