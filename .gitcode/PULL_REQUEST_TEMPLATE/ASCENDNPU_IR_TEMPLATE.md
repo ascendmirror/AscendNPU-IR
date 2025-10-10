@@ -1,7 +1,5 @@
 ---
-title: "[AscendNPU IR/MLIR]:"
-labels: ["fix","feature","refactor"]
-assignees: 'username'
+title: [AscendNPU IR]:
 ---
 
 ## 描述 Description
