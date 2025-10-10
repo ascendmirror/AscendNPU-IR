@@ -2,6 +2,7 @@
 
 ## 🎯 Introduction
 
+
 AscendNPU IR (AscendNPU Intermediate Representation) is built on MLIR (Multi-Level Intermediate Representation). It serves as an intermediate representation for compiling Ascend-compatible operators and provides comprehensive Ascend expression capabilities. It enhances the computational efficiency of Ascend AI processors through compilation optimization and supports deep tuning via ecosystem frameworks.
 
 AscendNPU IR offers multi-level abstraction interfaces: it provides a series of high-level abstraction interfaces encapsulate Ascend computation, data movement, and synchronization instructions. The compilation optimizations automatically detect hardware architecture, map hardware-agnostic expressions to underlying instructions to enhance operator development ease. Additionally, it provides fine-grained performance control interfaces, enabling precise control over on-chip memory addresses, pipeline synchronization insertion points, ping-pong pipeline optimization activation, and allowing granular performance control.
