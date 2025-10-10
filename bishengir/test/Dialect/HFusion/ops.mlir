@@ -24,3 +24,23 @@ func.func @test_group_matmul(%w1 : tensor<2x?x?xf32>, %tokens : tensor<?x?xf32>,
     outs(%out : tensor<?x?xf32>) -> tensor<?x?xf32>
     return
 }
+
+// -----
+func.func @histogram_nomask(%arg0: tensor<8xi32>) -> tensor<4xi32> {
+  // CHECK-LABEL: func.func @histogram_nomask
+  // CHECK: hfusion.histogram
+  // CHECK: return
+  %res = hfusion.histogram %arg0, 4 : tensor<8xi32> -> tensor<4xi32>
+  return %res : tensor<4xi32>
+}
+
+// -----
+func.func @histogram_mask(%arg0: tensor<8xi32>, %mask: tensor<8xi1>)
+    -> tensor<4xi32> {
+  // CHECK-LABEL: func.func @histogram_mask
+  // CHECK: hfusion.histogram
+  // CHECK: return
+  %res = hfusion.histogram %arg0, 4, %mask
+         : tensor<8xi32>, tensor<8xi1> -> tensor<4xi32>
+  return %res : tensor<4xi32>
+}
