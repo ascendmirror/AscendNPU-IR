@@ -435,6 +435,31 @@ public:
   }
 };
 
+class FoldSymbolToTensorEmpty
+    : public OpRewritePattern<symbol::BindSymbolicShapeOp> {
+public:
+  using OpRewritePattern<symbol::BindSymbolicShapeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(symbol::BindSymbolicShapeOp bindOp,
+                                PatternRewriter &rewriter) const final {
+    Value bindSrc = bindOp.getOperand();
+    auto empty = bindSrc.getDefiningOp<tensor::EmptyOp>();
+    if (!empty) {
+      return failure();
+    }
+    SmallVector<Value> operands = empty->getOperands();
+    SmallVector<Value> symbols = bindOp.getShapeSymbols();
+    if (operands == symbols) {
+      return failure();
+    }
+
+    auto newEmpty = rewriter.create<tensor::EmptyOp>(
+        empty->getLoc(), empty->getResultTypes(), symbols);
+    rewriter.replaceOp(empty, newEmpty);
+    return success();
+  }
+};
+
 class PropagateSymbolPass
     : public impl::PropagateSymbolBase<PropagateSymbolPass> {
 public:
@@ -494,6 +519,8 @@ void PropagateSymbolPass::runOnOperation() {
 
   patterns.add<UnifySameOperandsShapeSymbol<linalg::ElemwiseBinaryOp>>(ctx);
   patterns.add<UnifySameOperandsShapeSymbol<hfusion::ElemwiseBinaryOp>>(ctx);
+
+  patterns.add<FoldSymbolToTensorEmpty>(ctx);
 
   if (failed(applyPatternsGreedily(func, std::move(patterns)))) {
     signalPassFailure();
