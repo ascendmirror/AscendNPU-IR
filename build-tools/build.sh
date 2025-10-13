@@ -46,6 +46,7 @@ readonly LONG_OPTS=(
   "safety-options"
   "safety-ld-options"
   "skip-rpath"
+  "enable-cpu-runner"
 )
 
 readonly GETOPT_LONGOPTIONS=$(printf "%s," "${LONG_OPTS[@]}")
@@ -75,6 +76,7 @@ CCACHE_BUILD="ON"
 SAFETY_OPTIONS=""
 SAFETY_LD_OPTIONS=""
 BISHENGIR_PUBLISH="ON"
+LLVM_BUILD_TARGETS="host"
 
 # help infomation
 usage() {
@@ -103,6 +105,7 @@ usage() {
                 [--safety-options]
                 [--safety-ld-options]
                 [--skip_rpath]
+                [--enable-cpu-runner]
 
     Options:
       --add-cmake-options CMAKE_OPTIONS    Add options to CMake. (Default: null)
@@ -129,6 +132,7 @@ usage() {
       --safety-ld-options                  Whether to build with safe options for linking. (Default: disabled)
       --skip-rpath                         Disable the Run-time Search Path option. (Default: disabled)
       --torch-mlir-source-dir DIR          Torch-MLIR project's root directory. (Default: 'third-party/torch-mlir')
+      --enable-cpu-runner                  Enable the compilation of CPU runner targets
       "
 }
 
@@ -232,6 +236,10 @@ while true; do
     TORCH_MLIR_SOURCE_DIR="$(realpath "$2")"
     shift 2
     ;;
+  --enable-cpu-runner)
+    LLVM_BUILD_TARGETS+=";Native"
+    shift
+    ;;
   --)
     shift
     break
@@ -318,7 +326,7 @@ cmake_generate() {
     -DLLVM_ENABLE_PROJECTS="${ENABLE_PROJECTS}" \
     -DLLVM_EXTERNAL_PROJECTS="${enable_external_projects}" \
     -DLLVM_EXTERNAL_BISHENGIR_SOURCE_DIR="${BISHENGIR_SOURCE_DIR}" \
-    -DLLVM_TARGETS_TO_BUILD="host" \
+    -DLLVM_TARGETS_TO_BUILD="${LLVM_BUILD_TARGETS}" \
     ${torch_mlir_option} \
     -DLLVM_ENABLE_ASSERTIONS="${ENABLE_ASSERTION}" \
     -DMLIR_ENABLE_BINDINGS_PYTHON="${PYTHON_BINDING}" \
