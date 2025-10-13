@@ -42,7 +42,9 @@ git submodule update --init --recursive
 We provide a convenient build script `build.sh` to automate configuration and build process.
 
 ```bash
-# Run in the project root directory
+# Running for the first time in the project root directory
+./build-tools/build.sh -o ./build --build-type Debug --apply-patches [Optional]
+# Not first time running in the project root directory
 ./build-tools/build.sh -o ./build --build-type Debug [Optional]
 ```
 
