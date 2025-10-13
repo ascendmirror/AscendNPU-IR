@@ -125,3 +125,20 @@ func.func @test_symbol_from_arith_op_0(%arg0: tensor<?x32x128xf32>, %arg1: tenso
   %extracted_slice = tensor.extract_slice %arg1[0, 0, 0] [%2, 32, 128] [1, 1, 1] : tensor<?x32x128xf32> to tensor<?x32x128xf32>
   return %extracted_slice : tensor<?x32x128xf32>
 }
+
+// -----
+
+// CHECK-LABEL: test_fold_symbol_to_tensor_empty(
+// CHECK-DAG: %[[S0:.*]] = symbol.symbolic_int
+// CHECK-DAG: %[[S1:.*]] = symbol.symbolic_int
+// CHECK: tensor.empty(%[[S1]])
+func.func @test_fold_symbol_to_tensor_empty(%arg0: tensor<?x1152xbf16>, %arg1: tensor<?x1024x1152xf32>) -> tensor<?x1024x1152xf32> {
+  %c0 = arith.constant 0 : index
+  %dim = tensor.dim %arg0, %c0 : tensor<?x1152xbf16>
+  %0 = affine.apply affine_map<()[s0] -> (s0 floordiv 1024)>()[%dim]
+  %1 = tensor.empty(%0) : tensor<?x1024x1152xf32>
+  %2 = linalg.elemwise_binary {fun = #linalg.binary_fn<mul>} 
+       ins(%arg1, %arg1 : tensor<?x1024x1152xf32>, tensor<?x1024x1152xf32>)
+       outs(%1 : tensor<?x1024x1152xf32>) -> tensor<?x1024x1152xf32>
+  return %2 : tensor<?x1024x1152xf32>
+}
