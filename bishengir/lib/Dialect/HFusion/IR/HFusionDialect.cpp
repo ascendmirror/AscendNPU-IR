@@ -14,8 +14,11 @@
 // limitations under the License.
 //
 //===----------------------------------------------------------------------===//
+#include "bishengir/Config/bishengir-config.h"
 
+#if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
 #include "bishengir/Dialect/HACC/IR/HACC.h"
+#endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
 #include "bishengir/Dialect/HFusion/IR/HFusion.h"
 #include "bishengir/Dialect/MathExt/IR/MathExt.h"
 
