@@ -15,7 +15,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "bishengir/Config/bishengir-config.h"
+
 #include "bishengir/Dialect/Tensor/IR/TensorImpl.h"
+#if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
 #include "mlir/Dialect/Linalg/IR/LinalgExtensions.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 
@@ -46,3 +49,5 @@ Value createTensorEmptyOp(OpBuilder &builder, Location loc, Value source) {
 
 } // namespace tensor
 } // namespace mlir
+
+#endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
