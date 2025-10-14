@@ -22,7 +22,7 @@ AscendNPU IR（AscendNPU Intermediate Representation）是基于MLIR（Multi-Lev
 1. 克隆主仓库：
 
 ```bash
-git clone https://gitcode.com/Ascend/ascendnpu-ir.git
+git clone https://gitcode.com/Ascend/ascendnpu-ir.git --recurse-submodules --shallow-submodules
 cd AscendNPU-IR
 ```
 
