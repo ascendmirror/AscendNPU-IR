@@ -21,7 +21,7 @@
 #include "bishengir/Dialect/MemRef/IR/MemRefImpl.h"
 #include "bishengir/Dialect/Tensor/IR/TensorImpl.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Linalg/IR/LinalgExtensions.h"
+// #include "mlir/Dialect/Linalg/IR/LinalgExtensions.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "llvm/ADT/TypeSwitch.h"
 
@@ -719,25 +719,25 @@ void utils::renumberReassociation(
   }
 }
 
-bool utils::isScalarLike(Value value) {
-  Type type = value.getType();
-  std::optional<size_t> rankMaybe = utils::getShapeRank(type);
-  // for scalar with no rank
-  if (!rankMaybe.has_value()) {
-    return type.isIntOrIndexOrFloat();
-  }
-  // for zero rank tensor like tensor<f32>
-  size_t rank = rankMaybe.value();
-  if (rank == 0) {
-    return true;
-  }
-  // e.g. dense<1.000000e+00>
-  if (mlir::linalg::isSplatDense(value)) {
-    return true;
-  }
-  // for one size tensor like tensor<1x1x1xf32>
-  return isOneSizeShape(value);
-}
+// bool utils::isScalarLike(Value value) {
+//   Type type = value.getType();
+//   std::optional<size_t> rankMaybe = utils::getShapeRank(type);
+//   // for scalar with no rank
+//   if (!rankMaybe.has_value()) {
+//     return type.isIntOrIndexOrFloat();
+//   }
+//   // for zero rank tensor like tensor<f32>
+//   size_t rank = rankMaybe.value();
+//   if (rank == 0) {
+//     return true;
+//   }
+//   // e.g. dense<1.000000e+00>
+//   if (mlir::linalg::isSplatDense(value)) {
+//     return true;
+//   }
+//   // for one size tensor like tensor<1x1x1xf32>
+//   return isOneSizeShape(value);
+// }
 
 bool utils::isOneSizeShape(Value value) {
   if (auto shapedType = dyn_cast<ShapedType>(value.getType())) {
@@ -747,34 +747,34 @@ bool utils::isOneSizeShape(Value value) {
   return false;
 }
 
-std::optional<Value> utils::extractScalarValue(PatternRewriter &rewriter,
-                                               Location loc, Value src) {
-  Type type = src.getType();
-  if (type.isIntOrIndexOrFloat()) {
-    // src already scalar
-    return src;
-  }
+// std::optional<Value> utils::extractScalarValue(PatternRewriter &rewriter,
+//                                                Location loc, Value src) {
+//   Type type = src.getType();
+//   if (type.isIntOrIndexOrFloat()) {
+//     // src already scalar
+//     return src;
+//   }
 
-  SmallVector<Value> indices;
-  std::optional<size_t> rankMaybe = utils::getShapeRank(type);
-  if (!rankMaybe.has_value()) {
-    return std::nullopt;
-  }
-  if (mlir::linalg::isSplatDense(src)) {
-    return mlir::linalg::createConstantFromDenseSplat(src, rewriter);
-  }
-  if (isOneSizeShape(src)) {
-    // only extract scalar from one size tensor/memref
-    size_t rank = rankMaybe.value();
-    Value constZero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    for (size_t i = 0; i < rank; ++i) {
-      indices.push_back(constZero);
-    }
-    Value scalar = rewriter.create<tensor::ExtractOp>(loc, src, indices);
-    return scalar;
-  }
-  return std::nullopt;
-}
+//   SmallVector<Value> indices;
+//   std::optional<size_t> rankMaybe = utils::getShapeRank(type);
+//   if (!rankMaybe.has_value()) {
+//     return std::nullopt;
+//   }
+//   if (mlir::linalg::isSplatDense(src)) {
+//     return mlir::linalg::createConstantFromDenseSplat(src, rewriter);
+//   }
+//   if (isOneSizeShape(src)) {
+//     // only extract scalar from one size tensor/memref
+//     size_t rank = rankMaybe.value();
+//     Value constZero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+//     for (size_t i = 0; i < rank; ++i) {
+//       indices.push_back(constZero);
+//     }
+//     Value scalar = rewriter.create<tensor::ExtractOp>(loc, src, indices);
+//     return scalar;
+//   }
+//   return std::nullopt;
+// }
 
 bool utils::isArithOp(Operation *op) {
   if (op == nullptr) {
