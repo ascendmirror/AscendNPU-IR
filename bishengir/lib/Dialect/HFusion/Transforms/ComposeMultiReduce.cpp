@@ -48,7 +48,7 @@ struct ComposeMultiReducePass
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
     ReachabilityAnalyzer analyzer(funcOp);
-
+    ctx = &getContext();
     initOpt();
 
     SmallVector<Operation *> reduceOps = collectReduceOperations(analyzer);
@@ -59,6 +59,7 @@ struct ComposeMultiReducePass
   }
 
 private:
+  MLIRContext *ctx;
   /// Initialize pass options with defaults if not set
   void initOpt() {
     if (maxCompose == -1)
@@ -185,7 +186,6 @@ private:
     auto baseShape = utils::getShape(baseOp.getDpsInputs().begin()->getType());
     auto newDimensions = newOp.getDimensions();
     auto baseDimensions = baseOp.getDimensions();
-
     if (aggressive) {
       return checkAggressiveShapeCompatibility(newShape, baseShape,
                                                newDimensions, baseDimensions);
@@ -220,11 +220,14 @@ private:
 
     SmallVector<ReassociationIndices> supposedExpand;
     SmallVector<ReassociationIndices> supposedCollapse;
-    SmallVector<int64_t> newExpandShape;
+    SmallVector<OpFoldResult> newExpandShape;
 
+    Divisibility divisibility(ctx);
+    auto newShapeOpFoldResult = getAsIndexOpFoldResult(ctx, newShape);
+    auto baseShapeOpFoldResult = getAsIndexOpFoldResult(ctx, baseShape);
     bool can = areLooseReassociationsCompatible(
-        supposedExpand, supposedCollapse, to_vector(newShape),
-        to_vector(baseShape), newExpandShape);
+        supposedExpand, supposedCollapse, newShapeOpFoldResult,
+        baseShapeOpFoldResult, newExpandShape, divisibility);
     if (!can) {
       return {false, false};
     }
@@ -348,8 +351,8 @@ private:
     bool needsExpansion;
     SmallVector<ReassociationIndices> supposedExpand;
     SmallVector<ReassociationIndices> supposedExpandInit;
-    SmallVector<int64_t> newExpandShape;
-    SmallVector<int64_t> newExpandShapeInit;
+    SmallVector<OpFoldResult> newExpandShape;
+    SmallVector<OpFoldResult> newExpandShapeInit;
   };
 
   /// Compute expansion information for a reduce operation
@@ -359,16 +362,20 @@ private:
                        ArrayRef<int64_t> basePivotInitShape) const {
     ExpansionInfo info;
     SmallVector<ReassociationIndices> dummyCollapse;
-
+    Divisibility divisibility(ctx);
+    auto inputShape = getAsIndexOpFoldResult(
+        ctx, utils::getShape(reduceOp.getDpsInputs()[0].getType()));
+    auto baseInputShape = getAsIndexOpFoldResult(ctx, basePivotShape);
     bool can = areLooseReassociationsCompatible(
-        info.supposedExpand, dummyCollapse,
-        utils::getShape(reduceOp.getDpsInputs()[0].getType()),
-        to_vector(basePivotShape), info.newExpandShape);
+        info.supposedExpand, dummyCollapse, inputShape, baseInputShape,
+        info.newExpandShape, divisibility);
 
+    auto initShape = getAsIndexOpFoldResult(
+        ctx, utils::getShape(reduceOp.getDpsInits()[0].getType()));
+    auto baseInitShape = getAsIndexOpFoldResult(ctx, basePivotInitShape);
     bool canInit = areLooseReassociationsCompatible(
-        info.supposedExpandInit, dummyCollapse,
-        utils::getShape(reduceOp.getDpsInits()[0].getType()),
-        to_vector(basePivotInitShape), info.newExpandShapeInit);
+        info.supposedExpandInit, dummyCollapse, initShape, baseInitShape,
+        info.newExpandShapeInit, divisibility);
     if (!can || !canInit) {
       llvm_unreachable("Input and inits unexpectedly failed to collapse");
     }
@@ -417,14 +424,16 @@ private:
     return operandVal;
   }
 
+  /// Expand an input value
   Value expandOpr(OpBuilder &builder, Location loc, Value operandVal,
                   ArrayRef<ReassociationIndices> reassociation,
-                  ArrayRef<int64_t> expandShape) const {
+                  ArrayRef<OpFoldResult> resultShape) const {
     if (isa<RankedTensorType>(operandVal.getType())) {
-      auto *expandedOperand =
-          tensor::reshape_utils::createNewReshapingOp<tensor::ExpandShapeOp,
-                                                      OpBuilder>(
-              builder, loc, operandVal, reassociation, expandShape);
+      auto resultType = RankedTensorType::get(
+          tensor::reshape_utils::getStaticOpFoldRes(resultShape),
+          getElementTypeOrSelf(operandVal));
+      auto expandedOperand = builder.create<tensor::ExpandShapeOp>(
+          loc, resultType, operandVal, reassociation, resultShape);
       return expandedOperand->getResult(0);
     }
     return operandVal;

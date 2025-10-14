@@ -132,11 +132,18 @@ public:
       }
       return staticTotalMult;
     }
+
+    std::optional<size_t> getDynamicAxisPosition() const {
+      auto pos = find(this->getShape(), ShapedType::kDynamic);
+      if (pos == this->getShape().end())
+        return std::nullopt;
+      return (pos - this->getShape().begin());
+    }
   };
 
   // Asserts if dynamic are the same for now
-  bool isInferrable(RankedTensorWithInfo typeA,
-                    RankedTensorWithInfo typeB) const {
+  bool isInferrable(const RankedTensorWithInfo &typeA,
+                    const RankedTensorWithInfo &typeB) const {
     int dynCountA = typeA.getNumDynamicDims();
     int dynCountB = typeB.getNumDynamicDims();
     if (dynCountA > 1 || dynCountB > 1)
@@ -147,6 +154,34 @@ public:
     // by logic!
     // Without divisibility API, parting can only assume the value is the same
     return (typeA.getStaticTotalMult() == typeB.getStaticTotalMult());
+  }
+
+  void constructDivisibility(const RankedTensorWithInfo &srcType,
+                             const RankedTensorWithInfo &dstType,
+                             Divisibility &divisibility) const {
+    assert(isInferrable(srcType, dstType) && "types are not inferrable");
+    auto srcDyn = srcType.getDynamicAxisPosition();
+    auto dstDyn = dstType.getDynamicAxisPosition();
+    if (srcDyn.has_value() && dstDyn.has_value()) {
+      divisibility.addSourceDividesResult(*srcDyn, *dstDyn);
+      divisibility.addResultDividesSource(*dstDyn, *srcDyn);
+    }
+    if (srcDyn.has_value()) {
+      auto dstShape = dstType.getShape();
+      for (size_t i = 0; i < dstShape.size(); ++i) {
+        if (dstShape[i] == 1) {
+          divisibility.addResultDividesSource(i, *srcDyn);
+        }
+      }
+    }
+    if (dstDyn.has_value()) {
+      auto srcShape = srcType.getShape();
+      for (size_t i = 0; i < srcShape.size(); ++i) {
+        if (srcShape[i] == 1) {
+          divisibility.addSourceDividesResult(i, *dstDyn);
+        }
+      }
+    }
   }
 
   LogicalResult matchAndRewrite(tensor::ReshapeOp reshapeOp,
@@ -166,12 +201,17 @@ public:
     }
     SmallVector<ReassociationIndices> newReassociationExpand,
         newReassociationCollapse;
-    SmallVector<int64_t> srcShape(srcType.getShape());
-    SmallVector<int64_t> dstShape(dstType.getShape());
-    SmallVector<int64_t> newExpandShape;
+    auto *ctx = reshapeOp.getContext();
+    SmallVector<OpFoldResult> srcShape =
+        getAsIndexOpFoldResult(ctx, srcType.getShape());
+    SmallVector<OpFoldResult> dstShape =
+        getAsIndexOpFoldResult(ctx, dstType.getShape());
+    SmallVector<OpFoldResult> newExpandShape;
+    Divisibility divisibility(reshapeOp->getContext());
+    constructDivisibility(srcType, dstType, divisibility);
     bool compatibleReassociation = areLooseReassociationsCompatible(
         newReassociationExpand, newReassociationCollapse, srcShape, dstShape,
-        newExpandShape);
+        newExpandShape, divisibility);
     if (!compatibleReassociation)
       return failure();
 
@@ -179,7 +219,7 @@ public:
     utils::renumberReassociation(newReassociationCollapse);
     rewriter.setInsertionPointAfter(reshapeOp);
     auto newExpandType =
-        RankedTensorType::get(newExpandShape, getElementTypeOrSelf(dstType));
+        dstType.clone(decomposeMixedValues(newExpandShape).first);
     auto newExpandOp = rewriter.create<tensor::ExpandShapeOp>(
         reshapeOp.getLoc(), newExpandType, src, newReassociationExpand);
     auto newCollapseOp = rewriter.create<tensor::CollapseShapeOp>(

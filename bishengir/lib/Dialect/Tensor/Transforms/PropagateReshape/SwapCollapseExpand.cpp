@@ -32,6 +32,12 @@
 #include "llvm/ADT/SmallPtrSet.h"
 
 #define DEBUG_TYPE "propagate-reshape"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define DBGSNL() (llvm::dbgs() << "\n")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
+#define LLDBG(X)                                                               \
+  LLVM_DEBUG(DBGS() << __FILE__ << ":" << __LINE__ << " " << X << "\n")
+
 namespace mlir {
 namespace tensor {
 using namespace mlir::hfusion;
@@ -92,60 +98,147 @@ bool areReassociationsCompatible(
 }
 } // namespace
 
+static bool isSwapCollapseExpandApplicable(tensor::ExpandShapeOp expandOp,
+                                           tensor::CollapseShapeOp collapseOp) {
+  auto *definedCollapse = collapseOp.getSrc().getDefiningOp();
+  if (!definedCollapse || isStopPropagatable(definedCollapse))
+    return false;
+
+  if (llvm::all_of(expandOp->getUsers(),
+                   [&](Operation *op) { return isOutOp(op); })) {
+    return false;
+  }
+
+  return true;
+}
+
+static Divisibility
+buildDivisibilityInformation(tensor::CollapseShapeOp collapseOp,
+                             tensor::ExpandShapeOp expandOp,
+                             PatternRewriter &rewriter) {
+  auto collapseReassoc = collapseOp.getReassociationIndices();
+  auto expandReassoc = expandOp.getReassociationIndices();
+  Divisibility divisibility(rewriter.getContext());
+  size_t intermediateRank = collapseReassoc.size();
+  // Build divisibility information
+  for (size_t i = 0; i < intermediateRank; ++i) {
+    divisibility.addIntermediateInfo(collapseReassoc[i], expandReassoc[i]);
+  }
+
+  for (size_t resultIdx = 0; resultIdx < intermediateRank; ++resultIdx) {
+    const auto &sourceGroup = collapseReassoc[resultIdx];
+    if (expandReassoc[resultIdx].size() != 1)
+      continue;
+    const auto realResultIndex = expandReassoc[resultIdx][0];
+    if (sourceGroup.size() > 1) {
+      for (int64_t sourceDim : sourceGroup) {
+        divisibility.addSourceDividesResult(sourceDim, realResultIndex);
+      }
+    }
+  }
+
+  for (size_t sourceIdx = 0; sourceIdx < intermediateRank; ++sourceIdx) {
+    const auto &resultGroup = expandReassoc[sourceIdx];
+    if (collapseReassoc[sourceIdx].size() != 1)
+      continue;
+    const auto realSourceIndex = collapseReassoc[sourceIdx][0];
+    if (resultGroup.size() > 1) {
+      for (int64_t resultDim : resultGroup) {
+        divisibility.addResultDividesSource(resultDim, realSourceIndex);
+      }
+    }
+  }
+
+  return divisibility;
+}
+
+static bool computeReassociations(
+    tensor::CollapseShapeOp collapseOp, tensor::ExpandShapeOp expandOp,
+    PatternRewriter &rewriter,
+    SmallVector<ReassociationIndices> &newReassociationExpand,
+    SmallVector<ReassociationIndices> &newReassociationCollapse,
+    SmallVector<OpFoldResult> &newExpandShape) {
+  auto collapseReassoc = collapseOp.getReassociationIndices();
+  auto expandReassoc = expandOp.getReassociationIndices();
+  SmallVector<int64_t> newExpandShapeInt;
+
+  // Try fixed reassociations first
+  if (areReassociationsCompatible(
+          collapseReassoc, expandReassoc, newReassociationExpand,
+          newReassociationCollapse,
+          utils::getShape(collapseOp.getSrc().getType()),
+          utils::getShape(expandOp.getResult().getType()), newExpandShapeInt)) {
+    newExpandShape =
+        getAsIndexOpFoldResult(rewriter.getContext(), newExpandShapeInt);
+    return true;
+  }
+
+  // Fixed reassociations failed, try loose reassociations
+  newExpandShape.clear();
+  newReassociationExpand.clear();
+  newReassociationCollapse.clear();
+  LLVM_DEBUG(llvm::dbgs() << "Fixed reassociations fail\n";);
+
+  Divisibility divisibility =
+      buildDivisibilityInformation(collapseOp, expandOp, rewriter);
+
+  auto collapseSourceShape =
+      tensor::getMixedSizesOrOutputShape(rewriter, collapseOp.getSrc());
+  auto expandShapeResult =
+      tensor::getMixedSizesOrOutputShape(rewriter, expandOp.getResult());
+
+  if (!areLooseReassociationsCompatible(
+          newReassociationExpand, newReassociationCollapse, collapseSourceShape,
+          expandShapeResult, newExpandShape, divisibility)) {
+    LLVM_DEBUG(llvm::dbgs() << "Loose reassociations fail\n";);
+    return false;
+  }
+
+  return true;
+}
+
 LogicalResult
 SwapCollapseExpand::matchAndRewrite(tensor::ExpandShapeOp expandOp,
                                     PatternRewriter &rewriter) const {
-  auto collapseOp = expandOp.getSrc().getDefiningOp<tensor::CollapseShapeOp>();
-  if (!collapseOp)
-    return failure();
-  auto *definedCollapse = collapseOp.getSrc().getDefiningOp();
-  if (!definedCollapse || isStopPropagatable(definedCollapse))
-    return failure();
-  if (llvm::all_of(expandOp->getUsers(),
-                   [&](Operation *op) { return isOutOp(op); })) {
-    return failure();
-  }
+  tensor::CollapseShapeOp collapseOp =
+      expandOp.getSrc().getDefiningOp<tensor::CollapseShapeOp>();
+  if (!collapseOp || !isSwapCollapseExpandApplicable(expandOp, collapseOp))
+    return rewriter.notifyMatchFailure(expandOp,
+                                       "Swap collapse expand not applicable");
   LLVM_DEBUG(llvm::dbgs() << "Trying to swap collapse expand here\n";);
-  auto collapseReassoc = collapseOp.getReassociationIndices();
-  auto expandReassoc = expandOp.getReassociationIndices();
   SmallVector<ReassociationIndices> newReassociationExpand;
   SmallVector<ReassociationIndices> newReassociationCollapse;
-  auto collapseSourceShape = utils::getShape(collapseOp.getSrc().getType());
-  auto expandShapeResult = utils::getShape(expandOp.getResult().getType());
-  SmallVector<int64_t> newExpandShape;
-  bool reassociationsDone = false;
-  if (!areReassociationsCompatible(
-          collapseReassoc, expandReassoc, newReassociationExpand,
-          newReassociationCollapse, collapseSourceShape, expandShapeResult,
-          newExpandShape)) {
-    newExpandShape.clear();
-    newReassociationExpand.clear();
-    newReassociationCollapse.clear();
-    LLVM_DEBUG(llvm::dbgs() << "Fixed reassociations fail\n";);
-  } else
-    reassociationsDone = true;
+  SmallVector<OpFoldResult> newExpandShape;
 
-  if (!reassociationsDone &&
-      !areLooseReassociationsCompatible(
-          newReassociationExpand, newReassociationCollapse, collapseSourceShape,
-          expandShapeResult, newExpandShape)) {
-    LLVM_DEBUG(llvm::dbgs() << "Loose reassociations fail\n";);
-    return failure();
+  if (!computeReassociations(collapseOp, expandOp, rewriter,
+                             newReassociationExpand, newReassociationCollapse,
+                             newExpandShape)) {
+    return rewriter.notifyMatchFailure(collapseOp,
+                                       "Reassociations not computable");
   }
 
+  // Step 3: Create replacement operations
   renumberReassociation(newReassociationExpand);
   renumberReassociation(newReassociationCollapse);
   rewriter.setInsertionPointAfter(expandOp);
-  auto newExpandType =
-      RankedTensorType::get(newExpandShape, getElementTypeOrSelf(expandOp));
-  auto newExpandOp = rewriter.create<tensor::ExpandShapeOp>(
+
+  auto newExpandType = RankedTensorType::get(getStaticOpFoldRes(newExpandShape),
+                                             getElementTypeOrSelf(expandOp));
+  tensor::ExpandShapeOp newExpandOp;
+
+  newExpandOp = rewriter.create<tensor::ExpandShapeOp>(
       collapseOp.getLoc(), newExpandType, collapseOp.getSrc(),
       newReassociationExpand);
+
+  LDBG(newExpandOp);
+
   auto newCollapseOp = rewriter.create<tensor::CollapseShapeOp>(
       expandOp.getLoc(), expandOp.getResult().getType(),
       newExpandOp.getResult(), newReassociationCollapse);
+
   rewriter.replaceAllUsesWith(expandOp, newCollapseOp.getResult());
   return success();
 }
+
 } // namespace tensor
 } // namespace mlir

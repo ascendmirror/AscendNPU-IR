@@ -144,6 +144,8 @@ LogicalResult handleTransposeOp(tensor::ExpandShapeOp expandOp,
                                 PatternRewriter &rewriter,
                                 Operation *definingOp) {
   auto expandOutShape = expandOp.getResultType().getShape();
+  auto mixedExpandOutShape =
+      getMixedSizesOrOutputShape(rewriter, expandOp.getResult());
   auto expandInShape = expandOp.getSrcType().getShape();
   auto reassociation = expandOp.getReassociationIndices();
 
@@ -154,14 +156,14 @@ LogicalResult handleTransposeOp(tensor::ExpandShapeOp expandOp,
       utils::getShapeRank(transposeOp->getResult(0)).value_or(0);
 
   // Create new Expand input shape
-  SmallVector<int64_t, 4> newExpandInputShape;
+  SmallVector<OpFoldResult> newExpandInputShape;
   // Create new Expand reassociation
-  SmallVector<ReassociationIndices, 4> newExpandReassociation;
+  SmallVector<ReassociationIndices> newExpandReassociation;
   reshape_utils::createTransposedReassoc(
-      reassociation, expandOutShape, getInversePermutation(permutation),
+      reassociation, mixedExpandOutShape, getInversePermutation(permutation),
       newExpandInputShape, newExpandReassociation);
   // Create new tranpose permutation
-  SmallVector<int64_t, 4> newPermutation;
+  SmallVector<int64_t> newPermutation;
   reshape_utils::createNewPermutation(transposeRank, permutation,
                                       newExpandReassociation, newPermutation);
 
@@ -172,13 +174,15 @@ LogicalResult handleTransposeOp(tensor::ExpandShapeOp expandOp,
   auto dstOp = transposeOp.getDpsInitOperand(0)->get();
 
   // Add New Expand operations
-  rewriter.setInsertionPointAfterValue(srcOp);
-  auto resTy =
-      RankedTensorType::get(newExpandInputShape, getElementTypeOrSelf(srcOp));
+  auto transposeResult = transposeOp->getResult(0);
+  setInsertionPointBeforeValue(rewriter, transposeResult);
+  auto [newExpandStaticInputShape, _] =
+      decomposeMixedValues(newExpandInputShape);
+  auto resTy = RankedTensorType::get(newExpandStaticInputShape,
+                                     getElementTypeOrSelf(srcOp));
   tensor::ExpandShapeOp newSrcOp = rewriter.create<tensor::ExpandShapeOp>(
       srcOp.getLoc(), resTy, srcOp, newExpandReassociation);
 
-  rewriter.setInsertionPointAfterValue(dstOp);
   resTy = RankedTensorType::get(expandOutShape, getElementTypeOrSelf(dstOp));
   tensor::ExpandShapeOp newDstOp = rewriter.create<tensor::ExpandShapeOp>(
       dstOp.getLoc(), resTy, dstOp, reassociation);

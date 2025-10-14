@@ -174,7 +174,8 @@ LogicalResult handleElementwiseOp(tensor::CollapseShapeOp collapseOp,
 template <class T>
 LogicalResult handleTransposeOp(tensor::CollapseShapeOp collapseOp,
                                 PatternRewriter &rewriter, Operation *userOp) {
-  auto collapseInShape = collapseOp.getSrcType().getShape();
+  auto mixedCollapseInShape =
+      getMixedSizesOrOutputShape(rewriter, collapseOp.getSrc());
   linalg::TransposeOp transposeOp = cast<linalg::TransposeOp>(userOp);
   auto permutation = transposeOp.getPermutation();
   auto reassociation = collapseOp.getReassociationIndices();
@@ -182,29 +183,30 @@ LogicalResult handleTransposeOp(tensor::CollapseShapeOp collapseOp,
   bool isInit = checkValueIsInit(userOp, collapseOp);
 
   // Create new Expand input shape
-  SmallVector<int64_t, 4> newTransposeOutputShape;
+  SmallVector<OpFoldResult> newTransposeOutputShape;
   // Create new Expand reassociation
-  SmallVector<ReassociationIndices, 4> newCollapseReassociation;
+  SmallVector<ReassociationIndices> newCollapseReassociation;
   reshape_utils::createTransposedReassoc(
-      reassociation, collapseInShape, (isInit ? invPermutation : permutation),
-      newTransposeOutputShape, newCollapseReassociation);
+      reassociation, mixedCollapseInShape,
+      (isInit ? invPermutation : permutation), newTransposeOutputShape,
+      newCollapseReassociation);
 
   // Create new tranpose permutation
-  SmallVector<int64_t, 4> newPermutation;
-  auto transposeRank =
-      utils::getShapeRank(transposeOp->getResult(0)).value_or(0);
+  SmallVector<int64_t> newPermutation;
+  auto transposeRank = utils::getShapeRank(transposeOp->getResult(0));
   reshape_utils::createNewPermutation(
-      transposeRank, permutation,
-      (isInit ? newCollapseReassociation : reassociation), newPermutation);
-
+      transposeRank.value(), permutation,
+      (isInit ? ArrayRef<ReassociationIndices>(newCollapseReassociation)
+              : ArrayRef<ReassociationIndices>(reassociation)),
+      newPermutation);
   LLVM_DEBUG(llvm::dbgs() << "Try to push " << collapseOp << " after "
                           << *userOp << "\n";);
 
   auto collapseSrcOp = collapseOp.getSrc();
   auto transposeSrcOp = transposeOp.getDpsInputOperand(0)->get();
-  rewriter.setInsertionPointAfterValue(collapseSrcOp);
-
-  auto expandedTy = collapseOp.getSrcType().clone(newTransposeOutputShape);
+  rewriter.setInsertionPointAfter(transposeOp);
+  auto expandedTy = collapseOp.getSrcType().clone(
+      getStaticOpFoldRes(newTransposeOutputShape));
   linalg::TransposeOp newTransposeOp;
 
   if (isInit) {
@@ -214,8 +216,9 @@ LogicalResult handleTransposeOp(tensor::CollapseShapeOp collapseOp,
     newTransposeOp = rewriter.create<linalg::TransposeOp>(
         transposeOp->getLoc(), expandArg, collapseSrcOp, newPermutation);
   } else {
-    tensor::EmptyOp dstOp = rewriter.create<tensor::EmptyOp>(
-        transposeOp.getLoc(), expandedTy, ValueRange());
+    auto dstOp = rewriter.create<tensor::ExpandShapeOp>(
+        collapseOp->getLoc(), expandedTy, transposeOp.getInit(),
+        newCollapseReassociation);
     // add new transpose operation
     newTransposeOp = rewriter.create<linalg::TransposeOp>(
         transposeOp->getLoc(), collapseSrcOp, dstOp, newPermutation);
@@ -225,7 +228,8 @@ LogicalResult handleTransposeOp(tensor::CollapseShapeOp collapseOp,
   auto newCollapseOutType = transposeOp->getResultTypes()[0];
   auto newCollapseOp = rewriter.create<tensor::CollapseShapeOp>(
       collapseOp.getLoc(), newCollapseOutType, newTransposeOp->getResult(0),
-      (isInit ? reassociation : newCollapseReassociation));
+      (isInit ? ArrayRef<ReassociationIndices>(reassociation)
+              : ArrayRef<ReassociationIndices>(newCollapseReassociation)));
 
   // old transpose replaced by new collapse
   rewriter.replaceOp(transposeOp, newCollapseOp);

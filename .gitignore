@@ -2,3 +2,5 @@ build*/
 !build-tools/
 .vscode
 .cache
+*.orig
+.idea

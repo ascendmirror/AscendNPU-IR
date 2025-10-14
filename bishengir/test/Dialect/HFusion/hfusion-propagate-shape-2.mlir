@@ -464,3 +464,68 @@ module {
     return %1 : tensor<4096x1x32x4x64xf32>
   }
 }
+
+// -----
+// CHECK: Valid
+// CHECK-LABEL: func.func @unit_propagate_reshape_compose(
+func.func @unit_propagate_reshape_compose(
+        %arg0: tensor<1x109x4096xbf16>, %arg1: tensor<1x24576xbf16>, %arg2: tensor<109x4096xbf16>,
+        %arg3: tensor<109xf32>, %arg4: tensor<109x4096xf32>, %arg5: tensor<1x109xf32>,
+        %arg6: tensor<1x109x4096xf32>, %arg7: tensor<109x4096xf32>, %arg8: tensor<1x109x4096xf32>,
+        %arg9: f32, %arg10: f32) -> (tensor<1x109x4096xf32>, tensor<1x109x1xf32>)
+        attributes {hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>} {
+  %0 = linalg.fill ins(%arg10 : f32) outs(%arg3 : tensor<109xf32>) -> tensor<109xf32>
+  %reduced = linalg.reduce ins(%arg4 : tensor<109x4096xf32>) outs(%0 : tensor<109xf32>) dimensions = [1]
+    (%in: f32, %init: f32) {
+      %10 = arith.addf %in, %init : f32
+      linalg.yield %10 : f32
+    }
+  %expanded = tensor.expand_shape %reduced [[0, 1, 2]] output_shape [1, 109, 1] : tensor<109xf32> into tensor<1x109x1xf32>
+  %1 = tensor.empty() : tensor<1x109x1xf32>
+  %2 = linalg.elemwise_binary {fun = #linalg.binary_fn<div>} ins(%expanded, %arg9 : tensor<1x109x1xf32>, f32) outs(%1 : tensor<1x109x1xf32>) -> tensor<1x109x1xf32>
+  %collapsed = tensor.collapse_shape %2 [[0, 1, 2]] : tensor<1x109x1xf32> into tensor<109xf32>
+  %broadcasted = linalg.broadcast ins(%collapsed : tensor<109xf32>) outs(%arg7 : tensor<109x4096xf32>) dimensions = [1]
+  %expanded_0 = tensor.expand_shape %broadcasted [[0, 1], [2]] output_shape [1, 109, 4096] : tensor<109x4096xf32> into tensor<1x109x4096xf32>
+  %3 = linalg.elemwise_binary {fun = #linalg.binary_fn<sub>} ins(%arg6, %expanded_0 : tensor<1x109x4096xf32>, tensor<1x109x4096xf32>) outs(%arg8 : tensor<1x109x4096xf32>) -> tensor<1x109x4096xf32>
+  %4 = linalg.elemwise_binary {fun = #linalg.binary_fn<mul>} ins(%3, %3 : tensor<1x109x4096xf32>, tensor<1x109x4096xf32>) outs(%arg8 : tensor<1x109x4096xf32>) -> tensor<1x109x4096xf32>
+  %collapsed_1 = tensor.collapse_shape %4 [[0, 1], [2]] : tensor<1x109x4096xf32> into tensor<109x4096xf32>
+  %reduced_2 = linalg.reduce ins(%collapsed_1 : tensor<109x4096xf32>) outs(%0 : tensor<109xf32>) dimensions = [1]
+    (%in: f32, %init: f32) {
+      %10 = arith.addf %in, %init : f32
+      linalg.yield %10 : f32
+    }
+  %expanded_3 = tensor.expand_shape %reduced_2 [[0, 1, 2]] output_shape [1, 109, 1] : tensor<109xf32> into tensor<1x109x1xf32>
+  %5 = tensor.empty() : tensor<1x109x1xbf16>
+  %6 = hfusion.cast {round_mode = #hfusion.round_mode<rint>} ins(%2 : tensor<1x109x1xf32>) outs(%5 : tensor<1x109x1xbf16>) -> tensor<1x109x1xbf16>
+  %collapsed_4 = tensor.collapse_shape %6 [[0], [1, 2]] : tensor<1x109x1xbf16> into tensor<1x109xbf16>
+  %7 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%collapsed_4 : tensor<1x109xbf16>) outs(%arg5 : tensor<1x109xf32>) -> tensor<1x109xf32>
+  %collapsed_5 = tensor.collapse_shape %7 [[0, 1]] : tensor<1x109xf32> into tensor<109xf32>
+  %broadcasted_6 = linalg.broadcast ins(%collapsed_5 : tensor<109xf32>) outs(%arg7 : tensor<109x4096xf32>) dimensions = [1]
+  %expanded_7 = tensor.expand_shape %broadcasted_6 [[0, 1], [2]] output_shape [1, 109, 4096] : tensor<109x4096xf32> into tensor<1x109x4096xf32>
+  %8 = linalg.elemwise_binary {fun = #linalg.binary_fn<sub>} ins(%arg6, %expanded_7 : tensor<1x109x4096xf32>, tensor<1x109x4096xf32>) outs(%arg8 : tensor<1x109x4096xf32>) -> tensor<1x109x4096xf32>
+  %9 = linalg.elemwise_binary {fun = #linalg.binary_fn<div>} ins(%expanded_3, %arg9 : tensor<1x109x1xf32>, f32) outs(%1 : tensor<1x109x1xf32>) -> tensor<1x109x1xf32>
+  return %8, %9 : tensor<1x109x4096xf32>, tensor<1x109x1xf32>
+}
+
+// -----
+// CHECK: Valid
+// CHECK-LABEL: @transpose_collapse_as_input(
+func.func @transpose_collapse_as_input(%arg0: tensor<?x4096xbf16>, %arg1: i64) -> tensor<1x16x?x128xbf16> attributes {hacc.entry, hacc.function_kind = #hacc.function_kind<HOST>} {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.29730177875068026 : f64
+  %dim = tensor.dim %arg0, %c0 : tensor<?x4096xbf16>
+  %expanded = tensor.expand_shape %arg0 [[0, 1], [2]] output_shape [1, %dim, 4096] : tensor<?x4096xbf16> into tensor<1x?x4096xbf16>
+  %extracted_slice = tensor.extract_slice %expanded[0, 0, 0] [1, %dim, 2048] [1, 1, 1] : tensor<1x?x4096xbf16> to tensor<1x?x2048xbf16>
+  %expanded_0 = tensor.expand_shape %extracted_slice [[0], [1], [2, 3]] output_shape [1, %dim, 16, 128] : tensor<1x?x2048xbf16> into tensor<1x?x16x128xbf16>
+  %0 = tensor.empty(%dim) : tensor<1x16x?x128xbf16>
+  %collapsed = tensor.collapse_shape %expanded_0 [[0, 1], [2], [3]] : tensor<1x?x16x128xbf16> into tensor<?x16x128xbf16>
+  %1 = tensor.empty(%dim) : tensor<16x?x128xbf16>
+  %transposed = linalg.transpose ins(%collapsed : tensor<?x16x128xbf16>) outs(%1 : tensor<16x?x128xbf16>) permutation = [1, 0, 2]
+  %expanded_1 = tensor.expand_shape %transposed [[0, 1], [2], [3]] output_shape [1, 16, %dim, 128] : tensor<16x?x128xbf16> into tensor<1x16x?x128xbf16>
+  %2 = arith.truncf %cst : f64 to f32
+  %3 = tensor.empty(%dim) : tensor<1x16x?x128xf32>
+  %4 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%expanded_1 : tensor<1x16x?x128xbf16>) outs(%3 : tensor<1x16x?x128xf32>) -> tensor<1x16x?x128xf32>
+  %5 = linalg.elemwise_binary {fun = #linalg.binary_fn<mul>} ins(%4, %2 : tensor<1x16x?x128xf32>, f32) outs(%3 : tensor<1x16x?x128xf32>) -> tensor<1x16x?x128xf32>
+  %6 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%5 : tensor<1x16x?x128xf32>) outs(%0 : tensor<1x16x?x128xbf16>) -> tensor<1x16x?x128xbf16>
+  return %6 : tensor<1x16x?x128xbf16>
+}

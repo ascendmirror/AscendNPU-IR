@@ -20,23 +20,24 @@
 //===----------------------------------------------------------------------===//
 
 #include "bishengir/Dialect/HFusion/Utils/Utils.h"
-#include "bishengir/Dialect/HFusion/IR/HFusion.h"
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
 #include "bishengir/Dialect/Tensor/Transforms/Passes.h"
 #include "bishengir/Dialect/Tensor/Transforms/PropagateReshape/Utils.h"
 #include "bishengir/Dialect/Tensor/Utils/Utils.h"
-#include "bishengir/Dialect/Utils/Util.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include <cstddef>
 #include <cstdint>
+#include <utility>
 
 #define DEBUG_TYPE "tensor-propagate-utils"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define DBGSNL() (llvm::dbgs() << "\n")
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
+#define LLDBG(X)                                                               \
+  LLVM_DEBUG(DBGS() << __FILE__ << ":" << __LINE__ << " " << X << "\n")
 
 using namespace mlir::utils::debugger;
 
@@ -61,37 +62,34 @@ void updateHIVMDimensionalOp(hivm::VReduceOp op, PatternRewriter &rewriter,
 }
 
 void updateDefiningOp(Operation *definingOp, PatternRewriter &rewriter,
-                      ArrayRef<Value> newOperands) {
-  if (!isa<DestinationStyleOpInterface>(definingOp))
-    updateDefiningOpNonDst(definingOp, rewriter, newOperands);
+                      ArrayRef<Value> newOperands,
+                      std::optional<ArrayRef<int64_t>> collapsedShape) {
   rewriter.modifyOpInPlace(definingOp, [&]() {
     definingOp->setOperands(newOperands);
-    auto dpsInits = cast<DestinationStyleOpInterface>(definingOp).getDpsInits();
+    // Update result types
     for (unsigned i = 0; i < definingOp->getNumResults(); ++i) {
-      Value initOperand = dpsInits[i];
-      auto collapsedType = initOperand.getType();
-      definingOp->getResult(i).setType(collapsedType);
+      Type newType;
+      if (auto dpsOp = dyn_cast<DestinationStyleOpInterface>(definingOp)) {
+        // For destination-style ops, infer type from init operands
+        auto dpsInits = dpsOp.getDpsInits();
+        newType = dpsInits[i].getType();
+      } else if (collapsedShape.has_value()) {
+        // For non-destination ops with explicit shape, create new tensor type
+        auto elementType = getElementTypeOrSelf(definingOp->getResult(i));
+        newType = RankedTensorType::get(*collapsedShape, elementType);
+      } else {
+        // For non-destination ops without shape, don't modify type
+        continue;
+      }
+      definingOp->getResult(i).setType(newType);
     }
   });
-}
-
-void updateDefiningOpNonDst(Operation *definingOp, PatternRewriter &rewriter,
-                            ArrayRef<Value> newOperands) {
-  rewriter.modifyOpInPlace(definingOp,
-                           [&]() { definingOp->setOperands(newOperands); });
 }
 
 void updateDefiningOpNonDst(Operation *definingOp, PatternRewriter &rewriter,
                             ArrayRef<Value> newOperands,
-                            ArrayRef<int64_t> collapsedShape) {
-  rewriter.modifyOpInPlace(definingOp, [&]() {
-    definingOp->setOperands(newOperands);
-    for (unsigned i = 0; i < definingOp->getNumResults(); ++i) {
-      auto oldType = getElementTypeOrSelf(definingOp->getResult(i));
-      definingOp->getResult(i).setType(
-          RankedTensorType::get(collapsedShape, oldType));
-    }
-  });
+                            std::optional<ArrayRef<int64_t>> collapsedShape) {
+  updateDefiningOp(definingOp, rewriter, newOperands, collapsedShape);
 }
 
 void renumberReassociation(
@@ -767,12 +765,12 @@ void updateHFusionReduceWithIndexDim(
 }
 
 void createTransposedReassoc(
-    SmallVector<ReassociationIndices, 4> &oldReassociation,
-    ArrayRef<int64_t> expandedShape, ArrayRef<int64_t> permutation,
-    SmallVector<int64_t, 4> &newExpandedShape,
-    SmallVector<ReassociationIndices, 4> &newReassociation) {
-  // Calculate tranposed reassociation indices.
-  SmallVector<ReassociationIndices, 4> transposedReassociation;
+    ArrayRef<ReassociationIndices> oldReassociation,
+    ArrayRef<OpFoldResult> expandedShape, ArrayRef<int64_t> permutation,
+    SmallVector<OpFoldResult> &newExpandedShape,
+    SmallVector<ReassociationIndices> &newReassociation) {
+  // Calculate transposed reassociation indices.
+  SmallVector<ReassociationIndices> transposedReassociation;
   auto rank = oldReassociation.size();
   LDBG("rank is " << rank);
   for (size_t i = 0; i < rank; i++) {
@@ -781,8 +779,8 @@ void createTransposedReassoc(
     transposedReassociation.push_back(deepCopy);
   }
   LDBG("old reassociation " << to_string(oldReassociation));
-  // flat tranposed reassociation for mapping index
-  SmallVector<int64_t, 4> indexRemap;
+  // flat transposed reassociation for mapping index
+  SmallVector<int64_t> indexRemap;
   for (const auto &vec : transposedReassociation)
     for (auto i : vec)
       indexRemap.push_back(i);
@@ -790,7 +788,6 @@ void createTransposedReassoc(
   // Create new output shape
   for (size_t i : indexRemap)
     newExpandedShape.push_back(expandedShape[i]);
-  LDBG("newExpandedShape " << to_string(newExpandedShape));
 
   // Create new reassociation
   int64_t index = 0;
@@ -812,8 +809,8 @@ SmallVector<int64_t> getInversePermutation(ArrayRef<int64_t> permutation) {
 }
 
 void createNewPermutation(size_t rank, ArrayRef<int64_t> permutation,
-                          SmallVector<ReassociationIndices, 4> &reassociation,
-                          SmallVector<int64_t, 4> &newPermutation) {
+                          ArrayRef<ReassociationIndices> reassociation,
+                          SmallVector<int64_t> &newPermutation) {
   for (size_t i = 0; i < rank; i++) {
     assert(static_cast<size_t>(permutation[i]) < reassociation.size());
     ReassociationIndices deepCopy = reassociation[permutation[i]];
@@ -841,6 +838,12 @@ bool isNonUnitExpandOrEmptyReassoc(
       return true;
   }
   return false;
+}
+
+SmallVector<int64_t> getStaticOpFoldRes(ArrayRef<OpFoldResult> opfrs) {
+  return llvm::map_to_vector(opfrs, [&](OpFoldResult opfr) {
+    return getConstantIntValue(opfr).value_or(ShapedType::kDynamic);
+  });
 }
 
 } // namespace reshape_utils

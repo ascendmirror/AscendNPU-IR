@@ -52,18 +52,17 @@ void updateHIVMDimensionalOp(hivm::VReduceOp op, PatternRewriter &rewriter,
                              ArrayRef<int64_t> newDimensions);
 
 /// Update defining operation with destination style interface
-void updateDefiningOp(Operation *definingOp, PatternRewriter &rewriter,
-                      ArrayRef<Value> newOperands);
-
-/// Update defining operation without destination style interface
-void updateDefiningOpNonDst(Operation *definingOp, PatternRewriter &rewriter,
-                            ArrayRef<Value> newOperands);
+void updateDefiningOp(
+    Operation *definingOp, PatternRewriter &rewriter,
+    ArrayRef<Value> newOperands,
+    std::optional<ArrayRef<int64_t>> collapsedShape = std::nullopt);
 
 /// Update defining operation without destination style interface and have
 /// result
-void updateDefiningOpNonDst(Operation *definingOp, PatternRewriter &rewriter,
-                            ArrayRef<Value> newOperands,
-                            ArrayRef<int64_t> collapsedShape);
+void updateDefiningOpNonDst(
+    Operation *definingOp, PatternRewriter &rewriter,
+    ArrayRef<Value> newOperands,
+    std::optional<ArrayRef<int64_t>> collapsedShape = std::nullopt);
 
 /// Renumber reassociation indices
 void renumberReassociation(SmallVector<ReassociationIndices> &newReassociation);
@@ -235,16 +234,15 @@ void updateHFusionReduceWithIndexDim(PatternRewriter &rewriter,
 
 // utility functions used for reorder tranpose op
 void createTransposedReassoc(
-    SmallVector<ReassociationIndices, 4> &oldReassociation,
-    ArrayRef<int64_t> expandedShape, ArrayRef<int64_t> permutation,
-    SmallVector<int64_t, 4> &newExpandedShape,
-    SmallVector<ReassociationIndices, 4> &newReassociation);
+    ArrayRef<ReassociationIndices> oldReassociation,
+    ArrayRef<OpFoldResult> expandedShape, ArrayRef<int64_t> permutation,
+    SmallVector<OpFoldResult> &newExpandedShape,
+    SmallVector<ReassociationIndices> &newReassociation);
 
 // utility functions used for reorder tranpose op
-void createNewPermutation(
-    size_t rank, ArrayRef<int64_t> permutation,
-    SmallVector<ReassociationIndices, 4> &newExpandReassociation,
-    SmallVector<int64_t, 4> &newPermutation);
+void createNewPermutation(size_t rank, ArrayRef<int64_t> permutation,
+                          ArrayRef<ReassociationIndices> reassociation,
+                          SmallVector<int64_t> &newPermutation);
 
 // Get the inverse of this permutation
 SmallVector<int64_t> getInversePermutation(ArrayRef<int64_t> permutation);
@@ -252,6 +250,7 @@ SmallVector<int64_t> getInversePermutation(ArrayRef<int64_t> permutation);
 bool isNonUnitExpandOrEmptyReassoc(ArrayRef<int64_t> expandedShape,
                      ArrayRef<ReassociationIndices> reassociation);
 
+SmallVector<int64_t> getStaticOpFoldRes(ArrayRef<OpFoldResult> opfrs);
 } // namespace reshape_utils
 } // namespace tensor
 } // namespace mlir
