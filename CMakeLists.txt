@@ -30,6 +30,10 @@ else()
   set(BISHENGIR_ENABLE_TORCH_CONVERSIONS 0)
 endif()
 
+# The BISHENGIR_BUILD_STANDALONE_IR_ONLY option is used to only build IR definitions.
+option(BISHENGIR_BUILD_STANDALONE_IR_ONLY
+  "Experimental feature. If set, only build IR definitions." OFF)
+
 # Only enable execution engine if the native target is available.
 if (${LLVM_NATIVE_ARCH} IN_LIST LLVM_TARGETS_TO_BUILD)
   set(MLIR_ENABLE_EXECUTION_ENGINE 1)
@@ -163,7 +167,9 @@ if(MLIR_ENABLE_BINDINGS_PYTHON)
   add_subdirectory(python)
 endif()
 
-add_subdirectory(bishengir/tools)
+if(NOT BISHENGIR_BUILD_STANDALONE_IR_ONLY)
+  add_subdirectory(bishengir/tools)
+endif()
 
 if(NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
   install(

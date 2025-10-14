@@ -1,5 +1,7 @@
 add_subdirectory(Annotation)
-add_subdirectory(HACC)
+if(NOT BISHENGIR_BUILD_STANDALONE_IR_ONLY)
+  add_subdirectory(HACC)
+endif()
 add_subdirectory(HFusion)
 add_subdirectory(HIVM)
 add_subdirectory(MathExt)
