@@ -15,13 +15,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "bishengir/Config/bishengir-config.h"
 #include "bishengir/Dialect/Utils/Util.h"
 #include "bishengir/Dialect/Annotation/IR/Annotation.h"
 #include "bishengir/Dialect/HIVM/Utils/Utils.h"
 #include "bishengir/Dialect/MemRef/IR/MemRefImpl.h"
 #include "bishengir/Dialect/Tensor/IR/TensorImpl.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
 #include "mlir/Dialect/Linalg/IR/LinalgExtensions.h"
+#endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "llvm/ADT/TypeSwitch.h"
 
@@ -164,8 +167,13 @@ Value createEmptyOpWithTargetElemType(
     std::optional<MemRefLayoutAttrInterface> layout) {
   auto shapedType = cast<ShapedType>(source.getType());
   if (isa<TensorType>(shapedType)) {
+#if BISHENGIR_BUILD_STANDALONE_IR_ONLY
+    llvm_unreachable("Not implemented");
+#else
+    // TODO: it should be defined in Dialect/Tensor/IR
     return tensor::createTensorEmptyOpWithTargetElemType(builder, loc, source,
                                                          targetElemType);
+#endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
   }
   return memref::createMemRefAllocOpWithTargetElemType(builder, loc, source,
                                                        targetElemType, std::move(layout));
@@ -174,7 +182,11 @@ Value createEmptyOpWithTargetElemType(
 Value createEmptyOp(OpBuilder &builder, Location loc, Value source) {
   auto shapedType = cast<ShapedType>(source.getType());
   if (isa<TensorType>(shapedType)) {
+#if BISHENGIR_BUILD_STANDALONE_IR_ONLY
+    llvm_unreachable("Not implemented");
+#else
     return tensor::createTensorEmptyOp(builder, loc, source);
+#endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
   }
   return memref::createMemRefAllocOp(builder, loc, source);
 }
@@ -719,6 +731,7 @@ void utils::renumberReassociation(
   }
 }
 
+#if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
 bool utils::isScalarLike(Value value) {
   Type type = value.getType();
   std::optional<size_t> rankMaybe = utils::getShapeRank(type);
@@ -738,6 +751,7 @@ bool utils::isScalarLike(Value value) {
   // for one size tensor like tensor<1x1x1xf32>
   return isOneSizeShape(value);
 }
+#endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
 
 bool utils::isOneSizeShape(Value value) {
   if (auto shapedType = dyn_cast<ShapedType>(value.getType())) {
@@ -747,6 +761,7 @@ bool utils::isOneSizeShape(Value value) {
   return false;
 }
 
+#if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
 std::optional<Value> utils::extractScalarValue(PatternRewriter &rewriter,
                                                Location loc, Value src) {
   Type type = src.getType();
@@ -775,6 +790,7 @@ std::optional<Value> utils::extractScalarValue(PatternRewriter &rewriter,
   }
   return std::nullopt;
 }
+#endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
 
 bool utils::isArithOp(Operation *op) {
   if (op == nullptr) {

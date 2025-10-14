@@ -30,6 +30,10 @@ else()
   set(BISHENGIR_ENABLE_TORCH_CONVERSIONS 0)
 endif()
 
+# The BISHENGIR_BUILD_STANDALONE_IR_ONLY option is used to only build IR definitions.
+option(BISHENGIR_BUILD_STANDALONE_IR_ONLY
+  "Experimental feature. If set, only build IR definitions." OFF)
+
 # Only enable execution engine if the native target is available.
 if (${LLVM_NATIVE_ARCH} IN_LIST LLVM_TARGETS_TO_BUILD)
   set(MLIR_ENABLE_EXECUTION_ENGINE 1)
@@ -144,8 +148,29 @@ add_llvm_install_targets(install-bishengir-publish-products
                          COMPONENT bishengir-publish-products)
 
 add_subdirectory(bishengir/tools/bishengir-hfusion-ods-gen)
-add_subdirectory(bishengir/include/bishengir)
-add_subdirectory(bishengir/lib)
+if (BISHENGIR_BUILD_STANDALONE_IR_ONLY)
+  add_subdirectory(bishengir/include/bishengir/Interfaces)
+  set(STANDALONE_IR_BUILD_DIALECT
+  Annotation
+  HFusion
+  HIVM
+  MemRef
+  MemRefExt
+  Symbol
+  Tensor
+  )
+  foreach(d IN LISTS STANDALONE_IR_BUILD_DIALECT)
+    add_subdirectory(bishengir/include/bishengir/Dialect/${d})
+    add_subdirectory(bishengir/lib/Dialect/${d}/IR)
+  endforeach()
+  # TODO: Math and Utils should be added in STANDALONE_IR_BUILD_DIALECT
+  add_subdirectory(bishengir/include/bishengir/Dialect/MathExt)
+  add_subdirectory(bishengir/lib/Dialect/Math)
+  add_subdirectory(bishengir/lib/Dialect/Utils)
+else()
+  add_subdirectory(bishengir/include/bishengir)
+  add_subdirectory(bishengir/lib)
+endif()
 add_subdirectory(bishengir/lib/CAPI)
 
 if(MLIR_INCLUDE_TESTS)
@@ -163,7 +188,9 @@ if(MLIR_ENABLE_BINDINGS_PYTHON)
   add_subdirectory(python)
 endif()
 
-add_subdirectory(bishengir/tools)
+if(NOT BISHENGIR_BUILD_STANDALONE_IR_ONLY)
+  add_subdirectory(bishengir/tools)
+endif()
 
 if(NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
   install(

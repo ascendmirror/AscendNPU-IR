@@ -1,3 +1,7 @@
+if(NOT BISHENGIR_BUILD_STANDALONE_IR_ONLY)
+  list(APPEND BS_FEAT_LINK_LIBS BiShengIRLinalgDialectExt)
+endif()
+
 add_bishengir_library(BiShengIRDialectUtils
   OpInterfaceUtils.cpp
   ReachabilityAnalyzer.cpp
@@ -6,10 +10,7 @@ add_bishengir_library(BiShengIRDialectUtils
   ValueDependencyAnalyzer.cpp
 
   DEPENDS
-  MLIRLinalgOpsIncGen
-  MLIRLinalgStructuredOpsIncGen
   BiShengIRHIVMEnumsIncGen
-  BiShengIRHIVMAttributesIncGen
 
   LINK_LIBS PUBLIC
   BiShengIRAnnotationDialect
@@ -24,5 +25,5 @@ add_bishengir_library(BiShengIRDialectUtils
   MLIRTensorDialect
   BiShengIRMemRefDialect
   BiShengIRTensorDialect
-  BiShengIRLinalgDialectExt
+  ${BS_FEAT_LINK_LIBS}
 )
