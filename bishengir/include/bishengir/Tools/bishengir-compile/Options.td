@@ -298,6 +298,14 @@ def enableHfusionCountBufferDmaOpt : HFusionOptimizationControlOptions<
   "false"
 >;
 
+def assumeInjectiveDynamic : HFusionOptimizationControlOptions<
+  "If enabled, will assume dynamic dimensions on tensor reshape operations has "
+  "injective one-to-one semantics based on the appearance order of the "
+  "dimensions.",
+  "bool",
+  "false"
+>;
+
 //===----------------------------------------------------------------------===//
 // HIVM Optimization Control Options
 //===----------------------------------------------------------------------===//

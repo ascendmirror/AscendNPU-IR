@@ -27,6 +27,11 @@ def CanonicalizeTensorReshape
   let dependentDialects = [
     "tensor::TensorDialect",
   ];
+  let options = [
+      Option<"injectiveDynamic", "injective-dynamic", "bool",
+             /*default=*/"false",
+             "Assume dynamic shapes have one to one value">
+  ];
 }
 
 def FoldTensorEmpty : Pass<"fold-tensor-empty", "func::FuncOp"> {

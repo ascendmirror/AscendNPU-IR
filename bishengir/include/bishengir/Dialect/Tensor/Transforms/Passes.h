@@ -30,7 +30,8 @@ namespace mlir {
 namespace tensor {
 
 /// Create a pass to canonicalize tensor reshape.
-std::unique_ptr<Pass> createCanonicalizeTensorReshapePass();
+std::unique_ptr<Pass> createCanonicalizeTensorReshapePass(
+    const CanonicalizeTensorReshapeOptions &options = {});
 
 /// Create a pass to narrow liveness of tensor ops
 std::unique_ptr<Pass> createNarrowTensorOpPass();

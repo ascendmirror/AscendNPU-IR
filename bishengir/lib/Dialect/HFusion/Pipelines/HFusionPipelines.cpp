@@ -91,6 +91,8 @@ static void preProcess(OpPassManager &pm,
     pm.addPass(createAdaptTritonKernelPass());
   }
   pm.addPass(createTensorToHFusionConversionPass());
+  CanonicalizeTensorReshapeOptions canonicalizeReshapeOpt;
+  canonicalizeReshapeOpt.injectiveDynamic = options.assumeInjectiveDynamic;
   pm.nest<func::FuncOp>().addPass(
       tensor::createCanonicalizeTensorReshapePass());
   canonicalizationPipeline(pm, options);
@@ -165,6 +167,8 @@ static void flattenAndFold(OpPassManager &pm,
   flattenOpsOpt.skipHost = options.enableMultiKernel;
   flattenOpsOpt.multiDynamicShape = false;
   pm.nest<func::FuncOp>().addPass(createFlattenOpsPass(flattenOpsOpt));
+  CanonicalizeTensorReshapeOptions canonicalizeReshapeOpt;
+  canonicalizeReshapeOpt.injectiveDynamic = options.assumeInjectiveDynamic;
   pm.nest<func::FuncOp>().addPass(
       tensor::createCanonicalizeTensorReshapePass());
   canonicalizationPipeline(pm, options, AfterFlattenBeforeAutoSchedule);
@@ -292,6 +296,8 @@ void buildHFusionPipelines(OpPassManager &pm,
     }
     hfusionAutoSchedulePipeline(pm, options);
   } else {
+    CanonicalizeTensorReshapeOptions canonicalizeReshapeOpt;
+    canonicalizeReshapeOpt.injectiveDynamic = options.assumeInjectiveDynamic;
     pm.nest<func::FuncOp>().addPass(
         tensor::createCanonicalizeTensorReshapePass());
     // To handle ops that are not decomposed properly in the hivm.hir form

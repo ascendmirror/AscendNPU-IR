@@ -40,6 +40,9 @@ namespace mlir::tensor {
 namespace {
 struct CanonicalizeTensorReshape
     : public impl::CanonicalizeTensorReshapeBase<CanonicalizeTensorReshape> {
+  explicit CanonicalizeTensorReshape(
+      const CanonicalizeTensorReshapeOptions &options)
+      : CanonicalizeTensorReshapeBase(options) {}
   using Base::Base;
   void runOnOperation() override;
 };
@@ -117,7 +120,9 @@ public:
 class FoldReshape : public OpRewritePattern<tensor::ReshapeOp> {
 public:
   using OpRewritePattern<tensor::ReshapeOp>::OpRewritePattern;
-
+  explicit FoldReshape(MLIRContext *context, bool isInjective)
+      : OpRewritePattern<tensor::ReshapeOp>(context),
+        injectiveDynamic(isInjective) {}
   class RankedTensorWithInfo : public RankedTensorType {
   public:
     explicit RankedTensorWithInfo(RankedTensorType rankedTensor)
@@ -135,8 +140,8 @@ public:
   };
 
   // Asserts if dynamic are the same for now
-  bool isInferrable(RankedTensorWithInfo typeA,
-                    RankedTensorWithInfo typeB) const {
+  bool isInferable(RankedTensorWithInfo typeA,
+                   RankedTensorWithInfo typeB) const {
     int dynCountA = typeA.getNumDynamicDims();
     int dynCountB = typeB.getNumDynamicDims();
     if (dynCountA > 1 || dynCountB > 1)
@@ -146,6 +151,16 @@ public:
     // Only support 1 to 1 and/or 0 to 0 for now, other case should be derivable
     // by logic!
     // Without divisibility API, parting can only assume the value is the same
+    return (typeA.getStaticTotalMult() == typeB.getStaticTotalMult());
+  }
+
+  // Asserts if dynamic are the same for now
+  bool isInferableInjective(RankedTensorWithInfo typeA,
+                            RankedTensorWithInfo typeB) const {
+    int dynCountA = typeA.getNumDynamicDims();
+    int dynCountB = typeB.getNumDynamicDims();
+    if (dynCountA != dynCountB)
+      return false;
     return (typeA.getStaticTotalMult() == typeB.getStaticTotalMult());
   }
 
@@ -160,9 +175,16 @@ public:
       return failure();
     }
     // Check if the dynamic has the same value
-    if (!isInferrable(srcType, dstType)) {
-      return rewriter.notifyMatchFailure(
-          reshapeOp, "Dynamic requirement is not satisfied");
+    if (injectiveDynamic) {
+      if (!isInferableInjective(srcType, dstType)) {
+        return rewriter.notifyMatchFailure(
+            reshapeOp, "injective dynamic requirement is not satisfied");
+      }
+    } else {
+      if (!isInferable(srcType, dstType)) {
+        return rewriter.notifyMatchFailure(
+            reshapeOp, "dynamic requirement is not satisfied");
+      }
     }
     SmallVector<ReassociationIndices> newReassociationExpand,
         newReassociationCollapse;
@@ -188,18 +210,22 @@ public:
     rewriter.replaceAllUsesWith(reshapeOp, newCollapseOp.getResult());
     return success();
   }
+
+private:
+  bool injectiveDynamic;
 };
 
 void CanonicalizeTensorReshape::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
   patterns.insert<CanonicalizeTensorReshapeOpPattern>(patterns.getContext());
-  patterns.insert<FoldReshape>(patterns.getContext());
+  patterns.insert<FoldReshape>(patterns.getContext(), injectiveDynamic);
   if (failed(applyPatternsGreedily(getOperation(), std::move(patterns))))
     return signalPassFailure();
 }
 } // namespace mlir::tensor
 
-std::unique_ptr<Pass> mlir::tensor::createCanonicalizeTensorReshapePass() {
-  return std::make_unique<CanonicalizeTensorReshape>();
+std::unique_ptr<Pass> mlir::tensor::createCanonicalizeTensorReshapePass(
+    const CanonicalizeTensorReshapeOptions &options) {
+  return std::make_unique<CanonicalizeTensorReshape>(options);
 }
