@@ -198,3 +198,31 @@ module {
   }
 }
 
+// -----
+
+// CHECK: @keep_function_signature_returned_operand_is_not_fused_0(
+// CHECK: arith.constant
+// CHECK: tensor.collapse_shape
+// CHECK: tensor.dim
+// CHECK: tensor.extract_slice
+// CHECK: tensor.collapse_shape
+// CHECK: %[[CONCAT:.*]] = tensor.concat
+// CHECK: return %[[CONCAT]]
+// CHECK: @keep_function_signature_returned_operand_is_not_fused(
+// CHECK: arith.constant
+// CHECK: %[[RETURNED:.*]] = call @keep_function_signature_returned_operand_is_not_fused_0(
+// CHECK: tensor.dim
+// CHECK: %[[EXPANDED:.*]] = tensor.expand_shape %[[RETURNED]]
+// CHECK: return %[[EXPANDED]]
+func.func @keep_function_signature_returned_operand_is_not_fused(%arg0: tensor<1x?x32x128xbf16>, %arg1: i64, %arg2: tensor<1x109x32x128xbf16>) -> tensor<?x32x128xbf16> attributes {hacc.entry, hacc.function_kind = #hacc.function_kind<HOST>, hfusion.fusion_kind = #hfusion.fusion_kind<PURE_ELEMWISE>} {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %collapsed = tensor.collapse_shape %arg0 [[0, 1], [2, 3]] : tensor<1x?x32x128xbf16> into tensor<?x4096xbf16>
+  %dim = tensor.dim %arg0, %c1 : tensor<1x?x32x128xbf16>
+  %extracted_slice = tensor.extract_slice %collapsed[0, 0] [%dim, 4096] [1, 1] : tensor<?x4096xbf16> to tensor<?x4096xbf16>
+  %collapsed_0 = tensor.collapse_shape %arg2 [[0, 1], [2, 3]] : tensor<1x109x32x128xbf16> into tensor<109x4096xbf16>
+  %concat = tensor.concat dim(0) %extracted_slice, %collapsed_0 : (tensor<?x4096xbf16>, tensor<109x4096xbf16>) -> tensor<?x4096xbf16>
+  %dim_1 = tensor.dim %concat, %c0 : tensor<?x4096xbf16>
+  %expanded = tensor.expand_shape %concat [[0], [1, 2]] output_shape [%dim_1, 32, 128] : tensor<?x4096xbf16> into tensor<?x32x128xbf16>
+  return %expanded : tensor<?x32x128xbf16>
+}

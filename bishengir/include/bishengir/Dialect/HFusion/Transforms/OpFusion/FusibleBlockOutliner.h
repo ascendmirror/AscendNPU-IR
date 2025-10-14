@@ -40,8 +40,8 @@ public:
   bool outline(const std::string &prefixOutline = "");
 
   // get the number uses of an operation outside of the function
-  size_t getNumOutsideUsesOfOp(SetVector<Operation *> &opsWithAuxs,
-                               Value out) const;
+  size_t getNumOutShouldBeReturned(SetVector<Operation *> &opsWithAuxs,
+                                   Value out) const;
 
 private:
   size_t funcCnt_{0};
