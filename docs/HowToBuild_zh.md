@@ -32,7 +32,7 @@ cd AscendNPU-IR
 
 ```bash
 # 递归地拉取所有子模块
-git submodule update --init --recursive
+#git submodule update --init --recursive
 ```
 
 ## 🏗️ 将AscendNPU IR构建为外部LLVM项目
