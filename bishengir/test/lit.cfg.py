@@ -29,6 +29,7 @@ config.substitutions.append(('%shlibext', config.llvm_shlib_ext))
 config.substitutions.append(("%host_cxx", config.host_cxx))
 config.substitutions.append(("%host_cc", config.host_cc))
 config.substitutions.append(("%bishengir_src_root", config.bishengir_src_root))
+config.substitutions.append(("%lib", config.bishengir_lib_dir))
 
 llvm_config.with_system_environment(['HOME', 'INCLUDE', 'LIB', 'TMP', 'TEMP'])
 

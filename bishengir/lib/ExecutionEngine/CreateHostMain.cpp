@@ -148,8 +148,6 @@ struct CreateHostMainPass
                     const SmallVector<ShapedValue> &memrefs,
                     func::FuncOp wrapperFunc,
                     std::size_t argumentInsertionIndex) {
-    if (memrefs.empty())
-      return;
     const auto loc = wrapperFunc.getLoc();
     wrapperFunc.insertArgument(argumentInsertionIndex,
                                rewriter.getType<LLVM::LLVMPointerType>(), {},
