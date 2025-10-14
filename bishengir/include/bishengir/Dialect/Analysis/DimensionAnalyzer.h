@@ -106,11 +106,30 @@ public:
   ///                 structurally equivalent (e.g., before and after concat).
   bool areDimensionsEqual(Dimension lhs, Dimension rhs, bool isStrict = false);
 
+  SmallVector<int64_t> getArgumentRef(Value v) const;
+  bool existArgumentRef(Value v) const {
+    return argumentsRefPointer_.count(v);
+  };
+  int64_t getShapeElementParent(int index) {
+    return solverShapeElem_->find(index);
+  }
+  int64_t getCollapseElementParent(int index) {
+    return solverCollapserElem_->find(index);
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Union-find handler
+  //===--------------------------------------------------------------------===//
+
+  void joinShape(int a, int b);
+  void joinCollapser(int a, int b);
+  void disconnect(int a, int b);
+  bool isConnected(int a, int b);
+
 protected:
   /// Helper to represent connected dimensions.
   using DimensionIndex = SmallVector<int64_t>;
   using DimensionShape = SmallVector<int64_t>;
-  using ArgumentIndex = SmallVector<int64_t>;
 
   //===--------------------------------------------------------------------===//
   // Functions for initialization
@@ -236,19 +255,9 @@ protected:
   void processInsertSliceOp(tensor::InsertSliceOp insertSliceOp);
 
   //===--------------------------------------------------------------------===//
-  // Union-find handler
-  //===--------------------------------------------------------------------===//
-
-  void joinShape(int a, int b);
-  void joinCollapser(int a, int b);
-  void disconnect(int a, int b);
-  bool isConnected(int a, int b);
-
-  //===--------------------------------------------------------------------===//
   // Helper function
   //===--------------------------------------------------------------------===//
   void dumpModuleOP() const;
-  SmallVector<int64_t> getArgumentRef(Value v) const;
   SmallVector<int64_t> getArgumentRefOrCreateDummy(Value v);
 
 protected:
@@ -256,7 +265,6 @@ protected:
   int64_t dimensionAllocation_ = 0;
 
   SmallVector<Value> argumentList_;
-  ArgumentIndex argumentIndex_;
   SmallVector<Operation *> outList_;
   int64_t argumentTotalLength_ = 0;
   SmallVector<ConnectedLeftRight, 4> isConnected_;

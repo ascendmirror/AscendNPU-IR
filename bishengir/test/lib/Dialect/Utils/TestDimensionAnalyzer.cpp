@@ -22,8 +22,8 @@
 #include "bishengir/Dialect/HFusion/IR/HFusion.h"
 #include "bishengir/Dialect/Tensor/Utils/Utils.h"
 #include "bishengir/Dialect/Utils/Util.h"
-
 #include "llvm/Support/CommandLine.h"
+#include <string>
 
 #define DEBUG_TYPE "test-dimension-analyzer"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
@@ -61,19 +61,45 @@ struct TestDimensionAnalyzerPass
 
       DenseMap<Value, Value> settled;
       OpBuilder builder(&getContext());
+      for (auto &arg : funcOp.getArguments()) {
+        addEncoding(builder, analyzer, arg);
+      }
       funcOp.walk([&](Operation *op) {
-        for (auto res : op->getResults()) {
-          auto commonAxis = analyzer.getCommonAxis(res);
-          if (commonAxis.empty())
-            continue;
-          LDBG(res << " Common axis");
-          for (size_t i = 0; i < commonAxis.size(); ++i) {
-            LDBG("bit: " << commonAxis[i]);
-          }
-          LDBG("Interchange: " << to_string(analyzer.getInterchange(res)));
-        }
+        for (auto res : op->getResults())
+          addEncoding(builder, analyzer, res);
       });
+      auto *terminator = funcOp.getBody().getBlocks().back().getTerminator();
+      auto newFunctionType = funcOp.getFunctionType().clone(
+          TypeRange(funcOp.getArguments()), terminator->getOperandTypes());
+      funcOp.setFunctionType(newFunctionType);
     });
+  }
+  void addEncoding(OpBuilder &builder, DimensionAnalyzer &analyzer, Value res) {
+    if (!analyzer.existArgumentRef(res))
+      return;
+    if (auto tensorType =
+            dyn_cast_if_present<RankedTensorType>(res.getType())) {
+      SmallVector<Attribute> encoding;
+      auto argRef = analyzer.getArgumentRef(res);
+      for (auto el : argRef) {
+        auto symbolString =
+            std::to_string(analyzer.getCollapseElementParent(el));
+        encoding.push_back(SymbolRefAttr::get(&getContext(), symbolString));
+      }
+      auto encoded = RankedTensorType::get(tensorType.getShape(),
+                                           tensorType.getElementType(),
+                                           builder.getArrayAttr(encoding));
+      res.setType(encoded);
+    }
+    auto commonAxis = analyzer.getCommonAxis(res);
+    if (commonAxis.empty())
+      return;
+
+    LDBG(res << " Common axis");
+    for (size_t i = 0; i < commonAxis.size(); ++i) {
+      LDBG("bit: " << commonAxis[i]);
+    }
+    LDBG("Interchange: " << to_string(analyzer.getInterchange(res)));
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {

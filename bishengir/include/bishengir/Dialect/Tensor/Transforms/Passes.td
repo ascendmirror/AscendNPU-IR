@@ -40,7 +40,7 @@ let summary = "Fold tensor empty";
 def NormalizeTensorOps : Pass<"normalize-tensor-ops", "func::FuncOp"> {
   let summary = "Optimization patterns for tensor ops";
   let options = [
-    Option<"skipAlignedSlice", "skip-aligned-slice", "bool", "false", 
+    Option<"skipAlignedSlice", "skip-aligned-slice", "bool", "false",
            "Skip FoldInsertSliceToConcat pattern for aligned slice.">,
   ];
   let constructor = "mlir::tensor::createNormalizeTensorOpsPass()";
@@ -165,7 +165,7 @@ def BubbleUpExtractSlice : Pass<"bubble-up-extract-slice", "func::FuncOp"> {
   ];
 }
 
-def MergeConsecutiveInsertExtractSlice 
+def MergeConsecutiveInsertExtractSlice
     : Pass<"merge-consecutive-insert-extract-slice", "func::FuncOp"> {
   let summary = "Merge consecutive insert extract slice";
   let description = [{Merge consecutive insert extract slice}];
@@ -185,6 +185,15 @@ def OptimizeDpsOpWithYieldedInsertSlice :
   let constructor = [{
     mlir::tensor::createOptimizeDpsOpWithYieldedInsertSlicePass()
   }];
+  let dependentDialects = [
+    "tensor::TensorDialect",
+  ];
+}
+
+def ReplicateOutEmptyTensor
+    : Pass<"replicate-out-empty-tensor", "func::FuncOp"> {
+  let summary = "Clone tensor empty for destination style interface";
+  let constructor = "mlir::tensor::createReplicateOutEmptyTensorPass()";
   let dependentDialects = [
     "tensor::TensorDialect",
   ];

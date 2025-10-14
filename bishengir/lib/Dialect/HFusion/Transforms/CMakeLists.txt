@@ -17,6 +17,7 @@ add_bishengir_dialect_library(BiShengIRHFusionTransforms
   Decompose.cpp
   DecomposeOpInterfaceImpl.cpp
   DecomposeMulti.cpp
+  DimensionBasedCSE.cpp
   DropSymbols.cpp
   EliminateDuplicateFuncs.cpp
   FlattenOps.cpp
@@ -73,6 +74,7 @@ add_bishengir_dialect_library(BiShengIRHFusionTransforms
   MLIRSCFTransformOps
   MLIRShapeDialect
   MLIRTensorDialect
+  MLIRTensorTransforms
   MLIRTensorTransformOps
   MLIRTensorUtils
   MLIRTransformDialect
