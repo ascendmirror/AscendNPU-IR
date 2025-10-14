@@ -1,3 +1,6 @@
-add_subdirectory(IR)
+if(BISHENGIR_BUILD_STANDALONE_IR_ONLY)
+    add_subdirectory(IR)
+    return()
+endif()
 add_subdirectory(Transforms)
 add_subdirectory(Utils)

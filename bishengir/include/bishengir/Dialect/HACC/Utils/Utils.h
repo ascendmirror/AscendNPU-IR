@@ -18,6 +18,10 @@
 #ifndef BISHENGIR_DIALECT_HACC_UTILS_UTILS_H
 #define BISHENGIR_DIALECT_HACC_UTILS_UTILS_H
 
+#include "bishengir/Config/bishengir-config.h"
+
+#if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
+
 #include "bishengir/Dialect/HACC/IR/HACC.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -172,4 +176,5 @@ size_t countDeviceArgSizeInByte(ModuleOp modOp);
 } // namespace hacc
 } // namespace mlir
 
+#endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
 #endif // BISHENGIR_DIALECT_HACC_UTILS_UTILS_H
