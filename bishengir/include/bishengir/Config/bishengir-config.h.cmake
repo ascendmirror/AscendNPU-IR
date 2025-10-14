@@ -34,4 +34,7 @@
 /* If set, enable BiShengIR CPU Runner. */
 #cmakedefine01 MLIR_ENABLE_EXECUTION_ENGINE
 
+/* If set, only build IR definitions. */
+#cmakedefine01 BISHENGIR_BUILD_STANDALONE_IR_ONLY
+
 #endif
