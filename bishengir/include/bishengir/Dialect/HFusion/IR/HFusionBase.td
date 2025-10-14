@@ -34,7 +34,7 @@ def HFusion_Dialect : Dialect {
   }];
   let cppNamespace = "::mlir::hfusion";
   let dependentDialects = [
-    "hacc::HACCDialect",
+    // "hacc::HACCDialect",
     "linalg::LinalgDialect",
     "mathExt::MathExtDialect",
     "mesh::MeshDialect",

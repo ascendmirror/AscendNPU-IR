@@ -18,7 +18,7 @@
 #include "bishengir/Dialect/MathExt/IR/MathExt.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/CommonFolders.h"
-#include "mlir/Dialect/Quant/QuantOps.h"
+// #include "mlir/Dialect/Quant/QuantOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/IR/BuiltinTypes.h"

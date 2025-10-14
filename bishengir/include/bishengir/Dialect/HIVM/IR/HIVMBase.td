@@ -41,7 +41,7 @@ def HIVM_Dialect : Dialect {
   let cppNamespace = "::mlir::hivm";
   let dependentDialects = [
     "arith::ArithDialect", "bishengir::memref_ext::MemRefExtDialect",
-    "math::MathDialect", "memref::MemRefDialect", "hacc::HACCDialect",
+    "math::MathDialect", "memref::MemRefDialect", // "hacc::HACCDialect",
     "tensor::TensorDialect"
   ];
   let hasCanonicalizer = 1;

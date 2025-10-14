@@ -1968,13 +1968,17 @@ FailureOr<SmallVector<Value>> IsFiniteOp::decomposeOperation(OpBuilder &b) {
 
 MutableOperandRange GatherOp::getDpsInitsMutable() { return getInitMutable(); }
 
+// SmallVector<utils::IteratorType> GatherOp::getIteratorTypesArray() {
+//   SmallVector<utils::IteratorType> result(getInit().getType().getRank() + 1,
+//                                           utils::IteratorType::parallel);
+//   // The gather dim for indicies and src each take a loop, since we want the src
+//   // loop (reduction dim) to be on the inside, we set the gatherDim+1 to reduce
+//   result[getAxis() + 1] = utils::IteratorType::gather;
+//   return result;
+// }
+
 SmallVector<utils::IteratorType> GatherOp::getIteratorTypesArray() {
-  SmallVector<utils::IteratorType> result(getInit().getType().getRank() + 1,
-                                          utils::IteratorType::parallel);
-  // The gather dim for indicies and src each take a loop, since we want the src
-  // loop (reduction dim) to be on the inside, we set the gatherDim+1 to reduce
-  result[getAxis() + 1] = utils::IteratorType::gather;
-  return result;
+  llvm_unreachable("Not implemented");
 }
 
 /// The source gather axis will be inside the index gather axis. For src
@@ -2299,14 +2303,14 @@ void AtomicXchgOp::getEffects(
 //===----------------------------------------------------------------------===//
 void HFusionDialect::getCanonicalizationPatterns(
     RewritePatternSet &results) const {
-  results.add<
-      mlir::linalg::InlineDenseSplatToGenericRegion<hfusion::ElemwiseBinaryOp>,
-      mlir::linalg::InlineDenseSplatToGenericRegion<hfusion::ElemwiseUnaryOp>,
-      mlir::linalg::InlineDenseSplatToGenericRegion<hfusion::CompareOp>,
-      mlir::linalg::InlineDenseSplatToGenericRegion<hfusion::CastOp>,
-      mlir::linalg::SimplifySplatDenseForBinary<hfusion::ElemwiseBinaryOp>,
-      mlir::linalg::SimplifySplatDenseForBinary<hfusion::CompareOp>>(
-      getContext());
+  // results.add<
+  //     mlir::linalg::InlineDenseSplatToGenericRegion<hfusion::ElemwiseBinaryOp>,
+  //     mlir::linalg::InlineDenseSplatToGenericRegion<hfusion::ElemwiseUnaryOp>,
+  //     mlir::linalg::InlineDenseSplatToGenericRegion<hfusion::CompareOp>,
+  //     mlir::linalg::InlineDenseSplatToGenericRegion<hfusion::CastOp>,
+  //     mlir::linalg::SimplifySplatDenseForBinary<hfusion::ElemwiseBinaryOp>,
+  //     mlir::linalg::SimplifySplatDenseForBinary<hfusion::CompareOp>>(
+  //     getContext());
 }
 
 //===----------------------------------------------------------------------===//
@@ -2330,8 +2334,8 @@ LogicalResult SortOp::verify() {
 // HistogramOp
 //===----------------------------------------------------------------------===//
 LogicalResult HistogramOp::verify() {
-  auto inTy = getInput().getType().dyn_cast<RankedTensorType>();
-  auto outTy = getOutput().getType().dyn_cast<RankedTensorType>();
+  auto inTy = dyn_cast<RankedTensorType>(getInput().getType());
+  auto outTy = dyn_cast<RankedTensorType>(getInput().getType());
   Value mask = getMask();
 
   // Input/output must be ranked tensors
@@ -2340,7 +2344,7 @@ LogicalResult HistogramOp::verify() {
 
   // Input element type must be i32 or i64
   Type inEltTy = inTy.getElementType();
-  if (!inEltTy.isa<IntegerType>() ||
+  if (!isa<IntegerType>(inEltTy) ||
       (inEltTy.getIntOrFloatBitWidth() != 32 &&
        inEltTy.getIntOrFloatBitWidth() != 64))
     return emitOpError() << "input element type must be i32 or i64";
@@ -2353,7 +2357,7 @@ LogicalResult HistogramOp::verify() {
 
   // Output element type must be i32 or i64
   Type outEltTy = outTy.getElementType();
-  if (!outEltTy.isa<IntegerType>() ||
+  if (!isa<IntegerType>(outEltTy) ||
       (outEltTy.getIntOrFloatBitWidth() != 32 &&
        outEltTy.getIntOrFloatBitWidth() != 64))
     return emitOpError() << "output element type must be i32 or i64";
@@ -2366,7 +2370,7 @@ LogicalResult HistogramOp::verify() {
 
   // If mask is provided, it must match input shape
   if (mask) {
-    auto maskTy = mask.getType().dyn_cast<RankedTensorType>();
+    auto maskTy = dyn_cast<RankedTensorType>(mask.getType());
     if (!maskTy)
       return emitOpError() << "mask must be a ranked tensor";
     if (maskTy.getElementType() != IntegerType::get(getContext(), 1))
@@ -2387,8 +2391,8 @@ FailureOr<SmallVector<Value>> HistogramOp::decomposeOperation(OpBuilder &b) {
   Value input = getInput();
   int64_t bins = getNumBins();
   Value mask = getMask();
-  auto inTy = input.getType().cast<RankedTensorType>();
-  auto outTy = getOutput().getType().cast<RankedTensorType>();
+  auto inTy = cast<RankedTensorType>(input.getType());
+  auto outTy = cast<RankedTensorType>(getOutput().getType());
 
   Type outEltTy = outTy.getElementType();
   Type idxTy = b.getIndexType();

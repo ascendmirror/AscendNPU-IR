@@ -1,2 +1,4 @@
 add_subdirectory(IR)
-add_subdirectory(Transforms)
+if(NOT BISHENGIR_BUILD_STANDALONE_IR_ONLY)
+    add_subdirectory(Transforms)
+endif()

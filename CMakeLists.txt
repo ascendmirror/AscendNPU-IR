@@ -163,7 +163,9 @@ if(MLIR_ENABLE_BINDINGS_PYTHON)
   add_subdirectory(python)
 endif()
 
-add_subdirectory(bishengir/tools)
+if(NOT BISHENGIR_BUILD_STANDALONE_IR_ONLY)
+  add_subdirectory(bishengir/tools)
+endif()
 
 if(NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
   install(

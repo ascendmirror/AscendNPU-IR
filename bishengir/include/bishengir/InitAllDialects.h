@@ -27,7 +27,7 @@
 #include "bishengir/Dialect/Annotation/IR/Annotation.h"
 #include "bishengir/Dialect/Annotation/Transforms/BufferizableOpInterfaceImpl.h"
 #include "bishengir/Dialect/Bufferization/Transforms/TilingInterfaceImpl.h"
-#include "bishengir/Dialect/HACC/IR/HACC.h"
+// #include "bishengir/Dialect/HACC/IR/HACC.h"
 #include "bishengir/Dialect/HFusion/IR/HFusion.h"
 #include "bishengir/Dialect/HFusion/Transforms/BufferizableOpInterfaceImpl.h"
 #include "bishengir/Dialect/HFusion/Transforms/DecomposeOpInterfaceImpl.h"
@@ -52,7 +52,7 @@ namespace bishengir {
 inline void registerAllDialects(mlir::DialectRegistry &registry) {
   // clang-format off
   registry.insert<mlir::annotation::AnnotationDialect,
-                  mlir::hacc::HACCDialect,
+                  // mlir::hacc::HACCDialect,
                   mlir::hfusion::HFusionDialect,
                   mlir::hivm::HIVMDialect,
                   mlir::mathExt::MathExtDialect,
@@ -69,12 +69,12 @@ inline void registerAllDialects(mlir::DialectRegistry &registry) {
 #endif
 
   // Register all external models.
-  mlir::annotation::registerBufferizableOpInterfaceExternalModels(registry);
-  mlir::hfusion::registerTilingInterfaceExternalModels(registry);
-  mlir::hfusion::registerBufferizableOpInterfaceExternalModels(registry);
-  mlir::hfusion::registerDecomposeInterfaceExternalModels(registry);
-  bishengir::tensor::registerTilingInterfaceExternalModels(registry);
-  bishengir::bufferization::registerTilingInterfaceExternalModels(registry);
+  // mlir::annotation::registerBufferizableOpInterfaceExternalModels(registry);
+  // mlir::hfusion::registerTilingInterfaceExternalModels(registry);
+  // mlir::hfusion::registerBufferizableOpInterfaceExternalModels(registry);
+  // mlir::hfusion::registerDecomposeInterfaceExternalModels(registry);
+  // bishengir::tensor::registerTilingInterfaceExternalModels(registry);
+  // bishengir::bufferization::registerTilingInterfaceExternalModels(registry);
 }
 
 /// Append all the bishengir-specific dialects to the registry contained in the
