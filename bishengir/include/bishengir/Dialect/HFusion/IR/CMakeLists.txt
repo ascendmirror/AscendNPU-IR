@@ -1,3 +1,8 @@
+set(tblgen_feat_list)
+if(BISHENGIR_BUILD_STANDALONE_IR_ONLY)
+  list(APPEND tblgen_feat_list -DBISHENGIR_BUILD_STANDALONE_IR_ONLY)
+endif()
+
 # Declare a function to generate ODS with bishengir-hfusion-ods-yaml-gen
 function(add_hfusion_ods_yaml_gen yaml_ast_file output_file)
   set(YAML_AST_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/${yaml_ast_file})
@@ -42,7 +47,16 @@ add_custom_target(HFusionOdsGen
 )
 add_dependencies(mlir-headers HFusionOdsGen)
 
-add_bishengir_dialect(HFusionOps hfusion)
+# TODO: Better to do it with the add_bishengir_dialect()
+set(LLVM_TARGET_DEFINITIONS HFusionOps.td)
+mlir_tablegen(HFusionOps.h.inc -gen-op-decls)
+mlir_tablegen(HFusionOps.cpp.inc -gen-op-defs)
+mlir_tablegen(HFusionOpsTypes.h.inc -gen-typedef-decls -typedefs-dialect=hfusion)
+mlir_tablegen(HFusionOpsTypes.cpp.inc -gen-typedef-defs -typedefs-dialect=hfusion)
+mlir_tablegen(HFusionOpsDialect.h.inc -gen-dialect-decls -dialect=hfusion ${tblgen_feat_list})
+mlir_tablegen(HFusionOpsDialect.cpp.inc -gen-dialect-defs -dialect=hfusion ${tblgen_feat_list})
+add_public_tablegen_target(BiShengIRHFusionOpsIncGen)
+add_dependencies(mlir-headers BiShengIRHFusionOpsIncGen)
 
 add_bishengir_doc(HFusionDoc HFusionDialect Dialects/ -gen-dialect-doc -dialect=hfusion)
 add_dependencies(HFusionDialectDocGen HFusionOdsGen)
