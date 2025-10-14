@@ -233,6 +233,12 @@ LogicalResult SchedulerBase::runPreScheduleProcedure(OpBuilder &opBuilder) {
   if (failed(cacheIO(opBuilder)))
     return currentFunc.emitError() << "Failed to cache inputs/outputs.";
 
+  if (failed(applyReplicateOutEmptyTensor(currentFunc)))
+    return currentFunc.emitError() << "Failed to replicate empty tensor.";
+
+  if (failed(applyDimensionBasedCSE(currentFunc)))
+    return currentFunc.emitError() << "Failed to apply dimension based CSE.";
+
   if (failed(analyzeAndVerifyKernel()))
     return currentFunc.emitError() << "Failed to analyze and verify kernel.";
   return success();
@@ -1170,6 +1176,22 @@ LogicalResult SchedulerBase::applyMergeConsecutiveInsertExtractSlice(
     func::FuncOp target) const {
   PassManager pm(getContext());
   pm.addPass(tensor::createMergeConsecutiveInsertExtractSlicePass());
+  if (failed(pm.run(target)))
+    return failure();
+  return success();
+}
+
+LogicalResult SchedulerBase::applyReplicateOutEmptyTensor(func::FuncOp target) {
+  PassManager pm(getContext());
+  pm.addPass(tensor::createReplicateOutEmptyTensorPass());
+  if (failed(pm.run(target)))
+    return failure();
+  return success();
+}
+
+LogicalResult SchedulerBase::applyDimensionBasedCSE(func::FuncOp target) {
+  PassManager pm(getContext());
+  pm.addPass(hfusion::createDimensionBasedCSEPass());
   if (failed(pm.run(target)))
     return failure();
   return success();

@@ -628,6 +628,12 @@ protected:
   LogicalResult applyCSEAndCanonicalizePass(
       func::FuncOp target, ArrayRef<std::string> disabledPatterns = {}) const;
 
+  /// Apply a pass to replicate empty tensor used in outs
+  LogicalResult applyReplicateOutEmptyTensor(func::FuncOp target);
+  /// Apply a dimension based CSE optimization to replicated empty out tensor
+  /// functions
+  LogicalResult applyDimensionBasedCSE(func::FuncOp target);
+
   //===--------------------------------------------------------------------===//
   // Value Handle related API.
   //===--------------------------------------------------------------------===//
