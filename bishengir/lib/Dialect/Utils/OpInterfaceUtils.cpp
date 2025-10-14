@@ -25,6 +25,8 @@
 // https://github.com/bytedance/byteir/blob/main/compiler/lib/Utils/OpInterfaceUtils.cpp
 //===----------------------------------------------------------------------===//
 
+#include "bishengir/Config/bishengir-config.h"
+#if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
 #include "bishengir/Dialect/Utils/OpInterfaceUtils.h"
 
 #include "mlir/IR/BuiltinTypes.h"
@@ -98,3 +100,5 @@ void mlir::detail::addOpInterfaceExtension(
 void mlir::registerOpInterfaceExtensions(DialectRegistry &registry) {
   ExtensionRegistry::inst().apply(registry);
 }
+
+#endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
