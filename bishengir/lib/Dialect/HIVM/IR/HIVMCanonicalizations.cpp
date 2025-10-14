@@ -505,7 +505,7 @@ void VBrcOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,
 
 void VReduceOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,
                                             ::mlir::MLIRContext *context) {
-  results.add<RedudantVReduceOp, RedudantVReduceInitOp>(context);
+  results.add<RedudantVReduceOp /*, RedudantVReduceInitOp*/>(context);
 }
 
 void VCumsumOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,

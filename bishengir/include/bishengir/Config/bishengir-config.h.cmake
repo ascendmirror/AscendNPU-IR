@@ -34,4 +34,7 @@
 /* If set, enable BiShengIR CPU Runner. */
 #cmakedefine01 MLIR_ENABLE_EXECUTION_ENGINE
 
+/* If set, only HFusion and HIVM IR interface will be built */
+#cmakedefine01 BISHENGIR_BUILD_STANDALONE_IR_ONLY
+
 #endif
