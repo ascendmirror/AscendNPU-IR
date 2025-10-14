@@ -23,6 +23,7 @@ config.bishengir_published = @BISHENGIR_PUBLISH@
 
 if 'bisheng' not in config.bisheng_compiler_executable:
     config.bisheng_compiler_executable = os.path.join("@BISHENG_COMPILER_PATH@", 'bisheng')
+config.bishengir_lib_dir = os.path.join("@CMAKE_BINARY_DIR@", 'lib')
 config.enable_execution_engine = @MLIR_ENABLE_EXECUTION_ENGINE@
 
 import lit.llvm
