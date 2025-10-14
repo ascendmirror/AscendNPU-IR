@@ -133,6 +133,19 @@ attributes {hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>} {
 }
 
 // -----
+// CHECK-LABEL: func.func @normalize_dynamic_offset_insert_slice_0
+// CHECK-SAME: %[[arg0:.*]]: tensor<1x37xf32>, %[[arg1:.*]]: tensor<432x37xf32>
+// CHECK: %[[offset:.*]] = arith.index_cast
+// CHECK: %[[extract:.*]] = tensor.extract_slice %[[arg1]][0, 0] [%[[offset]], 37]
+// CHECK: %[[extract0:.*]] = tensor.extract_slice %[[arg1]]
+// CHECK: tensor.concat dim(0) %[[extract]], %[[arg0]], %[[extract0]]
+func.func @normalize_dynamic_offset_insert_slice_0(%arg0: tensor<1x37xf32>, %arg1: tensor<432x37xf32>, %arg2: i32) -> tensor<432x37xf32> {
+  %offset = arith.index_cast %arg2 : i32 to index
+  %inserted_slice = tensor.insert_slice %arg0 into %arg1[%offset, 0] [1, 37] [1, 1] : tensor<1x37xf32> into tensor<432x37xf32>
+  return %inserted_slice : tensor<432x37xf32>
+}
+
+// -----
 
 // CHECK-LABEL: func.func @not_normalize_insert_slice_to_concat_0
 // CHECK-NOT: tensor.concat
