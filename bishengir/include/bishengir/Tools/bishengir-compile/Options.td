@@ -363,6 +363,12 @@ def EnableHIVMUnitFlagSync : HIVMOptimizationControlOptions<
   "false"
 >;
 
+def EnableHIVMAssumeAliveLoops : HIVMOptimizationControlOptions<
+  "Assume that all loops (forOp whileOp) will execute at least once.",
+  "bool",
+  "false"
+>;
+
 def EnableHIVMInjectBlockAllSync : HIVMOptimizationControlOptions<
   "Enable inject all block sync for HIVM inject block sync.",
   "bool",

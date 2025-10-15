@@ -148,6 +148,7 @@ public:
         &enableStaticBarePtr,
         &enableTritonKernelCompile,
         &enableHIVMUnitFlagSync,
+        &enableHIVMAssumeAliveLoops,
     };
 
     SmallVector<Pass::Option<unsigned> *> sharedWithHIVMCompileUnsigned = {
