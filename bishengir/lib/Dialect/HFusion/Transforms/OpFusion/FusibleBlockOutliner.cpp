@@ -31,6 +31,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
+#include <algorithm>
 #include <iterator>
 
 #define DEBUG_TYPE "hfusion-fuse-outliner"
@@ -247,12 +248,12 @@ void FusibleBlockOutliner::eraseTriviallyDeadOps(ArrayRef<Operation *> ops) {
   }
 }
 
-size_t
-FusibleBlockOutliner::getNumOutsideUsesOfOp(SetVector<Operation *> &opsWithAuxs,
-                                            Value out) const {
-  return count_if(out.getUses(), [&opsWithAuxs](auto &use) {
-    return !opsWithAuxs.contains(use.getOwner());
-  });
+size_t FusibleBlockOutliner::getNumOutShouldBeReturned(
+    SetVector<Operation *> &opsWithAuxs, Value out) const {
+  // return 1 use at minimum
+  return std::max(size_t(1), size_t(count_if(out.getUses(), [](OpOperand &use) {
+                    return use.getOwner()->hasTrait<OpTrait::ReturnLike>();
+                  })));
 }
 
 func::FuncOp
@@ -269,7 +270,7 @@ FusibleBlockOutliner::outlineFunc(FusibleBlock &curBlock,
 
   for (Value out : curBlock.getOutputs())
     outTypes.append(options_.shouldKeepFuncSignature
-                        ? getNumOutsideUsesOfOp(opsWithAuxs, out)
+                        ? getNumOutShouldBeReturned(opsWithAuxs, out)
                         : 1,
                     out.getType());
 
@@ -303,7 +304,7 @@ FusibleBlockOutliner::outlineFunc(FusibleBlock &curBlock,
   for (Value out : curBlock.getOutputs()) {
     assert(curMap.getValueMap().contains(out));
     outs.append(options_.shouldKeepFuncSignature
-                    ? getNumOutsideUsesOfOp(opsWithAuxs, out)
+                    ? getNumOutShouldBeReturned(opsWithAuxs, out)
                     : 1,
                 curMap.getValueMap().at(out));
   }
@@ -330,18 +331,36 @@ func::CallOp FusibleBlockOutliner::createInvoke(func::FuncOp newFunc,
 
   if (options_.shouldKeepFuncSignature) {
     size_t returnIdx = 0;
-    SetVector<Operation *> opsWithAuxs;
-    for (auto &op : fusionBlock.getOpWithAuxs())
-      opsWithAuxs.insert(op);
+    auto results = newInvoke.getResults();
+    SmallVector<Value> uniqueResult(results.begin(), results.end());
+    uniqueResult.erase(std::unique(uniqueResult.begin(), uniqueResult.end()),
+                       uniqueResult.end());
 
-    for (auto fusionBlockOut : fusionBlock.getOutputs()) {
+    for (auto [oldOut, newOut] :
+         llvm::zip(fusionBlock.getOutputs(), uniqueResult)) {
+      // skip if no uses on return op
+      if (llvm::all_of(oldOut.getUsers(), [](Operation *op) {
+            return !op->hasTrait<OpTrait::ReturnLike>();
+          })) {
+        // replace all uses for non return op
+        ((Value)oldOut).replaceAllUsesWith(newOut);
+        ++returnIdx;
+        continue;
+      }
+
+      // list all uses in return op
       SmallVector<OpOperand *> uses;
-      for (auto &use : fusionBlockOut.getUses()) {
-        if (opsWithAuxs.contains(use.getOwner()))
+      for (auto &use : oldOut.getUses()) {
+        if (!use.getOwner()->hasTrait<OpTrait::ReturnLike>())
           continue;
         uses.push_back(&use);
       }
       std::reverse(uses.begin(), uses.end());
+
+      // replace all uses for non return op
+      ((Value)oldOut).replaceAllUsesWith(newOut);
+
+      // assign uses in return op
       for (auto &use : llvm::make_early_inc_range(uses)) {
         use->set(newInvoke->getResult(returnIdx++));
       }

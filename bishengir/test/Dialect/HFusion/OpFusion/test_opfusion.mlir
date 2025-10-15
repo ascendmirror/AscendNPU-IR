@@ -25,10 +25,10 @@ func.func @test_graph_a(%arg0: tensor<?x?xf32>) -> (tensor<?x?xf32>, tensor<?x?x
   %3 = linalg.matmul ins(%arg0, %arg0 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%2 : tensor<?x?xf32>) -> tensor<?x?xf32>
 // Single-NOT: call
 // Single-Aggr-NOT: call
-// CHECK: %[[CALL1:.*]]:2 = call @test_graph_a_0(
-// CHECK-SAME: -> (tensor<?x?xf32>, tensor<?x?xf32>)
   %4 = tensor.empty(%0, %1) : tensor<?x?xf32>
   %5 = linalg.elemwise_unary {fun = #linalg.unary_fn<log>} ins(%3 : tensor<?x?xf32>) outs(%4 : tensor<?x?xf32>) -> tensor<?x?xf32>
+// CHECK: %[[CALL1:.*]]:2 = call @test_graph_a_0(
+// CHECK-SAME: -> (tensor<?x?xf32>, tensor<?x?xf32>)
 // CHECK: %[[MATMUL3:.*]] = linalg.matmul
   %6 = tensor.empty(%0, %1) : tensor<?x?xf32>
   %7 = linalg.matmul ins(%arg0, %5 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%6 : tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -60,10 +60,10 @@ func.func @test_graph_a(%arg0: tensor<?x?xf32>) -> (tensor<?x?xf32>, tensor<?x?x
 // Single-Aggr: return
 // CHECK-LABEL: func.func @test_graph_b(
 // CHECK-SAME: %[[ARG0:.*]]: tensor<?x?xf32>, %[[ARG1:.*]]: tensor<?x?xf32>, %[[ARG2:.*]]: tensor<?x?xf32>)
-// CHECK: %[[CALL1:.*]]:5 = call @test_graph_b_0(
+// CHECK: %[[CALL1:.*]]:4 = call @test_graph_b_0(
 // CHECK: %[[MATMUL1:.*]] = linalg.matmul
 // CHECK: %[[CALL2:.*]] = call @test_graph_b_1(
-// CHECK: return %[[ARG0]], %[[CALL1]]#2, %[[CALL1]]#3, %[[CALL2]], %[[CALL1]]#4 : tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>
+// CHECK: return %[[ARG0]], %[[CALL1]]#1, %[[CALL1]]#2, %[[CALL2]], %[[CALL1]]#3 : tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>
 func.func @test_graph_b(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>, %arg2: tensor<?x?xf32>) -> (tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>)  attributes {hacc.function_kind = #hacc.function_kind<HOST>} {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -118,8 +118,8 @@ func.func @test_graph_c(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>, %arg2: t
 // Single-Aggr: call @test_graph_c_0
 // Single-Aggr: call @test_graph_c_1
 // Single-Aggr: call @test_graph_c_2
-// CHECK: %[[CALL1:.*]]:7 = call @test_graph_c_0(
-// CHECK-SAME: -> (tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>)
+// CHECK: %[[CALL1:.*]]:5 = call @test_graph_c_0(
+// CHECK-SAME: -> (tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>)
   %2 = tensor.empty(%0, %1) : tensor<?x?xf32>
   %3 = linalg.elemwise_unary {fun = #linalg.unary_fn<log>} ins(%arg1 : tensor<?x?xf32>) outs(%2 : tensor<?x?xf32>) -> tensor<?x?xf32>
   %4 = tensor.empty(%0, %1) : tensor<?x?xf32>
@@ -141,7 +141,7 @@ func.func @test_graph_c(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>, %arg2: t
   %17 = linalg.elemwise_unary {fun = #linalg.unary_fn<log>} ins(%5 : tensor<?x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
   %18 = tensor.empty(%0, %1) : tensor<?x?xf32>
   %19 = linalg.elemwise_binary {mul, fun = #linalg.binary_fn<mul>} ins(%13, %5 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%18 : tensor<?x?xf32>) -> tensor<?x?xf32>
-// CHECK: return %[[ARG0]], %[[CALL1]]#3, %[[CALL1]]#4, %[[MATMUL1]], %[[CALL1]]#5, %[[CALL1]]#6, %[[CALL2]] : tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>
+// CHECK: return %[[ARG0]], %[[CALL1]]#1, %[[CALL1]]#2, %[[MATMUL1]], %[[CALL1]]#3, %[[CALL1]]#4, %[[CALL2]] : tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>
   return %arg0, %7, %9, %11, %15, %17, %19 : tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>
 }
 
@@ -235,8 +235,8 @@ func.func @test_graph_f(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>, %arg2: t
   %4 = tensor.empty(%0, %1) : tensor<?x?xf32>
 // Single-NOT: call
 // Single-Aggr-NOT: call
-// CHECK: %[[CALL1:.*]]:4 = call @test_graph_f_0(
-// CHECK-SAME: -> (tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>)
+// CHECK: %[[CALL1:.*]]:3 = call @test_graph_f_0(
+// CHECK-SAME: -> (tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>)
   %5 = linalg.matmul ins(%3, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%4 : tensor<?x?xf32>) -> tensor<?x?xf32>
 // CHECK: %[[MATMUL1:.*]] = linalg.matmul
   %6 = tensor.empty(%0, %1) : tensor<?x?xf32>
@@ -246,7 +246,7 @@ func.func @test_graph_f(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>, %arg2: t
 // CHECK: %[[ELEMWISE1:.*]] = linalg.elemwise_binary
   %10 = tensor.empty(%0, %1) : tensor<?x?xf32>
   %11 = linalg.elemwise_binary {mul, fun = #linalg.binary_fn<mul>} ins(%7, %5 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%10 : tensor<?x?xf32>) -> tensor<?x?xf32>
-// CHECK: return %[[ARG1]], %[[CALL1]]#1, %[[CALL1]]#3, %[[ELEMWISE1]] : tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>
+// CHECK: return %[[ARG1]], %[[CALL1]]#0, %[[CALL1]]#2, %[[ELEMWISE1]] : tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>
   return %arg1, %3, %9, %11 : tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>
 }
 
