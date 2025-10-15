@@ -858,42 +858,45 @@ hivm::CreateSyncBlockLockOp createSyncBlockLockVar(OpBuilder &builder,
   return createSyncBlockLockOp;
 }
 
-std::optional<std::pair<Value, Value>> getOperationAliasInfo(Operation *op) {
+std::vector<std::pair<Value, Value>> getOperationAliasInfo(Operation *op) {
+
+  std::vector<std::pair<Value, Value>> result;
   if (auto subViewOp = dyn_cast<memref::SubViewOp>(op)) {
-    return std::make_pair(subViewOp.getResult(), subViewOp.getViewSource());
+    result.emplace_back(subViewOp.getResult(), subViewOp.getViewSource());
   } else if (auto extSliceOp = dyn_cast<tensor::ExtractSliceOp>(op)) {
-    return std::make_pair(extSliceOp.getResult(), extSliceOp.getSource());
+    result.emplace_back(extSliceOp.getResult(), extSliceOp.getSource());
   } else if (auto collapseShapeOp = dyn_cast<memref::CollapseShapeOp>(op)) {
-    return std::make_pair(collapseShapeOp.getResult(),
-                          collapseShapeOp.getViewSource());
+    result.emplace_back(collapseShapeOp.getResult(),
+                        collapseShapeOp.getViewSource());
   } else if (auto expandShapeOp = dyn_cast<memref::ExpandShapeOp>(op)) {
-    return std::make_pair(expandShapeOp.getResult(),
-                          expandShapeOp.getViewSource());
+    result.emplace_back(expandShapeOp.getResult(),
+                        expandShapeOp.getViewSource());
   } else if (auto expandShapeOp = dyn_cast<tensor::ExpandShapeOp>(op)) {
-    return std::make_pair(expandShapeOp.getResult(), expandShapeOp.getSrc());
+    result.emplace_back(expandShapeOp.getResult(), expandShapeOp.getSrc());
   } else if (auto viewOp = dyn_cast<memref::ViewOp>(op)) {
-    return std::make_pair(viewOp.getResult(), viewOp.getViewSource());
+    result.emplace_back(viewOp.getResult(), viewOp.getViewSource());
   } else if (auto reinterpretCastOp = dyn_cast<memref::ReinterpretCastOp>(op)) {
-    return std::make_pair(reinterpretCastOp.getResult(),
-                          reinterpretCastOp.getViewSource());
+    result.emplace_back(reinterpretCastOp.getResult(),
+                        reinterpretCastOp.getViewSource());
   } else if (auto reshapeOp = dyn_cast<memref::ReshapeOp>(op)) {
-    return std::make_pair(reshapeOp.getResult(), reshapeOp.getViewSource());
+    result.emplace_back(reshapeOp.getResult(), reshapeOp.getViewSource());
   } else if (auto castOp = dyn_cast<memref::CastOp>(op)) {
-    return std::make_pair(castOp.getResult(), castOp.getViewSource());
+    result.emplace_back(castOp.getResult(), castOp.getViewSource());
   } else if (auto extractStridedMetadataOp =
                  dyn_cast<memref::ExtractStridedMetadataOp>(op)) {
-    return std::make_pair(extractStridedMetadataOp.getBaseBuffer(),
-                          extractStridedMetadataOp.getViewSource());
+    result.emplace_back(extractStridedMetadataOp.getBaseBuffer(),
+                        extractStridedMetadataOp.getViewSource());
   } else if (auto toMemrefOp = dyn_cast<bufferization::ToMemrefOp>(op)) {
-    return std::make_pair(toMemrefOp.getResult(), toMemrefOp.getOperand());
+    result.emplace_back(toMemrefOp.getResult(), toMemrefOp.getOperand());
   } else if (auto toTensorOp = dyn_cast<bufferization::ToTensorOp>(op)) {
-    return std::make_pair(toTensorOp.getResult(), toTensorOp.getOperand());
-  } else if (auto toMemrefOp = dyn_cast<bufferization::ToMemrefOp>(op)) {
-    return std::make_pair(toMemrefOp.getResult(), toMemrefOp.getOperand());
+    result.emplace_back(toTensorOp.getResult(), toTensorOp.getOperand());
   } else if (auto bitCastOp = dyn_cast<hivm::BitcastOp>(op)) {
-    return std::make_pair(bitCastOp.getResult(), bitCastOp.getSrc());
+    result.emplace_back(bitCastOp.getResult(), bitCastOp.getSrc());
+  } else if (auto selectOp = dyn_cast<arith::SelectOp>(op)) {
+    result.emplace_back(selectOp.getResult(), selectOp.getTrueValue());
+    result.emplace_back(selectOp.getResult(), selectOp.getFalseValue());
   }
-  return std::nullopt;
+  return result;
 }
 
 std::optional<uint32_t> GetBufferSize(Value buffer) {

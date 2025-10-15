@@ -277,7 +277,7 @@ hivm::CreateSyncBlockLockOp createSyncBlockLockVar(OpBuilder &builder,
                                                    Location loc);
 
 /// get Operation alias pair.
-std::optional<std::pair<Value, Value>> getOperationAliasInfo(Operation *op);
+std::vector<std::pair<Value, Value>> getOperationAliasInfo(Operation *op);
 
 /// Get buffer static size.
 std::optional<uint32_t> GetBufferSize(Value buffer);
