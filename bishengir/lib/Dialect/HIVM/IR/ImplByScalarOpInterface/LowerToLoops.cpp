@@ -158,7 +158,7 @@ void decomposeVectorOpToScalarOpImpl(RewriterBase &rewriter, HIVMOP op) {
     }
   };
 
-  Value dst = op->getOperand(0);
+  Value dst = op.getDst()[0];
   MemRefType dstType = dyn_cast<MemRefType>(dst.getType());
   std::set<int> loopDims;
   for (int i = 0; i < dstType.getRank(); i++) {
