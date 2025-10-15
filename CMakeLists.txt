@@ -178,7 +178,8 @@ if(MLIR_INCLUDE_TESTS)
   add_subdirectory(bishengir/test)
 endif()
 
-if(MLIR_ENABLE_BINDINGS_PYTHON)
+# TODO: Standalone build should support python binding
+if(NOT BISHENGIR_BUILD_STANDALONE_IR_ONLY AND MLIR_ENABLE_BINDINGS_PYTHON)
   # If parent projects want to configure where to place the python packages,
   # respect that.
   if(NOT BISHENGIR_PYTHON_PACKAGES_DIR)
