@@ -36,19 +36,14 @@ llvm::LogicalResult applyPassManagerCLOptions(mlir::PassManager &pm);
 // expensive to use with compared to mlir::PassManager.
 class BiShengIRPassManager : public mlir::PassManager {
 public:
-  using PassManager::PassManager;
   BiShengIRCompileConfigBase config;
 
-  BiShengIRPassManager(const BiShengIRCompileConfigBase &config,
-                       mlir::MLIRContext *ctx, llvm::StringRef operationName,
-                       Nesting nesting)
-      : PassManager(ctx, operationName, nesting), config(config){};
+  template <typename... Args>
+  BiShengIRPassManager(const BiShengIRCompileConfigBase &config, Args &&...args)
+      : PassManager(std::forward<Args>(args)...), config(config){};
 
 #if MLIR_ENABLE_EXECUTION_ENGINE
   mlir::LogicalResult run(mlir::Operation *op);
-
-private:
-  void filterCPURunnerPasses(mlir::OpPassManager &originalPM);
 #endif // MLIR_ENABLE_EXECUTION_ENGINE
 };
 
