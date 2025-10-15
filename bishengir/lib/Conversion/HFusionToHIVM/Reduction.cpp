@@ -19,6 +19,7 @@
 #include "bishengir/Conversion/HFusionToHIVM/Utils.h"
 #include "bishengir/Dialect/HFusion/IR/HFusion.h"
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
+#include "bishengir/Dialect/Utils/Util.h"
 
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -151,8 +152,8 @@ struct LinalgToHIVMReduceLikeOp : public OpRewritePattern<ReduceOpTy> {
       // This is not a rank-0 case. Thus turn to the normal case.
       outRank = cast<ShapedType>(firstCollapseSrc.getType()).getRank();
     }
-    auto reassociation = hfusion_conversion_utils::getReAssociation(
-        reduceOp.getDimensions(), outRank);
+    auto reassociation =
+        reshape_utils::getReAssociation(reduceOp.getDimensions(), outRank);
 
     SmallVector<Value> collapseShapeOps;
     for (size_t i = 0; i < reduceOpInits.size(); i++) {
