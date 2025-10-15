@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "bishengir/Config/bishengir-config.h"
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
 #include "bishengir/Dialect/Tensor/IR/TensorImpl.h"
 #include "bishengir/Dialect/Utils/Util.h"
@@ -505,7 +506,11 @@ void VBrcOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,
 
 void VReduceOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,
                                             ::mlir::MLIRContext *context) {
-  results.add<RedudantVReduceOp, RedudantVReduceInitOp>(context);
+  results.add<RedudantVReduceOp
+#if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
+  , RedudantVReduceInitOp
+#endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
+  >(context);
 }
 
 void VCumsumOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,

@@ -42,7 +42,9 @@ git submodule update --init --recursive
 我们提供了一个便捷的构建脚本 `build.sh` 来自动化配置和构建过程。
 
 ```bash
-# 在项目根目录下运行
+# 首次在项目根目录下运行
+./build-tools/build.sh -o ./build --build-type Debug --apply-patches [可选参数]
+# 非首次在项目根目录下运行
 ./build-tools/build.sh -o ./build --build-type Debug [可选参数]
 ```
 
