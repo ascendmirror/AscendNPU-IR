@@ -96,7 +96,9 @@ class HIVM_LocalMmadOp<string mnemonic, list<Trait> traits = []> :
                        Arg<OptionalAttr<HIVM_UnitFlagAttr>, [{
                         Enable unit-flag for synchronization, it is 
                         managed by inject-sync passes.
-                       }]>:$unit_flag_mode
+                       }]>:$unit_flag_mode,
+                       DefaultValuedOptionalAttr<BoolAttr, "false"
+                        >:$fixpipe_already_inserted
                        );
   let results = (outs Variadic<AnyRankedTensor>:$result_tensors);
   code localMmadBaseDecls = [{
@@ -142,6 +144,7 @@ class HIVM_LocalMmadOp<string mnemonic, list<Trait> traits = []> :
     `outs` `(` $c `:` type($c) `)`
     (`sync_related_args` `(` $sync_related_args^ `:` type($sync_related_args) `)`)?
     (`unit_flag` `[` $unit_flag_mode^ (`,` $unit_flag_cond^)? `]`)?
+    (`fixpipe_already_inserted` `=` $fixpipe_already_inserted^ )?
     (`->` type($result_tensors)^)?
   }];
 
