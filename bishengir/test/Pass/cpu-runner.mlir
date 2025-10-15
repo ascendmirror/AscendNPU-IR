@@ -1,6 +1,7 @@
 // REQUIRES: execution-engine
 // UNSUPPORTED: bishengir_published
-// RUN: bishengir-compile --enable-hfusion-compile --enable-hivm-compile --enable-lir-compile=false --enable-cpu-runner-after=cse,12,wrapper-name=main_wrapper --enable-manage-host-resources %s | FileCheck %s
+// RUN: bishengir-compile --enable-hfusion-compile --enable-hivm-compile --enable-lir-compile=false --enable-cpu-runner-after=cse,12,wrapper-name=main_wrapper --enable-manage-host-resources --mlir-disable-threading %s | FileCheck %s
+// RUN: bishengir-compile --enable-hfusion-compile --enable-hivm-compile --enable-lir-compile=false --enable-cpu-runner-before=hfusion-reorder-ops,2,wrapper-name=main_wrapper --enable-manage-host-resources --mlir-disable-threading %s | FileCheck %s
 
 module {
     func.func @kernel(%arg0: tensor<?x5xf16>, %arg1: tensor<?x5xf16>) -> (tensor<5xf16>, tensor<5xf16>, tensor<5xf16>) attributes {hacc.function_kind = #hacc.function_kind<HOST>, hacc.host_func_type = #hacc.host_func_type<host_entry>} {

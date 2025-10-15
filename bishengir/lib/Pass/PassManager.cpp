@@ -16,12 +16,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "bishengir/Pass/PassManager.h"
-#include "bishengir/Config/bishengir-config.h"
-#include "bishengir/Pass/CPURunnerMetadata.h"
 #include "bishengir/Tools/BiShengIRConfigBase/Config.h"
 
 #if MLIR_ENABLE_EXECUTION_ENGINE
 #include "bishengir/ExecutionEngine/Passes.h"
+#include "bishengir/Pass/CPURunnerMetadata.h"
 #include "bishengir/Pass/PassManager.h"
 #include "mlir/Pass/Pass.h"
 #include "llvm/ADT/ScopeExit.h"
@@ -59,6 +58,7 @@ bool CPURunnerMetadataParser<includePassInfo>::parse(llvm::cl::Option &opt,
                                                      parser_data_type &value) {
   if (opt.getNumOccurrences() > 1)
     return opt.error("Option shouldn't be used multiple times!");
+  value.numOccurrences++;
 
   SmallVector<StringRef> args;
   arg.split(args, ',', 2, false);
@@ -71,7 +71,6 @@ bool CPURunnerMetadataParser<includePassInfo>::parse(llvm::cl::Option &opt,
     if (args.back().empty() || !PassInfo::lookup(args.back()))
       return opt.error("\"" + args.back() + "\" is not a pass!");
     value.passName = args.pop_back_val();
-    value.numOccurrences++;
 
     if (args.empty())
       return false;
@@ -98,35 +97,18 @@ template struct bishengir::CPURunnerMetadataParser<false>;
 
 namespace {
 
-// A hacked version of mlir::Pass to allow bishengir::BiShengPassManager to
-// access everything
-class BiShengIRPass : public Pass {
-  BiShengIRPass() = delete; // should never be instantiated
-  friend bishengir::BiShengIRPassManager;
-};
-
-static void verifyOptionUsage(const BiShengIRCompileConfigBase &config) {
+static void verifyOptionUsage(const BiShengIRCompileConfigBase &config,
+                              MLIRContext &ctx) {
   if (config.CPURunnerOpt().numOccurrences +
           config.CPURunnerBeforeOpt().numOccurrences +
           config.CPURunnerAfterOpt().numOccurrences >
       1)
     llvm::report_fatal_error(
-        "Cannot combine any of multible cpu-runner options.");
-}
+        "Cannot combine any of multiple cpu-runner options.");
 
-[[maybe_unused]] static void
-dumpPassNames(const OpPassManager &pm, llvm::raw_ostream &out = llvm::dbgs()) {
-  bool isFirst = true;
-  for (auto &pass : pm.getPasses()) {
-    const auto &passName = pass.getArgument();
-    if (passName.empty())
-      continue;
-    if (!isFirst)
-      out << ", ";
-    out << passName;
-    isFirst = false;
-  }
-  out << '\n';
+  if (ctx.isMultithreadingEnabled())
+    llvm::report_fatal_error(
+        "Cannot run the cpu-runner with multithreading enabled.");
 }
 
 static void executeCPURunnerPasses(Operation *op,
@@ -146,95 +128,150 @@ static void executeCPURunnerPasses(Operation *op,
         "[CPU Runner] Failed to run the CPU runner pipeline!");
   }
 }
-} // namespace
 
-void bishengir::BiShengIRPassManager::filterCPURunnerPasses(
-    OpPassManager &originalPM) {
-  // only pick the CPU runner passes
-  llvm::StringMap<decltype(CPURunnerMetadata<true>::passIndex)> passCnt;
-  bool passHit = false;
-  for (auto &pass : originalPM.getPasses()) {
-    const auto passArg = pass.getArgument();
-    llvm::dbgs() << passArg << '\n';
-    auto wasPassReached = [passArg, &passCnt](const auto &option) {
-      return (option.numOccurrences != 0) && passArg == option.passName &&
-             passCnt.at(passArg) == option.passIndex;
-    };
-    // filter the pass before
-    if (!passArg.empty()) {
-      ++passCnt[passArg];
-      if (wasPassReached(config.CPURunnerBeforeOpt())) {
-        passHit = true;
-        break;
+class CPURunnerPassExecutionHandler {
+public:
+  CPURunnerPassExecutionHandler(
+      const bishengir::BiShengIRCompileConfigBase &config) {
+    using namespace std::placeholders;
+
+    shouldStopBefore = shouldStopAfter = [](std::size_t) { return false; };
+
+    if (const auto runnerBefore = config.CPURunnerBeforeOpt();
+        runnerBefore.numOccurrences) {
+      stoppingPassName = runnerBefore.passName;
+
+      shouldStopBefore = [config = runnerBefore](std::size_t passIndex) {
+        assert(passIndex <= config.passIndex);
+        return config.passIndex == passIndex;
+      };
+    } else if (const auto runnerAfter = config.CPURunnerAfterOpt();
+               runnerAfter.numOccurrences) {
+      stoppingPassName = runnerAfter.passName;
+
+      shouldStopAfter = [config = runnerAfter](std::size_t passIndex) {
+        assert(passIndex <= config.passIndex);
+        return config.passIndex == passIndex;
+      };
+    }
+  }
+
+  ~CPURunnerPassExecutionHandler() {
+    if (!stoppingPassName.empty())
+      llvm::report_fatal_error(("Couldn't find `" + stoppingPassName +
+                                "` pass with the required index!")
+                                   .c_str());
+  }
+
+  void operator()(llvm::function_ref<void()> actionFn,
+                  const tracing::Action &action) {
+    // If a normal pass is running, ignore nested passes
+    if (isAPassRunning)
+      return actionFn();
+    auto *passExecution = dyn_cast<PassExecutionAction>(&action);
+    // The handler only cares about pass execution
+    if (!passExecution)
+      return actionFn();
+
+    auto &pass = passExecution->getPass();
+    auto *op = passExecution->getOp();
+    // Initialize the count of any operation to its parent's count
+    if (currentLevelCounters.find(op) == currentLevelCounters.end()) {
+      currentLevelCounters[op] = currentLevelCounters[nullptr];
+      LDBG("Pass count of `" << stoppingPassName << "` on " << op->getName()
+                             << ' ' << op << " is initialized with "
+                             << currentLevelCounters[op]);
+    }
+
+    // If the execution was stopped before, don't execute anything else
+    if (shouldStopBefore(currentLevelCounters[op]) ||
+        shouldStopAfter(currentLevelCounters[op])) {
+      LDBG("Stopping the execution of `" << pass.getArgument() << "` on "
+                                         << op->getName() << ' ' << op);
+      return;
+    }
+
+    // Handle `mlir::detail::OpToOpPassAdaptor`-like passes for nesting behavior
+    if (pass.getArgument().empty()) {
+      handleNesting(actionFn, pass, op);
+      return;
+    }
+
+    // Increment the count for the pass
+    if (pass.getArgument() == stoppingPassName) {
+      ++currentLevelCounters[op];
+      LDBG("Pass count of `" << stoppingPassName << "` on " << op->getName()
+                             << ' ' << op << " is updated to "
+                             << currentLevelCounters[op]);
+
+      // Stop if the limit was reached
+      if (shouldStopBefore(currentLevelCounters[op])) {
+        stoppingPassName.clear();
+        return;
       }
     }
 
-    // correct the nesting if needed
-    OpPassManager *nesting = this;
-    if (const auto passOpName = pass.getOpName(),
-        pmOpName = nesting->getOpName();
-        passOpName && pmOpName && *passOpName != *pmOpName)
-      nesting = &nest(*passOpName);
+    // Execute the pass normally and don't consider nested passes
+    LDBG("Executing pass `" << pass.getArgument() << "` on " << op->getName()
+                            << ' ' << op);
+    isAPassRunning = true;
+    actionFn();
+    isAPassRunning = false;
 
-    // call the original addPass on the clone using the hacked mlir::Pass
-    nesting->addPass(static_cast<BiShengIRPass *>(&pass)->clone());
-
-    // filter the pass after
-    if (!passArg.empty() && wasPassReached(config.CPURunnerAfterOpt())) {
-      passHit = true;
-      break;
-    }
+    if (pass.getArgument() == stoppingPassName &&
+        shouldStopAfter(currentLevelCounters[op]))
+      stoppingPassName.clear();
   }
 
-  if (!passHit) {
-    const auto &passInfo = (config.CPURunnerBeforeOpt().numOccurrences != 0)
-                               ? config.CPURunnerBeforeOpt()
-                               : config.CPURunnerAfterOpt();
-    llvm::report_fatal_error(
-        ("[CPU Runner] Failed to find the specified pass: " +
-         passInfo.passName +
-         (passInfo.passIndex == 1 ? ""
-                                  : "#" + std::to_string(passInfo.passIndex)))
-            .c_str());
+private:
+  void handleNesting(llvm::function_ref<void()> actionFn, const Pass &pass,
+                     Operation *op) {
+    LDBG("Entering nest on " << op->getName() << ' ' << op
+                             << " with a pass count of "
+                             << currentLevelCounters[op]);
+    PassCountPerOp nestedCounter;
+    // Push the parent's count to the child's map
+    nestedCounter[nullptr] = currentLevelCounters[op];
+    pastLevelsCounters.push_back(std::move(currentLevelCounters));
+    currentLevelCounters = std::move(nestedCounter);
+
+    actionFn();
+
+    // Update the count of the parent with the child's max one
+    pastLevelsCounters.back()[op] =
+        llvm::max_element(currentLevelCounters, [](const auto &first,
+                                                   const auto &second) {
+          return first.getSecond() < second.getSecond();
+        })->getSecond();
+    currentLevelCounters = pastLevelsCounters.pop_back_val();
+    LDBG("Exiting nest on " << op->getName() << ' ' << op
+                            << " with a pass count of "
+                            << currentLevelCounters[op]);
   }
-}
+
+private:
+  using PassCountPerOp = DenseMap<Operation *, std::size_t>;
+  SmallVector<PassCountPerOp, 1> pastLevelsCounters;
+  PassCountPerOp currentLevelCounters;
+
+  std::function<bool(std::size_t)> shouldStopBefore, shouldStopAfter;
+
+  std::string stoppingPassName;
+  bool isAPassRunning = false;
+};
+} // namespace
 
 LogicalResult bishengir::BiShengIRPassManager::run(Operation *op) {
   if (!config.shouldEnableCPURunner())
     return PassManager::run(op);
 
-  verifyOptionUsage(config);
+  auto &ctx = *op->getContext();
+  verifyOptionUsage(config, ctx);
 
-  if (config.CPURunnerOpt().numOccurrences != 0) {
-    // No need to filter any passes
-    if (failed(PassManager::run(op)))
-      return failure();
-
-    executeCPURunnerPasses(op, config);
-    return success();
-  }
-
-  LLVM_DEBUG(DBGS() << "Before filtering passes: ");
-  LLVM_DEBUG(dumpPassNames(*this));
-
-  // copy the OpPassManager part
-  OpPassManager originalPM(*this);
-
-  // restore the original OpPassManager part on return
-  auto onReturn = llvm::make_scope_exit([this, &originalPM]() {
-    *static_cast<OpPassManager *>(this) = std::move(originalPM);
-  });
-
-  // remove the existing passes
-  clear();
-
-  filterCPURunnerPasses(originalPM);
-
-  LLVM_DEBUG(DBGS() << "After filtering passes: ");
-  LLVM_DEBUG(dumpPassNames(*this));
-
+  ctx.registerActionHandler(CPURunnerPassExecutionHandler(config));
   if (failed(PassManager::run(op)))
     return failure();
+  ctx.registerActionHandler(nullptr);
 
   executeCPURunnerPasses(op, config);
   return success();
