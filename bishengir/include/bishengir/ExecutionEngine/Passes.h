@@ -34,6 +34,9 @@ namespace execution_engine {
 std::unique_ptr<Pass> createCreateHostMainPass(
     const ExecutionEngineHostMainCreatorOptions &options = {});
 
+/// Create a pass to convert HIVM operations to upstream dialect's equivalent.
+std::unique_ptr<Pass> createConvertHIVMToUpstreamPass();
+
 struct CPURunnerPipelineOptions
     : public PassPipelineOptions<CPURunnerPipelineOptions> {
   CPURunnerPipelineOptions() = default;
