@@ -60,6 +60,7 @@ func.func @test_symbol_unify_operands_and_results_by_binary(%arg0: tensor<1x?x40
   symbol.bind_symbolic_shape %arg2, [%S2], affine_map<()[s0] -> (1, s0, 4096)> : tensor<1x?x4096xf32>
   %0 = tensor.empty(%S0) : tensor<1x?x4096xf32>
   %1 = linalg.elemwise_binary {fun = #linalg.binary_fn<mul>} ins(%arg0, %arg1 : tensor<1x?x4096xf32>, tensor<1x?x4096xf32>) outs(%0 : tensor<1x?x4096xf32>) -> tensor<1x?x4096xf32>
+  symbol.bind_symbolic_shape %0, [%S2], affine_map<()[s0] -> (1, s0, 4096)> : tensor<1x?x4096xf32>
   symbol.bind_symbolic_shape %1, [%S2], affine_map<()[s0] -> (1, s0, 4096)> : tensor<1x?x4096xf32>
   return %1 : tensor<1x?x4096xf32>
 }
