@@ -184,15 +184,32 @@ struct CreateHostMainPass
       return type;
     if (isAnyTensorType(type))
       return UnrankedTensorType::get(type.getElementType());
-    return UnrankedMemRefType::get(type.getElementType(), {});
+    return UnrankedMemRefType::get(type.getElementType(),
+                                   cast<BaseMemRefType>(type).getMemorySpace());
   }
 
   static ShapedType getUnrankedMemRefType(ShapedValue value) {
-    return UnrankedMemRefType::get(value.getType().getElementType(), {});
+    return UnrankedMemRefType::get(
+        value.getType().getElementType(),
+        TypeSwitch<ShapedType, Attribute>(value.getType())
+            .Case([](BaseMemRefType type) { return type.getMemorySpace(); })
+            .Default({}));
   }
 
   static ShapedType getRankedVersion(ShapedType type, ArrayRef<int64_t> sizes) {
     return type.clone(sizes);
+  }
+
+  static ShapedType getWithoutMemScope(ShapedType type) {
+    return TypeSwitch<ShapedType, ShapedType>(type)
+        .Case([](MemRefType type) {
+          return MemRefType::get(type.getShape(), type.getElementType(),
+                                 type.getLayout(), {});
+        })
+        .Case([](UnrankedMemRefType type) {
+          return UnrankedMemRefType::get(type.getElementType(), {});
+        })
+        .Default(type);
   }
 
   ShapedValue adaptToType(IRRewriter &rewriter, ShapedValue shapedValue,
@@ -201,13 +218,13 @@ struct CreateHostMainPass
     Location loc = shapedValue.getLoc();
     Value result = shapedValue;
 
-    // Handle ranked unranked conversions
+    // Handle ranked unranked casts
     bool toUnranked =
         isRankedShapedType(sourceType) && isUnrankedShapedType(targetType);
     bool toRanked =
         isUnrankedShapedType(sourceType) && isRankedShapedType(targetType);
     if (toUnranked || toRanked) {
-      ShapedType castType =
+      const ShapedType castType =
           toUnranked ? getUnrankedVersion(sourceType)
                      : getRankedVersion(sourceType, targetType.getShape());
 
@@ -218,7 +235,7 @@ struct CreateHostMainPass
       }
     }
 
-    // Handle tensor memref conversions
+    // Handle tensor memref casts
     bool toMemRef = isAnyTensorType(sourceType) && isAnyMemRefType(targetType);
     bool toTensor = isAnyMemRefType(sourceType) && isAnyTensorType(targetType);
 
@@ -230,6 +247,14 @@ struct CreateHostMainPass
           loc, targetType, result, rewriter.getUnitAttr(),
           rewriter.getUnitAttr());
     }
+
+    // Handle different memory space
+    if (const auto sourceMemrefType = dyn_cast<BaseMemRefType>(sourceType),
+        targetMemrefType = dyn_cast<BaseMemRefType>(targetType);
+        sourceMemrefType && targetMemrefType &&
+        sourceMemrefType.getMemorySpace() != targetMemrefType.getMemorySpace())
+      result = rewriter.create<memref::MemorySpaceCastOp>(loc, targetMemrefType,
+                                                          result);
 
     return cast<ShapedValue>(result);
   }
@@ -252,13 +277,23 @@ struct CreateHostMainPass
              const SmallVector<ShapedMetadata> &&inputMetadata) {
     auto allocedMemrefs = llvm::map_to_vector(
         inputMetadata, [&rewriter, loc](const ShapedMetadata &info) {
+          const auto type =
+              TypeSwitch<ShapedType, ShapedType>(info.type)
+                  .Case([](RankedTensorType type) {
+                    return MemRefType::get(type.getShape(),
+                                           type.getElementType());
+                  })
+                  .Case([](MemRefType type) { return type; })
+                  .Default([](ShapedType type) {
+                    llvm::llvm_unreachable_internal(
+                        ("Unsupported shaped type: " + llvm::to_string(type))
+                            .c_str());
+                    return type;
+                  });
           return cast<ShapedValue>(
               rewriter
-                  .create<memref::AllocOp>(
-                      loc,
-                      MemRefType::get(info.type.getShape(),
-                                      info.type.getElementType()),
-                      info.dynSizes)
+                  .create<memref::AllocOp>(loc, cast<MemRefType>(type),
+                                           info.dynSizes)
                   .getResult());
         });
     auto memrefUnrankedTypes = llvm::map_to_vector(
@@ -356,8 +391,11 @@ struct CreateHostMainPass
 
     // Step 3: Print the randomly generated data to a file with a placeholder
     // path
+    auto getUnrankedMemRefTypeWithoutMemScope = [](ShapedValue memref) {
+      return getWithoutMemScope(getUnrankedMemRefType(memref));
+    };
     auto unrankedMemRefTypes =
-        llvm::map_to_vector(memrefs, getUnrankedMemRefType);
+        llvm::map_to_vector(memrefs, getUnrankedMemRefTypeWithoutMemScope);
     auto operands =
         adaptToTypes(rewriter, std::move(memrefs), unrankedMemRefTypes);
     printTensors(rewriter, operands, wrapperFunc, 0);
@@ -374,7 +412,8 @@ struct CreateHostMainPass
 
     // Step 5: Print the results to a file with a placeholder path
     auto results = getResults(kernelCall);
-    unrankedMemRefTypes = llvm::map_to_vector(results, getUnrankedMemRefType);
+    unrankedMemRefTypes =
+        llvm::map_to_vector(results, getUnrankedMemRefTypeWithoutMemScope);
     operands = adaptToTypes(rewriter, std::move(results), unrankedMemRefTypes);
     printTensors(rewriter, operands, wrapperFunc, 1);
 
