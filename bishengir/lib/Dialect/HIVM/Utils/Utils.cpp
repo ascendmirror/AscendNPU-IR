@@ -261,6 +261,18 @@ void setBaseMemRefTypeScope(Value val, AddressSpaceAttr targetMemScope) {
   auto newMemRefType =
       getBaseMemRefTypeWithNewScope(memRefType, targetMemScope);
   val.setType(newMemRefType);
+
+  if (auto blockVal = dyn_cast<BlockArgument>(val);
+      blockVal && blockVal.getOwner()->isEntryBlock()) {
+    if (auto funcOp =
+            dyn_cast<FunctionOpInterface>(blockVal.getOwner()->getParentOp())) {
+      const auto funcType = cast<FunctionType>(funcOp.getFunctionType());
+      SmallVector<Type> inputs(funcType.getInputs());
+      inputs[blockVal.getArgNumber()] = newMemRefType;
+      funcOp.setFunctionTypeAttr(
+          TypeAttr::get(funcType.clone(inputs, funcType.getResults())));
+    }
+  }
 }
 
 SmallVector<Value>
