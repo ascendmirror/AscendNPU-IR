@@ -20,8 +20,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "bishengir/Dialect/Annotation/IR/Annotation.h"
 #include "bishengir/Dialect/Tensor/Transforms/Passes.h"
 #include "bishengir/Dialect/Utils/Util.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -323,31 +325,9 @@ public:
           sliceOp, "only can fold insert_slice with strides equal to one");
     }
 
-    // sliceOp must have static offsets and sizes
-    ArrayRef<int64_t> offsets = sliceOp.getStaticOffsets();
-    ArrayRef<int64_t> sizes = sliceOp.getStaticSizes();
-    auto isDynamic = [](int64_t s) { return ShapedType::isDynamic(s); };
-    if (llvm::any_of(offsets, isDynamic)) {
-      return rewriter.notifyMatchFailure(
-          sliceOp, "only can fold insert_slice with static offsets");
-    }
-    if (llvm::any_of(offsets, isDynamic)) {
-      return rewriter.notifyMatchFailure(
-          sliceOp, "only can fold insert_slice with static sizes");
-    }
-
-    if (skipAlignedSlice && isOffsetsAligned(sliceOp)) {
-      return rewriter.notifyMatchFailure(sliceOp,
-                                         "not fold slice with aligned offsets");
-    }
-
     // slice op must have static shaped src and dst tensor with same rank
     RankedTensorType srcType = sliceOp.getSourceType();
     RankedTensorType dstType = sliceOp.getResultType();
-    if (srcType.getNumDynamicDims() != 0 || dstType.getNumDynamicDims() != 0) {
-      return rewriter.notifyMatchFailure(
-          sliceOp, "cannot fold insert_slice with dynamic shaped src or dst");
-    }
     if (srcType.getRank() != dstType.getRank()) {
       // insert_slice supports insertion into a tensor of higher rank than the
       // source tensor, we should avoid this situation
@@ -356,48 +336,69 @@ public:
     }
 
     // find out on which dimension to concat the slices
-    auto sliceDimMaybe = getUniqueConcatDim(srcType, dstType, offsets, sizes);
+    auto sliceDimMaybe = getUniqueConcatDim(sliceOp);
     if (!sliceDimMaybe.has_value()) {
       return rewriter.notifyMatchFailure(sliceOp,
                                          "should slice exactly one dimension");
     }
+
     int64_t sliceDim = sliceDimMaybe.value();
+    if (skipAlignedSlice && isOffsetsAligned(sliceOp, sliceDim)) {
+      return rewriter.notifyMatchFailure(sliceOp,
+                                         "not fold slice with aligned offsets");
+    }
+
     Value newConcat = convertInsertSliceToConcatOp(sliceOp, sliceDim, rewriter);
     rewriter.replaceOp(sliceOp, {newConcat});
     return success();
   }
 
 private:
-  bool isOffsetsAligned(InsertSliceOp sliceOp) const {
+  bool isOffsetsAligned(InsertSliceOp sliceOp, int64_t sliceDim) const {
     ArrayRef<int64_t> offsets = sliceOp.getStaticOffsets();
+    ArrayRef<int64_t> sizes = sliceOp.getStaticSizes();
+    int64_t rank = sliceOp.getResultType().getRank();
     int64_t bytesPerElem =
         sliceOp.getResultType().getElementTypeBitWidth() / utils::kBitsToByte;
-    return llvm::all_of(offsets, [&](int64_t offset) {
-      if (ShapedType::isDynamic(offset)) {
-        return false;
-      }
-      int64_t offsetInBytes = offset * bytesPerElem;
-      return offsetInBytes % utils::INTR_BYTES_PER_BLOCK == 0;
-    });
+    int64_t accumSize = 1;
+    for (int64_t dim = rank - 1; dim > sliceDim; dim--) {
+      accumSize *= sizes[dim];
+    }
+    int64_t offset =
+        (ShapedType::isDynamic(offsets[sliceDim]) ? 1 : offsets[sliceDim]);
+    int64_t accumOffsetInBytes = offset * accumSize * bytesPerElem;
+    return accumOffsetInBytes % utils::INTR_BYTES_PER_BLOCK == 0;
   }
 
-  void appendIfValueNotEmpty(SmallVector<Value> &vec, Value v) const {
+  bool appendIfValueNotEmpty(SmallVector<Value> &vec, Value v) const {
     // helper func to make sure not concat zero sized tensor.
     // v will be empty Value() if it is zero sized tensor.
     if (v) {
       vec.push_back(v);
+      return true;
     }
+    return false;
   }
 
-  std::optional<int64_t> getUniqueConcatDim(RankedTensorType srcType,
-                                            RankedTensorType dstType,
-                                            ArrayRef<int64_t> offsets,
-                                            ArrayRef<int64_t> sizes) const {
-    int64_t rank = srcType.getRank();
+  std::optional<int64_t>
+  getUniqueConcatDim(tensor::InsertSliceOp sliceOp) const {
+    RankedTensorType dstType = sliceOp.getResultType();
+    SmallVector<OpFoldResult> offsets = sliceOp.getMixedOffsets();
+    SmallVector<OpFoldResult> sizes = sliceOp.getMixedSizes();
+
+    int64_t rank = dstType.getRank();
     int64_t sliceDim = -1;
     for (int64_t dim = 0; dim < rank; ++dim) {
-      int64_t dstDimSize = dstType.getDimSize(dim);
-      if (offsets[dim] == 0 && (sizes[dim] == dstDimSize)) {
+      bool insertFullDim = true;
+      if (dstType.isDynamicDim(dim)) {
+        // conservatively treat dynamic dim insert_slice not full slice,
+        // since we do not analyze size equivalence
+        insertFullDim = false;
+      } else {
+        insertFullDim = isConstantIntValue(sizes[dim], dstType.getDimSize(dim));
+      }
+
+      if (isConstantIntValue(offsets[dim], 0) && insertFullDim) {
         // if slice the whole dimension, not interested
         continue;
       }
@@ -417,15 +418,11 @@ private:
   }
 
   SmallVector<OpFoldResult>
-  cloneWithSubstitution(ArrayRef<int64_t> data, int64_t substituteDim,
-                        int64_t substituteData,
+  cloneWithSubstitution(ArrayRef<OpFoldResult> data, int64_t substituteDim,
+                        OpFoldResult substituteData,
                         PatternRewriter &rewriter) const {
-    SmallVector<int64_t> dataVec{data};
-    SmallVector<OpFoldResult> result;
-    dataVec[substituteDim] = substituteData;
-    for (int64_t value : dataVec) {
-      result.push_back(OpFoldResult(rewriter.getIndexAttr(value)));
-    }
+    SmallVector<OpFoldResult> result(data.begin(), data.end());
+    result[substituteDim] = substituteData;
     return result;
   }
 
@@ -434,12 +431,12 @@ private:
                                      int64_t sliceDim,
                                      PatternRewriter &rewriter) const {
     Location loc = sliceOp->getLoc();
-    ArrayRef<int64_t> offsets = sliceOp.getStaticOffsets();
-    ArrayRef<int64_t> sizes = sliceOp.getStaticSizes();
-    ArrayRef<int64_t> strides = sliceOp.getStaticStrides();
-    auto sliceFrom = [&](Value from, int64_t curOffset,
-                         int64_t curSize) -> Value {
-      if (curSize == 0) {
+    SmallVector<OpFoldResult> offsets = sliceOp.getMixedOffsets();
+    SmallVector<OpFoldResult> sizes = sliceOp.getMixedSizes();
+    SmallVector<OpFoldResult> strides = sliceOp.getMixedStrides();
+    auto sliceFrom = [&](Value from, OpFoldResult curOffset,
+                         OpFoldResult curSize) -> Value {
+      if (isConstantIntValue(curSize, 0)) {
         // should not extract and concat zero sized tensor.
         // if zero sized, return empty Value()
         return Value();
@@ -448,29 +445,52 @@ private:
           cloneWithSubstitution(offsets, sliceDim, curOffset, rewriter);
       SmallVector<OpFoldResult> newSizes =
           cloneWithSubstitution(sizes, sliceDim, curSize, rewriter);
-      SmallVector<OpFoldResult> newStrides =
-          cloneWithSubstitution(strides, sliceDim, 1, rewriter);
+      SmallVector<OpFoldResult> newStrides = cloneWithSubstitution(
+          strides, sliceDim, rewriter.getIndexAttr(1), rewriter);
       auto newSliceOp = rewriter.create<tensor::ExtractSliceOp>(
           loc, from, newOffsets, newSizes, newStrides);
       return newSliceOp;
     };
-    RankedTensorType dstType = sliceOp.getResultType();
-    int64_t sliceOffset = offsets[sliceDim];
-    int64_t sliceSize = sizes[sliceDim];
-    int64_t sliceDstSize = dstType.getDimSize(sliceDim);
+    OpFoldResult sliceOffset = offsets[sliceDim];
+    OpFoldResult sliceSize = sizes[sliceDim];
+    OpFoldResult sliceDstSize =
+        tensor::getMixedSize(rewriter, loc, sliceOp.getResult(), sliceDim);
     Value src = sliceOp.getSource();
     Value dst = sliceOp->getOperand(1);
     SmallVector<Value> concatInputs;
     // extract `0 ~ offset` from dst tensor
-    appendIfValueNotEmpty(concatInputs, sliceFrom(dst, 0, sliceOffset));
+    bool hasNonZeroOffset = appendIfValueNotEmpty(
+        concatInputs, sliceFrom(dst, rewriter.getIndexAttr(0), sliceOffset));
     // extract `offset ~ offset+size` from src tensor, exactly src tensor
-    appendIfValueNotEmpty(concatInputs, src);
+    bool inserted = appendIfValueNotEmpty(concatInputs, src);
     // extract `offset + size ~ sliceDstSize` from dst tensor
-    appendIfValueNotEmpty(concatInputs,
-                          sliceFrom(dst, sliceOffset + sliceSize,
-                                    sliceDstSize - (sliceOffset + sliceSize)));
-    return rewriter.create<tensor::ConcatOp>(loc, sliceOp.getResultType(),
-                                             sliceDim, concatInputs);
+    AffineExpr dim0;
+    AffineExpr dim1;
+    bindDims(rewriter.getContext(), dim0, dim1);
+    auto subMap = AffineMap::get(2, 0, {dim0 - dim1});
+    auto sub = [&](OpFoldResult v1, OpFoldResult v2) {
+      return affine::makeComposedFoldedAffineApply(rewriter, loc, subMap,
+                                                   {v1, v2});
+    };
+    auto addMap = AffineMap::get(2, 0, {dim0 + dim1});
+    auto add = [&](OpFoldResult v1, OpFoldResult v2) {
+      return affine::makeComposedFoldedAffineApply(rewriter, loc, addMap,
+                                                   {v1, v2});
+    };
+    appendIfValueNotEmpty(
+        concatInputs,
+        sliceFrom(dst, add(sliceOffset, sliceSize),
+                  sub(sliceDstSize, add(sliceOffset, sliceSize))));
+    auto newConcatOp = rewriter.create<tensor::ConcatOp>(
+        loc, sliceOp.getResultType(), sliceDim, concatInputs);
+    if (!inserted) {
+      return newConcatOp.getResult();
+    }
+    int64_t insertSliceSourceIndex = (hasNonZeroOffset ? 1 : 0);
+    auto markOp = rewriter.create<annotation::MarkOp>(loc, newConcatOp);
+    martkp->setAttr(hfusion::InsertSliceSourceIndexAttr::name,
+                    rewriter.getI32IntegerAttr(insertSliceSourceIndex));
+    return newConcatOp.getResult();
   }
 
   bool skipAlignedSlice{false};

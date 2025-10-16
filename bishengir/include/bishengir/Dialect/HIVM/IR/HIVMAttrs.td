@@ -823,4 +823,11 @@ def HIVM_FuncDynMemrefArgsAttr
   }];
 }
 
+def HIVM_InsertSliceSourceIndexAttr
+    : HIVM_Attr<"InsertSliceSourceIndex", "insert_slice_source_index"> {
+  let description = [{
+    Specifies which operand is insert_slice source in vconcat op
+  }];
+}
+
 #endif // BISHENGIR_DIALECT_HIVM_IR_HIVMATTRS_TD
