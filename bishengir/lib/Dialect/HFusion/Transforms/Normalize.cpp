@@ -1402,6 +1402,39 @@ public:
   }
 };
 
+template <typename FuncType, typename FuncAttrType, typename OpType>
+static NamedAttribute getOpFunAttr(OpType op, PatternRewriter &rewriter) {
+  FuncType func = op.getFunAttr().getValue();
+  auto attr = rewriter.getAttr<FuncAttrType>(func);
+  auto funAttr = rewriter.getNamedAttr("fun", attr);
+  return funAttr;
+}
+
+template <typename OpType,
+          typename = std::enable_if<
+              std::is_same_v<OpType, linalg::ElemwiseBinaryOp> ||
+              std::is_same_v<OpType, linalg::ElemwiseUnaryOp> ||
+              std::is_same_v<OpType, hfusion::ElemwiseBinaryOp> ||
+              std::is_same_v<OpType, hfusion::ElemwiseUnaryOp> ||
+              std::is_same_v<OpType, hfusion::SelectOp>>>
+static SmallVector<NamedAttribute> getOpAttr(OpType op,
+                                             PatternRewriter &rewriter) {
+  if constexpr (std::is_same_v<OpType, linalg::ElemwiseBinaryOp>) {
+    return {getOpFunAttr<linalg::BinaryFn, linalg::BinaryFnAttr>(op, rewriter)};
+  } else if constexpr (std::is_same_v<OpType, linalg::ElemwiseUnaryOp>) {
+    return {getOpFunAttr<linalg::UnaryFn, linalg::UnaryFnAttr>(op, rewriter)};
+  } else if constexpr (std::is_same_v<OpType, hfusion::ElemwiseBinaryOp>) {
+    return {
+        getOpFunAttr<hfusion::BinaryFn, hfusion::BinaryFnAttr>(op, rewriter)};
+  } else if constexpr (std::is_same_v<OpType, hfusion::ElemwiseUnaryOp>) {
+    return {getOpFunAttr<hfusion::UnaryFn, hfusion::UnaryFnAttr>(op, rewriter)};
+  } else if constexpr (std::is_same_v<OpType, hfusion::SelectOp>) {
+    // no extra attrs
+    return {};
+  } else
+    llvm_unreachable("Unsupport Normalize OpType.");
+}
+
 /// normalize integer divsi and divui by float div
 /// supports i8/i16/i32/i64 type
 /// c = a / b
@@ -1427,6 +1460,16 @@ public:
     }
 
     auto loc = op->getLoc();
+    auto inputs = op.getDpsInputs();
+
+    if (auto fillOp = inputs[1].getDefiningOp<linalg::FillOp>()) {
+      SmallVector<NamedAttribute> attrs = getOpAttr(op, rewriter);
+      rewriter.replaceOpWithNewOp<linalg::ElemwiseBinaryOp>(
+          op, ValueRange{inputs[0], fillOp.getInputs()[0]},
+          ValueRange{op.getOutputs()[0]}, attrs);
+      return success();
+    }
+
     // linalg::ElemwiseBinaryOp's Outputs and Results must be
     // variadic of ranked tensor of any type values.
     // If the Outputs operand is a scalar, mlir crashes.
@@ -1434,13 +1477,14 @@ public:
     auto resTensor = op.getResultTensors()[0];
     auto resTy = dyn_cast<TensorType>(resTensor.getType());
     auto elemTySrc = getElementTypeOrSelf(resTy);
-    if (!elemTySrc.isInteger()) {
+
+    if (!elemTySrc.isInteger() ||
+        (elemTySrc.isInteger(64) && !isa<TensorType>(inputs[1].getType()))) {
       return failure();
     }
 
     // step1. res = divWithRoundMode(x, y, TRUNC)
     rewriter.setInsertionPoint(op);
-    auto inputs = op.getDpsInputs();
     auto res = hfusion::divWithRoundMode(rewriter, loc, elemTySrc, inputs[0],
                                          inputs[1], resTensor,
                                          hfusion::RoundMode::TRUNC);
@@ -1838,7 +1882,8 @@ static bool isF16ElemType(Type type) {
   return elemType.isF16();
 }
 
-template <typename srcType> static bool isElemType(Type valueType) {
+template <typename srcType>
+static bool isElemType(Type valueType) {
   if constexpr (std::is_same_v<bool, srcType>) {
     return isI1ElemType(valueType);
   }
@@ -2714,39 +2759,6 @@ public:
   }
 };
 
-template <typename FuncType, typename FuncAttrType, typename OpType>
-static NamedAttribute getOpFunAttr(OpType op, PatternRewriter &rewriter) {
-  FuncType func = op.getFunAttr().getValue();
-  auto attr = rewriter.getAttr<FuncAttrType>(func);
-  auto funAttr = rewriter.getNamedAttr("fun", attr);
-  return funAttr;
-}
-
-template <typename OpType,
-          typename = std::enable_if<
-              std::is_same_v<OpType, linalg::ElemwiseBinaryOp> ||
-              std::is_same_v<OpType, linalg::ElemwiseUnaryOp> ||
-              std::is_same_v<OpType, hfusion::ElemwiseBinaryOp> ||
-              std::is_same_v<OpType, hfusion::ElemwiseUnaryOp> ||
-              std::is_same_v<OpType, hfusion::SelectOp>>>
-static SmallVector<NamedAttribute> getOpAttr(OpType op,
-                                             PatternRewriter &rewriter) {
-  if constexpr (std::is_same_v<OpType, linalg::ElemwiseBinaryOp>) {
-    return {getOpFunAttr<linalg::BinaryFn, linalg::BinaryFnAttr>(op, rewriter)};
-  } else if constexpr (std::is_same_v<OpType, linalg::ElemwiseUnaryOp>) {
-    return {getOpFunAttr<linalg::UnaryFn, linalg::UnaryFnAttr>(op, rewriter)};
-  } else if constexpr (std::is_same_v<OpType, hfusion::ElemwiseBinaryOp>) {
-    return {
-        getOpFunAttr<hfusion::BinaryFn, hfusion::BinaryFnAttr>(op, rewriter)};
-  } else if constexpr (std::is_same_v<OpType, hfusion::ElemwiseUnaryOp>) {
-    return {getOpFunAttr<hfusion::UnaryFn, hfusion::UnaryFnAttr>(op, rewriter)};
-  } else if constexpr (std::is_same_v<OpType, hfusion::SelectOp>) {
-    // no extra attrs
-    return {};
-  } else
-    llvm_unreachable("Unsupport Normalize OpType.");
-}
-
 static void replaceI1ResultsWithTargetType(const SmallVector<Value> &oldResults,
                                            const SmallVector<Value> &newResults,
                                            PatternRewriter &rewriter,
@@ -3084,9 +3096,13 @@ private:
   template <typename OpElemType>
   bool isSupportOperand(OpType op) const = delete;
 
-  template <> bool isSupportOperand<bool>(OpType op) const { return false; }
+  template <>
+  bool isSupportOperand<bool>(OpType op) const {
+    return false;
+  }
 
-  template <> bool isSupportOperand<int8_t>(OpType op) const {
+  template <>
+  bool isSupportOperand<int8_t>(OpType op) const {
     if constexpr (std::is_same_v<OpType, linalg::FillOp> ||
                   std::is_same_v<OpType, linalg::BroadcastOp> ||
                   std::is_same_v<OpType, linalg::CopyOp> ||
