@@ -92,4 +92,10 @@ def HFusion_ReturnOperandNumAttr : HFusion_Attr<"ReturnOperandNum", "return_oper
   }];
 }
 
+def HFusion_InsertSliceSourceIndexAttr : HFusion_Attr<"InsertSliceSourceIndex", "insert_slice_source_index"> {
+  let description = [{
+    Specifies which operand is insert_slice source in concat op
+  }];
+}
+
 #endif // BISHENGIR_DIALECT_HFUSION_IR_HFUSIONATTRS_TD

@@ -25,10 +25,15 @@
 #include "mlir/IR/TypeUtilities.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/LogicalResult.h"
 
 using namespace mlir;
 using namespace mlir::hivm;
+
+#define DEBUG_TYPE "decompose-operation"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::hivm {
 
@@ -96,6 +101,92 @@ VBrcOp::decomposeOperation(mlir::OpBuilder &b) {
 // VConcatOp
 //===----------------------------------------------------------------------===//
 
+std::optional<Value> traceSource(Value value) {
+  if (isa<BlockArgument>(value) || utils::isAllocLikeOp(value)) {
+    return value;
+  }
+  auto *defOp = value.getDefiningOp();
+  if (auto subviewOp = llvm::dyn_cast<memref::SubViewOp>(defOp)) {
+    return traceSource(subviewOp.getViewSource());
+  }
+  return std::nullopt;
+}
+
+std::optional<Value> traceSameSource(ArrayRef<Value> values) {
+  DenseSet<Value> sources;
+  for (Value v : values) {
+    auto srcMaybe = traceSource(v);
+    if (!srcMaybe.has_value()) {
+      return std::nullopt;
+    }
+    sources.insert(srcMaybe.value());
+  }
+  if (sources.size() != 1) {
+    return std::nullopt;
+  }
+  return *sources.begin();
+}
+
+SmallVector<Value> filterValues(ArrayRef<Value> values, int64_t excludeIndex) {
+  SmallVector<Value> result;
+  int64_t size = static_cast<int64_t>(values.size());
+  for (int64_t i = 0; i < size; ++i) {
+    if (i == excludeIndex) {
+      continue;
+    }
+    result.push_back(values[i]);
+  }
+  return result;
+}
+
+LogicalResult decomposeInsertSliceConcat(VConcatOp concatOp, OpBuilder &b) {
+  IntegerAttr attr = concatOp->getAttrOfType<IntegerAttr>(
+      hivm::InsertSliceSourceIndexAttr::name);
+  if (!attr) {
+    return failure();
+  }
+  int64_t srcIndex = attr.getInt();
+  SmallVector<Value> inputs = concatOp.getSrc();
+  if (inputs.size() != 3 || srcIndex != 1) {
+    // only handle concat op with three inputs, where the insert_slice src is
+    // the second input
+    return failure();
+  }
+
+  SmallVector<Value> insertDst =
+      filterValues(inputs, /*excludeIndex=*/srcIndex);
+  auto dstSourceMaybe = traceSameSource(insertDst);
+  if (!dstSourceMaybe.has_value()) {
+    return failure();
+  }
+  Value dstSource = dstSourceMaybe.value();
+  LDBG("traced dstSource for concat with insert_slice pattern: " << dstSource);
+
+  Value copySrc = inputs[srcIndex];
+  MemRefType srcType = llvm::cast<MemRefType>(copySrc.getType());
+  int64_t rank = srcType.getRank();
+  Location loc = concatOp.getLoc();
+  SmallVector<OpFoldResult> offsets(rank, b.getIndexAttr(0));
+  SmallVector<OpFoldResult> sizes = memref::getMixedSizes(b, loc, copySrc);
+  SmallVector<OpFoldResult> strides(rank, b.getIndexAttr(1));
+
+  if (inputs.size() == 3) {
+    assert(srcIndex == 1 && "insert_slice src must be the middle operand");
+    SmallVector<OpFoldResult> firstSizes =
+        memref::getMixedSizes(b, loc, inputs[0]);
+    int64_t dim = concatOp.getDim();
+    offsets[dim] = firstSizes[dim];
+  }
+
+  Value copyDst =
+      b.create<memref::SubViewOp>(loc, dstSource, offsets, sizes, strides);
+  (void)b.create<hivm::CopyOp>(loc, concatOp->getResultTypes(), copySrc,
+                               copyDst);
+  mlir::IRRewriter rewriter(b);
+  rewriter.replaceAllUsesWith(concatOp.getDst(), dstSource);
+  return success();
+}
+
 /// Here we specify VConcat's decompose behavior
 /// VConcat will get erased and become Copy ops
 /// from inputs of concat to subviews of it's output
@@ -122,6 +213,10 @@ FailureOr<SmallVector<Value>> VConcatOp::decomposeOperation(OpBuilder &b) {
     totalSize = affine::makeComposedFoldedAffineApply(
         b, this->getLoc(), sumExpr, {totalSize, concatSizes[i]});
     offsets.push_back(totalSize);
+  }
+
+  if (succeeded(decomposeInsertSliceConcat(*this, b))) {
+    return SmallVector<Value>{};
   }
 
   for (size_t i = 0; i < srcNums; ++i) {

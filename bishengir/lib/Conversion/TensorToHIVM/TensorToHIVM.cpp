@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "bishengir/Conversion/TensorToHIVM/TensorToHIVM.h"
+#include "bishengir/Dialect/Annotation/IR/Annotation.h"
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
 #include "bishengir/Dialect/HIVM/Utils/Utils.h"
 #include "bishengir/Dialect/Utils/Util.h"
@@ -51,10 +52,37 @@ struct TensorToHIVMConcatOp : public OpRewritePattern<tensor::ConcatOp> {
     auto emptyDest = rewriter.create<tensor::EmptyOp>(
         concatOp.getLoc(), outputSizes,
         concatOp.getResultType().getElementType());
-    rewriter.replaceOpWithNewOp<hivm::VConcatOp>(
+    auto newConcatOp = rewriter.replaceOpWithNewOp<hivm::VConcatOp>(
         concatOp, concatOp.getResult().getType(), concatOp.getDim(),
         concatOp.getInputs(), emptyDest);
+    auto index = traceInsertSliceSourceIndex(concatOp, rewriter);
+    if (index.has_value()) {
+      newConcatOp->setAttr(hivm::InsertSliceSourceIndexAttr::name,
+                           rewriter.getI64IntegerAttr(index.value()));
+    }
     return success();
+  }
+
+  std::optional<int64_t>
+  traceInsertSliceSourceIndex(Operation *op, PatternRewriter &rewriter) const {
+    auto markOp = dyn_cast<annotation::MarkOp>(op);
+    if (markOp) {
+      IntegerAttr attr = markOp->getAttrOfType<IntegerAttr>(
+          hfusion::InsertSliceSourceIndexAttr::name);
+      if (attr) {
+        int64_t result = attr.getInt();
+        rewriter.eraseOp(markOp);
+        return result;
+      }
+    }
+
+    for (Operation *user : op->getUsers()) {
+      auto tracedIndex = traceInsertSliceSourceIndex(user, rewriter);
+      if (tracedIndex.has_value()) {
+        return tracedIndex;
+      }
+    }
+    return std::nullopt;
   }
 };
 
