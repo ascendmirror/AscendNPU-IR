@@ -127,3 +127,31 @@ func.func @test_tensor_pad_to_hivm_with_cast(%arg0 : tensor<?x?x512xf32>) -> ten
     return %padded : tensor<1x?x512xf32>
 }
 
+// -----
+
+// CHECK-LABEL: func.func @test_concat_with_insert_slice_source_index_mark_0
+// CHECK: hivm.hir.vconcat dim(0) {hivm.insert_slice_source_index = 0 : i64}
+func.func @test_concat_with_insert_slice_source_index_mark_0(
+  %arg0: tensor<?x1xf32>, %arg1: tensor<?x1xf32>) -> tensor<1x?xf32> {
+  %concat = tensor.concat dim(0) %arg0, %arg1 : (tensor<?x1xf32>, tensor<?x1xf32>) -> tensor<?x1xf32>
+  %c0 = arith.constant 0 : index
+  %dim = tensor.dim %concat, %c0 : tensor<?x1xf32>
+  %0 = tensor.empty(%dim) : tensor<1x?xf32>
+  %transposed = hivm.hir.vtranspose ins(%concat : tensor<?x1xf32>) outs(%0 : tensor<1x?xf32>) permutation = [1, 0] -> tensor<1x?xf32>
+  annotation.mark %transposed {hfusion.insert_slice_source_index = 0 : i32} : tensor<1x?xf32>
+  return %transposed : tensor<1x?xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @test_concat_with_insert_slice_source_index_mark_1
+// CHECK: hivm.hir.vconcat dim(0) {hivm.insert_slice_source_index = 1 : i64}
+func.func @test_concat_with_insert_slice_source_index_mark_1(
+  %arg0: tensor<?x1xf32>, %arg1: tensor<1x1xf32>, %arg2: tensor<?x1xf32>) -> tensor<16xf32> {
+  %0 = tensor.empty() : tensor<1x16xf32>
+  %concat = tensor.concat dim(0) %arg0, %arg1, %arg2 : (tensor<?x1xf32>, tensor<1x1xf32>, tensor<?x1xf32>) -> tensor<16x1xf32>
+  %transposed = hivm.hir.vtranspose ins(%concat : tensor<16x1xf32>) outs(%0 : tensor<1x16xf32>) permutation = [1, 0] -> tensor<1x16xf32>
+  %slice = tensor.extract_slice %transposed[0, 0] [1, 16] [1, 1] : tensor<1x16xf32> to tensor<16xf32>
+  annotation.mark %slice {hfusion.insert_slice_source_index = 1 : i32} : tensor<16xf32>
+  return %slice : tensor<16xf32>
+}
