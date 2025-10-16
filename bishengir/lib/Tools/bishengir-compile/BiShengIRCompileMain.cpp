@@ -173,6 +173,20 @@ bishengir::runBiShengIRPipeline(ModuleOp mod,
         runPipeline(hirCompileModule, buildPipeline, config, "BiShengHIR"));
     bool step2 = false;
     if (step1) {
+
+      if (config.shouldEnableCPURunner()) {
+        std::string errorMessage;
+        auto fileHandle =
+            mlir::openOutputFile(config.getOutputFile(), &errorMessage);
+        if (!fileHandle) {
+          llvm::errs() << "[ERROR] " << errorMessage << "\n";
+          return failure();
+        }
+        fileHandle->os() << hirCompileModule << '\n';
+        fileHandle->keep();
+        return OwningModuleRef(hirCompileModule);
+      }
+
       auto runExternalResult =
           runExternalHIVMOptimizationPipeline(hirCompileModule, config);
       if (!failed(runExternalResult)) {
@@ -200,19 +214,6 @@ bishengir::runBiShengIRPipeline(ModuleOp mod,
       diagEngine.emit(std::move(diag));
     }
     return failure();
-  }
-
-  if (config.shouldEnableCPURunner()) {
-    std::string errorMessage;
-    auto fileHandle =
-        mlir::openOutputFile(config.getOutputFile(), &errorMessage);
-    if (!fileHandle) {
-      llvm::errs() << "[ERROR] " << errorMessage << "\n";
-      return failure();
-    }
-    fileHandle->os() << mod << '\n';
-    fileHandle->keep();
-    return OwningModuleRef(mod);
   }
 
   // After the above procedure, we should have lower util the minimum HIVM op
