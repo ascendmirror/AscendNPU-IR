@@ -1434,7 +1434,7 @@ public:
     auto resTensor = op.getResultTensors()[0];
     auto resTy = dyn_cast<TensorType>(resTensor.getType());
     auto elemTySrc = getElementTypeOrSelf(resTy);
-    if (!elemTySrc.isInteger()) {
+    if (!elemTySrc.isInteger() || elemTySrc.isInteger(64)) {
       return failure();
     }
 
@@ -1838,7 +1838,8 @@ static bool isF16ElemType(Type type) {
   return elemType.isF16();
 }
 
-template <typename srcType> static bool isElemType(Type valueType) {
+template <typename srcType>
+static bool isElemType(Type valueType) {
   if constexpr (std::is_same_v<bool, srcType>) {
     return isI1ElemType(valueType);
   }
@@ -3084,9 +3085,13 @@ private:
   template <typename OpElemType>
   bool isSupportOperand(OpType op) const = delete;
 
-  template <> bool isSupportOperand<bool>(OpType op) const { return false; }
+  template <>
+  bool isSupportOperand<bool>(OpType op) const {
+    return false;
+  }
 
-  template <> bool isSupportOperand<int8_t>(OpType op) const {
+  template <>
+  bool isSupportOperand<int8_t>(OpType op) const {
     if constexpr (std::is_same_v<OpType, linalg::FillOp> ||
                   std::is_same_v<OpType, linalg::BroadcastOp> ||
                   std::is_same_v<OpType, linalg::CopyOp> ||

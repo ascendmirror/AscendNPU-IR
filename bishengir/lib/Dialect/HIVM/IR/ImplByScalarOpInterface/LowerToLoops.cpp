@@ -54,6 +54,14 @@ createScalarComputeOp(RewriterBase &rewriter, HIVMOP op,
         op.getLoc(), scalarInputs[0], scalarInputs[1]);
     resTensors.push_back(mulextOp.getLow());
     resTensors.push_back(mulextOp.getHigh());
+  } else if constexpr (std::is_same<hivm::VModOp, HIVMOP>::value) {
+    resTensor = getScalarResult<hivm::VModOp, arith::RemSIOp>(
+        rewriter, op.getLoc(), scalarInputs);
+    resTensors.push_back(resTensor);
+  } else if constexpr (std::is_same<hivm::VDivOp, HIVMOP>::value) {
+    resTensor = getScalarResult<hivm::VDivOp, arith::DivSIOp>(
+        rewriter, op.getLoc(), scalarInputs);
+    resTensors.push_back(resTensor);
   } else if constexpr (std::is_same<hivm::VAddOp, HIVMOP>::value) {
     resTensor = getScalarResult<hivm::VAddOp, arith::AddIOp>(
         rewriter, op.getLoc(), scalarInputs);
@@ -109,12 +117,6 @@ createScalarComputeOp(RewriterBase &rewriter, HIVMOP op,
     resTensor = getScalarResult<hivm::VShROp, arith::ShRSIOp>(
         rewriter, op.getLoc(), scalarInputs);
     resTensors.push_back(resTensor);
-  } else if constexpr (std::is_same<hivm::VModOp, HIVMOP>::value) {
-    resTensor = rewriter
-                    .create<arith::RemSIOp>(op.getLoc(), scalarInputs[0],
-                                            scalarInputs[1])
-                    .getResult();
-    resTensors.push_back(resTensor);
   } else {
     llvm_unreachable("Unsupport op type.");
   }
@@ -126,16 +128,20 @@ void decomposeVectorOpToScalarOpImpl(RewriterBase &rewriter, HIVMOP op) {
   auto buildLoopBody = [&rewriter,
                         &op](llvm::SmallVector<Value> indexes) -> void {
     llvm::SmallVector<Value, 4> scalarInputs;
-    hivm::HIVMStructuredOp hivmStructureOp = cast<hivm::HIVMStructuredOp>(op.getOperation());
-    auto getScalarValueFunc = [&rewriter, &indexes, &hivmStructureOp](OpOperand *operand) -> Value {
-      auto inlinedBroadcastableAxes = hivmStructureOp.getInlinedBroadcastableAxes(operand);
+    hivm::HIVMStructuredOp hivmStructureOp =
+        cast<hivm::HIVMStructuredOp>(op.getOperation());
+    auto getScalarValueFunc = [&rewriter, &indexes,
+                               &hivmStructureOp](OpOperand *operand) -> Value {
+      auto inlinedBroadcastableAxes =
+          hivmStructureOp.getInlinedBroadcastableAxes(operand);
       SmallVector<Value> newIndexes(indexes);
-      auto constZero = rewriter.create<arith::ConstantIndexOp>(hivmStructureOp->getLoc(), 0);
+      auto constZero =
+          rewriter.create<arith::ConstantIndexOp>(hivmStructureOp->getLoc(), 0);
       for (auto axis : inlinedBroadcastableAxes) {
         newIndexes[axis] = constZero;
       }
-      return mlir::utils::getScalarValue(rewriter, hivmStructureOp->getLoc(), operand->get(),
-                                         &newIndexes);
+      return mlir::utils::getScalarValue(rewriter, hivmStructureOp->getLoc(),
+                                         operand->get(), &newIndexes);
     };
 
     llvm::transform(
@@ -331,6 +337,7 @@ ENABLE_DEFAULT_OP_LOWER_TO_LOOPS_IMPLEMENTATION(VAbsOp)
 ENABLE_DEFAULT_OP_LOWER_TO_LOOPS_IMPLEMENTATION(VShLOp)
 ENABLE_DEFAULT_OP_LOWER_TO_LOOPS_IMPLEMENTATION(VShROp)
 ENABLE_DEFAULT_OP_LOWER_TO_LOOPS_IMPLEMENTATION(VModOp)
+ENABLE_DEFAULT_OP_LOWER_TO_LOOPS_IMPLEMENTATION(VDivOp)
 #undef ENABLE_DEFAULT_OP_LOWER_TO_LOOPS_IMPLEMENTATION
 
 ENABLE_CUM_OP_LOWER_TO_LOOPS_IMPLEMENTATION(VCumprodOp)

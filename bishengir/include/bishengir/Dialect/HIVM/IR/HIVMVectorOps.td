@@ -634,9 +634,10 @@ def VSubOp
 
 def VDivOp : HIVM_ElementwiseBinaryOp<
                  "vdiv", [SameOperandsElementType,
-                          OperElemTypeConstraints<[0, 1], [F16, F32]>,
+                          OperElemTypeConstraints<[0, 1], [F16, F32, I64]>,
                           DeclareOpInterfaceMethods<ExtraBufferOpInterface,
                             ["getExtraBufferSize"]>,
+                          DeclareOpInterfaceMethods<ImplByScalarOpInterface>,
                           BroadcastableOTF]> {
   let summary = "Elementwise Binary Vector Division Op";
   let description = baseClassDescription # [{
