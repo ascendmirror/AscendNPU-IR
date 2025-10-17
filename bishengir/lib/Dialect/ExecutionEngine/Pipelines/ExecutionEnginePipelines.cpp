@@ -18,6 +18,7 @@
 #include "bishengir/Dialect/Annotation/Transforms/Passes.h"
 #include "bishengir/Dialect/ExecutionEngine/Pipelines/Passes.h"
 #include "bishengir/Dialect/ExecutionEngine/Transforms/Passes.h"
+#include "bishengir/Dialect/HIVM/Transforms/Passes.h"
 #include "bishengir/Dialect/Tensor/Transforms/Passes.h"
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
@@ -42,6 +43,7 @@ void execution_engine::buildCPURunnerPipeline(
   hostFuncWrapperOpts.wrapperName = options.wrapperName;
   pm.addPass(execution_engine::createCreateHostMainPass(hostFuncWrapperOpts));
 
+  pm.addNestedPass<func::FuncOp>(hivm::createEnableMultiBufferPass());
   // Conversion to upstream dialect Passes
   pm.addPass(createConvertHIVMToUpstreamPass());
 

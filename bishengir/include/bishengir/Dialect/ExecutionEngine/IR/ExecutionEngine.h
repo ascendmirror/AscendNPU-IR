@@ -19,6 +19,21 @@
 // Execution Engine Dialect
 //===----------------------------------------------------------------------===//
 
+#include "bishengir/Dialect/HIVM/IR/HIVM.h"
+
 #include "bishengir/Dialect/ExecutionEngine/IR/ExecutionEngineBaseDialect.h.inc"
+
+//===----------------------------------------------------------------------===//
+// Execution Engine Enums
+//===----------------------------------------------------------------------===//
+
+#include "bishengir/Dialect/ExecutionEngine/IR/ExecutionEngineEnums.h.inc"
+
+//===----------------------------------------------------------------------===//
+// Execution Engine Attributes
+//===----------------------------------------------------------------------===//
+
+#define GET_ATTRDEF_CLASSES
+#include "bishengir/Dialect/ExecutionEngine/IR/ExecutionEngineAttrs.h.inc"
 
 #endif // BISHENGIR_DIALECT_EXECUTION_ENGINE_IR_EXECUTIONENGINE_H

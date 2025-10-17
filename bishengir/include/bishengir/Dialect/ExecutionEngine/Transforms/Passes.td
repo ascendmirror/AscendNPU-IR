@@ -93,10 +93,10 @@ def ExecutionEngineHIVMToUpstreamConversion : Pass<"execution-engine-convert-hiv
     Constraints/Assumptions:
       * The operations have to have either tensor or buffer semantics.
       * Synchronization operations are considered to be NoOp.
-      * PointerCastOp is not supported.
   }];
   let constructor = "mlir::execution_engine::createConvertHIVMToUpstreamPass()";
   let dependentDialects = [
+    "annotation::AnnotationDialect",
     "arith::ArithDialect",
     "bufferization::BufferizationDialect",
     "execution_engine::ExecutionEngineDialect",

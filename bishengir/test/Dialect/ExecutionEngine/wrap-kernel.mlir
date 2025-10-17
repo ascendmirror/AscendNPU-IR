@@ -20,18 +20,22 @@ module {
 // CHECK-LABEL:   func.func private @getFileHandle(!llvm.ptr) -> !llvm.ptr
 // CHECK-LABEL:   func.func private @getDataF16(memref<*xf16>) attributes {llvm.emit_c_interface}
 
+// CHECK-LABEL:   func.func @kernel(
+// CHECK-SAME:                      %[[VAL_0:[^:]*]]: tensor<?x5xf16>,
+// CHECK-SAME:                      %[[VAL_1:[^:]*]]: tensor<?x5xf16>) -> (tensor<5xf16>, tensor<5xf16>, tensor<5xf16>)
+
 // CHECK-LABEL:   func.func @main(
-// CHECK-SAME:                    %[[VAL_0:[^:]*]]: !llvm.ptr,
-// CHECK-SAME:                    %[[VAL_1:[^:]*]]: !llvm.ptr,
-// CHECK-SAME:                    %[[VAL_2:[^:]*]]: index,
-// CHECK-SAME:                    %[[VAL_3:[^:]*]]: index) {
-// CHECK:           %[[VAL_4:.*]] = memref.alloc(%[[VAL_2]]) : memref<?x5xf16>
-// CHECK:           %[[VAL_5:.*]] = memref.alloc(%[[VAL_3]]) : memref<?x5xf16>
+// CHECK-SAME:                    %[[VAL_0:[^:]*]]: index {execution_engine.arg_type = #execution_engine.arg_type<dyn_size>},
+// CHECK-SAME:                    %[[VAL_1:[^:]*]]: index {execution_engine.arg_type = #execution_engine.arg_type<dyn_size>},
+// CHECK-SAME:                    %[[VAL_2:[^:]*]]: !llvm.ptr {execution_engine.arg_type = #execution_engine.arg_type<input>},
+// CHECK-SAME:                    %[[VAL_3:[^:]*]]: !llvm.ptr {execution_engine.arg_type = #execution_engine.arg_type<output>}) {
+// CHECK:           %[[VAL_4:.*]] = memref.alloc(%[[VAL_0]]) : memref<?x5xf16>
+// CHECK:           %[[VAL_5:.*]] = memref.alloc(%[[VAL_1]]) : memref<?x5xf16>
 // CHECK:           %[[VAL_6:.*]] = memref.cast %[[VAL_4]] : memref<?x5xf16> to memref<*xf16>
 // CHECK:           %[[VAL_7:.*]] = memref.cast %[[VAL_5]] : memref<?x5xf16> to memref<*xf16>
 // CHECK:           call @getDataF16(%[[VAL_6]]) : (memref<*xf16>) -> ()
 // CHECK:           call @getDataF16(%[[VAL_7]]) : (memref<*xf16>) -> ()
-// CHECK:           %[[VAL_8:.*]] = call @getFileHandle(%[[VAL_0]]) : (!llvm.ptr) -> !llvm.ptr
+// CHECK:           %[[VAL_8:.*]] = call @getFileHandle(%[[VAL_2]]) : (!llvm.ptr) -> !llvm.ptr
 // CHECK:           call @printDataF16(%[[VAL_8]], %[[VAL_6]]) : (!llvm.ptr, memref<*xf16>) -> ()
 // CHECK:           call @printDataF16(%[[VAL_8]], %[[VAL_7]]) : (!llvm.ptr, memref<*xf16>) -> ()
 // CHECK:           call @closeFileHandle(%[[VAL_8]]) : (!llvm.ptr) -> ()
@@ -46,7 +50,7 @@ module {
 // CHECK:           %[[VAL_17:.*]] = bufferization.to_memref %[[VAL_16]] : memref<*xf16>
 // CHECK:           %[[VAL_18:.*]] = tensor.cast %[[VAL_13]]#2 : tensor<5xf16> to tensor<*xf16>
 // CHECK:           %[[VAL_19:.*]] = bufferization.to_memref %[[VAL_18]] : memref<*xf16>
-// CHECK:           %[[VAL_20:.*]] = call @getFileHandle(%[[VAL_1]]) : (!llvm.ptr) -> !llvm.ptr
+// CHECK:           %[[VAL_20:.*]] = call @getFileHandle(%[[VAL_3]]) : (!llvm.ptr) -> !llvm.ptr
 // CHECK:           call @printDataF16(%[[VAL_20]], %[[VAL_15]]) : (!llvm.ptr, memref<*xf16>) -> ()
 // CHECK:           call @printDataF16(%[[VAL_20]], %[[VAL_17]]) : (!llvm.ptr, memref<*xf16>) -> ()
 // CHECK:           call @printDataF16(%[[VAL_20]], %[[VAL_19]]) : (!llvm.ptr, memref<*xf16>) -> ()
