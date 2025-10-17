@@ -1,0 +1,2 @@
+add_mlir_dialect(ExecutionEngineBase execution_engine)
+add_bishengir_doc(ExecutionEngineBase ExecutionEngineDialect Dialects/ -gen-dialect-doc)

@@ -1,4 +1,4 @@
-//===- Passes.h - Execution Engine pass entrypoints -------------*- C++ -*-===//
+//===- Passes.h - ExecutionEngine pipeline entry points ---------*- C++ -*-===//
 //
 // Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,27 +15,20 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This header file defines prototypes that expose pass constructors.
+// This header file defines prototypes of all Execution Engine pipelines.
 //
 //===----------------------------------------------------------------------===//
-#ifndef BISHENGIR_EXECUTION_ENGINE_TRANSFORMS_PASSES_H
-#define BISHENGIR_EXECUTION_ENGINE_TRANSFORMS_PASSES_H
 
-#include "mlir/Pass/Pass.h"
+#ifndef BISHENGIR_DIALECT_EXECUTION_ENGINE_PIPELINES_PASSES_H
+#define BISHENGIR_DIALECT_EXECUTION_ENGINE_PIPELINES_PASSES_H
 
-namespace mlir {
+#include "mlir/Pass/PassOptions.h"
 
-#define GEN_PASS_DECL
-#include "bishengir/ExecutionEngine/Passes.h.inc"
+namespace mlir::execution_engine {
 
-namespace execution_engine {
-
-/// Create a pass to create wrappers for the only host related functions.
-std::unique_ptr<Pass> createCreateHostMainPass(
-    const ExecutionEngineHostMainCreatorOptions &options = {});
-
-/// Create a pass to convert HIVM operations to upstream dialect's equivalent.
-std::unique_ptr<Pass> createConvertHIVMToUpstreamPass();
+//===----------------------------------------------------------------------===//
+// Building and Registering.
+//===----------------------------------------------------------------------===//
 
 struct CPURunnerPipelineOptions
     : public PassPipelineOptions<CPURunnerPipelineOptions> {
@@ -62,18 +55,9 @@ struct CPURunnerPipelineOptions
 void buildCPURunnerPipeline(OpPassManager &pm,
                             const CPURunnerPipelineOptions &options = {});
 
-//===----------------------------------------------------------------------===//
-// Registration
-//===----------------------------------------------------------------------===//
-
-/// Generate the code for registering passes.
-#define GEN_PASS_REGISTRATION
-#include "bishengir/ExecutionEngine/Passes.h.inc"
-
-/// Register all Execution-Engine related pipelines.
+/// Register all Execution Engine related pipelines.
 void registerAllPipelines();
 
-} // namespace execution_engine
-} // namespace mlir
+} // namespace mlir::execution_engine
 
-#endif // BISHENGIR_EXECUTION_ENGINE_TRANSFORMS_PASSES_H
+#endif // BISHENGIR_DIALECT_EXECUTION_ENGINE_PIPELINES_PASSES_H

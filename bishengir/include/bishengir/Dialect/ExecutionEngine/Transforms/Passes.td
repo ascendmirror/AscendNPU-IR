@@ -67,6 +67,7 @@ def ExecutionEngineHostMainCreator : Pass<"execution-engine-create-host-main", "
   let dependentDialects = [
     "arith::ArithDialect",
     "bufferization::BufferizationDialect",
+    "execution_engine::ExecutionEngineDialect",
     "func::FuncDialect",
     "LLVM::LLVMDialect",
     "memref::MemRefDialect",
@@ -83,7 +84,7 @@ def ExecutionEngineHIVMToUpstreamConversion : Pass<"execution-engine-convert-hiv
   let description = [{
     Convert selected HIVM operations into upstream dialects mostly using Linalg.
     The main goal is to use dialects that can be lowered to LLVMIR using
-    upstream passes instead of internal ones.
+    upstream passes instead of our ones.
 
     Modifications made:
       * Remove HIVM attributes (e.g. memory spaces) from types.
@@ -98,6 +99,7 @@ def ExecutionEngineHIVMToUpstreamConversion : Pass<"execution-engine-convert-hiv
   let dependentDialects = [
     "arith::ArithDialect",
     "bufferization::BufferizationDialect",
+    "execution_engine::ExecutionEngineDialect",
     "linalg::LinalgDialect",
     "memref::MemRefDialect",
     "tensor::TensorDialect",

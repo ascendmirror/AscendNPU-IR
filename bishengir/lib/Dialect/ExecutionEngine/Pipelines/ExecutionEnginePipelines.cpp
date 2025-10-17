@@ -16,14 +16,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "bishengir/Dialect/Annotation/Transforms/Passes.h"
+#include "bishengir/Dialect/ExecutionEngine/Pipelines/Passes.h"
+#include "bishengir/Dialect/ExecutionEngine/Transforms/Passes.h"
 #include "bishengir/Dialect/Tensor/Transforms/Passes.h"
-#include "bishengir/ExecutionEngine/Passes.h"
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Bufferization/Pipelines/Passes.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"

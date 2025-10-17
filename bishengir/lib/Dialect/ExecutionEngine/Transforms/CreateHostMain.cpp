@@ -19,7 +19,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "bishengir/Dialect/HACC/Utils/Utils.h"
-#include "bishengir/ExecutionEngine/Passes.h"
+#include "bishengir/Dialect/ExecutionEngine/Transforms/Passes.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -37,7 +37,7 @@
 
 namespace mlir {
 #define GEN_PASS_DEF_EXECUTIONENGINEHOSTMAINCREATOR
-#include "bishengir/ExecutionEngine/Passes.h.inc"
+#include "bishengir/Dialect/ExecutionEngine/Transforms/Passes.h.inc"
 } // namespace mlir
 
 namespace {

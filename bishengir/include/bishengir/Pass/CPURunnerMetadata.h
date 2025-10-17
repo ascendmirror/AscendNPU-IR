@@ -21,7 +21,7 @@
 #include "bishengir/Config/bishengir-config.h"
 
 #if MLIR_ENABLE_EXECUTION_ENGINE
-#include "bishengir/ExecutionEngine/Passes.h"
+#include "bishengir/Dialect/ExecutionEngine/Pipelines/Passes.h"
 
 namespace bishengir {
 
