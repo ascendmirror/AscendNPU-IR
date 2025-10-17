@@ -882,7 +882,7 @@ struct HFusionToHIVMCumOp : public OpRewritePattern<HFUSIONOP> {
             tensor::getOrCreateDestinations(rewriter, op.getLoc(), op, dsts)))
       return failure();
     rewriter.replaceOpWithNewOp<HIVMOP>(op, op->getResultTypes(), op.getInput(),
-                                        dsts[0], op.getCumDims());
+                                        dsts[0], op.getCumDims(), op.getReverse());
     return success();
   }
 };
