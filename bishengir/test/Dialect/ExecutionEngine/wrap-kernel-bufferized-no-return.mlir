@@ -18,13 +18,20 @@ module {
 // CHECK-LABEL:   func.func private @getFileHandle(!llvm.ptr) -> !llvm.ptr
 // CHECK-LABEL:   func.func private @getDataF32(memref<*xf32>) attributes {llvm.emit_c_interface}
 
+// CHECK-LABEL:   func.func @kernel(
+// CHECK-SAME:                      %[[VAL_0:[^:]*]]: memref<?x5xf32, #hivm.address_space<gm>> {hacc.arg_type = #hacc.arg_type<input>, hacc.input_idx = #hacc.input_idx<0>},
+// CHECK-SAME:                      %[[VAL_1:[^:]*]]: memref<?x5xf32, #hivm.address_space<gm>> {hacc.arg_type = #hacc.arg_type<input>, hacc.input_idx = #hacc.input_idx<1>},
+// CHECK-SAME:                      %[[VAL_2:[^:]*]]: memref<5xf32, #hivm.address_space<gm>> {hacc.arg_type = #hacc.arg_type<output>, hacc.output_idx = #hacc.output_idx<0>},
+// CHECK-SAME:                      %[[VAL_3:[^:]*]]: memref<5xf32, #hivm.address_space<gm>> {hacc.arg_type = #hacc.arg_type<output>, hacc.output_idx = #hacc.output_idx<1>},
+// CHECK-SAME:                      %[[VAL_4:[^:]*]]: memref<5xf32, #hivm.address_space<gm>> {hacc.arg_type = #hacc.arg_type<output>, hacc.output_idx = #hacc.output_idx<2>})
+
 // CHECK-LABEL:   func.func @main(
-// CHECK-SAME:                    %[[VAL_0:[^:]*]]: !llvm.ptr,
-// CHECK-SAME:                    %[[VAL_1:[^:]*]]: !llvm.ptr,
-// CHECK-SAME:                    %[[VAL_2:[^:]*]]: index,
-// CHECK-SAME:                    %[[VAL_3:[^:]*]]: index) {
-// CHECK:           %[[VAL_4:.*]] = memref.alloc(%[[VAL_2]]) : memref<?x5xf32, #hivm.address_space<gm>>
-// CHECK:           %[[VAL_5:.*]] = memref.alloc(%[[VAL_3]]) : memref<?x5xf32, #hivm.address_space<gm>>
+// CHECK-SAME:                    %[[VAL_0:[^:]*]]: index {execution_engine.arg_type = #execution_engine.arg_type<dyn_size>},
+// CHECK-SAME:                    %[[VAL_1:[^:]*]]: index {execution_engine.arg_type = #execution_engine.arg_type<dyn_size>},
+// CHECK-SAME:                    %[[VAL_2:[^:]*]]: !llvm.ptr {execution_engine.arg_type = #execution_engine.arg_type<input>},
+// CHECK-SAME:                    %[[VAL_3:[^:]*]]: !llvm.ptr {execution_engine.arg_type = #execution_engine.arg_type<output>}) {
+// CHECK:           %[[VAL_4:.*]] = memref.alloc(%[[VAL_0]]) : memref<?x5xf32, #hivm.address_space<gm>>
+// CHECK:           %[[VAL_5:.*]] = memref.alloc(%[[VAL_1]]) : memref<?x5xf32, #hivm.address_space<gm>>
 // CHECK:           %[[VAL_6:.*]] = memref.alloc() : memref<5xf32, #hivm.address_space<gm>>
 // CHECK:           %[[VAL_7:.*]] = memref.alloc() : memref<5xf32, #hivm.address_space<gm>>
 // CHECK:           %[[VAL_8:.*]] = memref.alloc() : memref<5xf32, #hivm.address_space<gm>>
@@ -43,7 +50,7 @@ module {
 // CHECK:           call @getDataF32(%[[VAL_14]]) : (memref<*xf32>) -> ()
 // CHECK:           call @getDataF32(%[[VAL_16]]) : (memref<*xf32>) -> ()
 // CHECK:           call @getDataF32(%[[VAL_18]]) : (memref<*xf32>) -> ()
-// CHECK:           %[[VAL_19:.*]] = call @getFileHandle(%[[VAL_0]]) : (!llvm.ptr) -> !llvm.ptr
+// CHECK:           %[[VAL_19:.*]] = call @getFileHandle(%[[VAL_2]]) : (!llvm.ptr) -> !llvm.ptr
 // CHECK:           call @printDataF32(%[[VAL_19]], %[[VAL_10]]) : (!llvm.ptr, memref<*xf32>) -> ()
 // CHECK:           call @printDataF32(%[[VAL_19]], %[[VAL_12]]) : (!llvm.ptr, memref<*xf32>) -> ()
 // CHECK:           call @printDataF32(%[[VAL_19]], %[[VAL_14]]) : (!llvm.ptr, memref<*xf32>) -> ()
@@ -67,7 +74,7 @@ module {
 // CHECK:           %[[VAL_33:.*]] = memref.memory_space_cast %[[VAL_32]] : memref<*xf32, #hivm.address_space<gm>> to memref<*xf32>
 // CHECK:           %[[VAL_34:.*]] = memref.cast %[[VAL_29]] : memref<5xf32, #hivm.address_space<gm>> to memref<*xf32, #hivm.address_space<gm>>
 // CHECK:           %[[VAL_35:.*]] = memref.memory_space_cast %[[VAL_34]] : memref<*xf32, #hivm.address_space<gm>> to memref<*xf32>
-// CHECK:           %[[VAL_36:.*]] = call @getFileHandle(%[[VAL_1]]) : (!llvm.ptr) -> !llvm.ptr
+// CHECK:           %[[VAL_36:.*]] = call @getFileHandle(%[[VAL_3]]) : (!llvm.ptr) -> !llvm.ptr
 // CHECK:           call @printDataF32(%[[VAL_36]], %[[VAL_31]]) : (!llvm.ptr, memref<*xf32>) -> ()
 // CHECK:           call @printDataF32(%[[VAL_36]], %[[VAL_33]]) : (!llvm.ptr, memref<*xf32>) -> ()
 // CHECK:           call @printDataF32(%[[VAL_36]], %[[VAL_35]]) : (!llvm.ptr, memref<*xf32>) -> ()

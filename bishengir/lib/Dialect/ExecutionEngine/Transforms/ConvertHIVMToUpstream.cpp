@@ -11,18 +11,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "bishengir/Dialect/Annotation/IR/Annotation.h"
 #include "bishengir/Dialect/ExecutionEngine/Transforms/Passes.h"
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
+#include "bishengir/Dialect/Utils/Util.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/Iterators.h"
 #include "mlir/IR/Verifier.h"
-#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ScopedPrinter.h"
 
@@ -866,6 +864,92 @@ struct RewriteLoadOp : public OpRewritePattern<hivm::LoadOp> {
   }
 };
 
+struct RewritePointerCastOp : public OpRewritePattern<hivm::PointerCastOp> {
+
+  using OpRewritePattern<hivm::PointerCastOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(hivm::PointerCastOp op,
+                                PatternRewriter &rewriter) const final {
+    if (op.getAddrs().size() > 1)
+      return op.emitError()
+             << "cannot lower pointer casts with multiple addresses";
+
+    const auto memrefType = op.getResult().getType();
+    hivm::AddressSpaceAttr memorySpace = nullptr;
+    if (const auto memrefSpace = memrefType.getMemorySpace()) {
+      auto addressSpace = dyn_cast<hivm::AddressSpaceAttr>(memrefSpace);
+      if (!addressSpace)
+        return op.emitError() << "Unsupported address space in "
+                              << llvm::to_string(memrefType);
+
+      if (const auto annotations = utils::getAllAnnotateOpsWithAttr(
+              op, hivm::AddressSpaceAttr::getMnemonic());
+          !annotations.empty()) {
+        if (annotations.size() > 1)
+          return op.emitError(
+              "has multiple annotations redefining the address space");
+        const auto newAddressSpace = cast<hivm::AddressSpaceAttr>(
+            cast<annotation::MarkOp>(annotations.front())
+                .getStaticAttrValue(hivm::AddressSpaceAttr::getMnemonic()));
+        if (addressSpace)
+          return annotations.front()->emitError()
+                 << "cannot change the address space of the memref from \""
+                 << hivm::stringifyAddressSpace(addressSpace.getAddressSpace())
+                 << "\" to \""
+                 << hivm::stringifyAddressSpace(
+                        newAddressSpace.getAddressSpace())
+                 << '"';
+        addressSpace = newAddressSpace;
+      }
+
+      memorySpace = addressSpace;
+    }
+    const auto addressSpace =
+        memorySpace ? memorySpace.getAddressSpace() : hivm::AddressSpace::Zero;
+
+    auto funcOp = op->getParentOfType<FunctionOpInterface>();
+    BlockArgument memoryPoolArg = nullptr;
+    for (auto [arg, argAttr] : llvm::zip_equal(
+             funcOp.getArguments(), funcOp.getAllArgAttrs().getValue())) {
+      if (const auto dictAttr = cast<DictionaryAttr>(argAttr);
+          !dictAttr.contains(execution_engine::MemoryPoolAttr::name)) {
+        LDBG(arg << " is not a memory pool");
+        continue;
+      }
+      const auto memrefType = dyn_cast<MemRefType>(arg.getType());
+      if (!memrefType) {
+        LDBG(arg << " is not a memref pool");
+        continue;
+      }
+      if (const auto memorySpace = dyn_cast_or_null<hivm::AddressSpaceAttr>(
+              memrefType.getMemorySpace());
+          !memorySpace || memorySpace.getAddressSpace() != addressSpace) {
+        LDBG(arg << " is not a memref pool with \"" << addressSpace
+                 << "\" address space");
+        continue;
+      }
+      if (memoryPoolArg)
+        return emitError(arg.getLoc())
+               << "found multiple memory pools with the same address space";
+      memoryPoolArg = arg;
+    }
+    if (!memoryPoolArg)
+      return op.emitError()
+             << "couldn't find a memory pool argument with the address space \""
+             << hivm::stringifyAddressSpace(addressSpace) << '"';
+
+    auto offset =
+        rewriter
+            .create<arith::IndexCastUIOp>(op.getLoc(), rewriter.getIndexType(),
+                                          op.getSingleAddr())
+            .getResult();
+    rewriter.replaceOpWithNewOp<memref::ViewOp>(op, memrefType, memoryPoolArg,
+                                                offset, op.getDynamicSizes());
+
+    return success();
+  }
+};
+
 struct RewriteUsingTypeConverter {
 
   explicit RewriteUsingTypeConverter(const TypeConverter &typeConverter)
@@ -1023,7 +1107,8 @@ struct ConvertHIVMToUpstream
 
   using Base::Base;
 
-  template <typename T> static T getIfNotHIVM(T &&thing) {
+  template <typename T>
+  static T getIfNotHIVM(T &&thing) {
     return thing && isa<hivm::HIVMDialect>(thing.getDialect()) ? T{} : thing;
   }
 
@@ -1071,6 +1156,19 @@ struct ConvertHIVMToUpstream
   void runOnOperation() override {
     auto &ctx = getContext();
 
+    ConversionTarget target(ctx);
+    target.addIllegalOp<hivm::PointerCastOp>();
+    target.addLegalDialect<
+        linalg::LinalgDialect, bufferization::BufferizationDialect,
+        tensor::TensorDialect, memref::MemRefDialect, arith::ArithDialect>();
+    target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
+
+    RewritePatternSet pointerCastPatterns(&ctx);
+    pointerCastPatterns.add<RewritePointerCastOp>(&ctx);
+    if (failed(applyPartialConversion(getOperation(), target,
+                                      std::move(pointerCastPatterns))))
+      signalPassFailure();
+
     if (failed(applyTypeConversion())) {
       signalPassFailure();
       return;
@@ -1111,12 +1209,7 @@ struct ConvertHIVMToUpstream
     patterns.add<RewriteVBrcOp, RewriteVTransposeOp, RewriteVArangeOp,
                  RewriteVConcatOp, RewriteVReduceOp, RewriteLoadOp>(&ctx);
 
-    ConversionTarget target(ctx);
     target.addIllegalDialect<hivm::HIVMDialect>();
-    target.addLegalDialect<
-        linalg::LinalgDialect, bufferization::BufferizationDialect,
-        tensor::TensorDialect, memref::MemRefDialect, arith::ArithDialect>();
-    target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns))))

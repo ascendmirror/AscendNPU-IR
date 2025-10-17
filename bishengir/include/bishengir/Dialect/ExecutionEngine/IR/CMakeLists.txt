@@ -1,2 +1,10 @@
 add_mlir_dialect(ExecutionEngineBase execution_engine)
 add_bishengir_doc(ExecutionEngineBase ExecutionEngineDialect Dialects/ -gen-dialect-doc)
+
+set(LLVM_TARGET_DEFINITIONS ExecutionEngineAttrs.td)
+mlir_tablegen(ExecutionEngineEnums.h.inc -gen-enum-decls)
+mlir_tablegen(ExecutionEngineEnums.cpp.inc -gen-enum-defs)
+mlir_tablegen(ExecutionEngineAttrs.h.inc -gen-attrdef-decls -attrdefs-dialect=execution_engine)
+mlir_tablegen(ExecutionEngineAttrs.cpp.inc -gen-attrdef-defs -attrdefs-dialect=execution_engine)
+add_public_tablegen_target(MLIRExecutionEngineAttributesIncGen)
+add_dependencies(mlir-headers MLIRExecutionEngineAttributesIncGen)

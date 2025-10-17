@@ -18,8 +18,9 @@
 // This file implements wrapping logic for the single host function
 //
 //===----------------------------------------------------------------------===//
-#include "bishengir/Dialect/HACC/Utils/Utils.h"
 #include "bishengir/Dialect/ExecutionEngine/Transforms/Passes.h"
+#include "bishengir/Dialect/HACC/IR/HACC.h"
+#include "bishengir/Dialect/HIVM/IR/HIVM.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -125,9 +126,13 @@ struct CreateHostMainPass
                 ShapedMetadata data(type);
                 for (int64_t i = 0; i < type.getRank(); i++)
                   if (type.isDynamicDim(i)) {
-                    wrapperFunc.insertArgument(wrapperFunc.getNumArguments(),
-                                               rewriter.getIndexType(), {},
-                                               loc);
+                    wrapperFunc.insertArgument(
+                        wrapperFunc.getNumArguments(), rewriter.getIndexType(),
+                        rewriter.getDictionaryAttr({rewriter.getNamedAttr(
+                            execution_engine::ArgTypeAttr::name,
+                            rewriter.getAttr<execution_engine::ArgTypeAttr>(
+                                execution_engine::ArgType::ArgDynSize))}),
+                        loc);
                     data.dynSizes.push_back(wrapperFunc.args_end()[-1]);
                   }
                 return data;
@@ -147,14 +152,18 @@ struct CreateHostMainPass
   void printTensors(IRRewriter &rewriter,
                     const SmallVector<ShapedValue> &memrefs,
                     func::FuncOp wrapperFunc,
-                    std::size_t argumentInsertionIndex) {
+                    execution_engine::ArgType argType) {
     const auto loc = wrapperFunc.getLoc();
-    wrapperFunc.insertArgument(argumentInsertionIndex,
-                               rewriter.getType<LLVM::LLVMPointerType>(), {},
-                               loc);
-    auto fileHandle = createLibCall(
-        loc, rewriter, rewriter.getType<LLVM::LLVMPointerType>(),
-        getFileHandleFuncName, wrapperFunc.getArgument(argumentInsertionIndex));
+    wrapperFunc.insertArgument(
+        wrapperFunc.getNumArguments(),
+        rewriter.getType<LLVM::LLVMPointerType>(),
+        rewriter.getDictionaryAttr({rewriter.getNamedAttr(
+            execution_engine::ArgTypeAttr::name,
+            rewriter.getAttr<execution_engine::ArgTypeAttr>(argType))}),
+        loc);
+    auto fileHandle =
+        createLibCall(loc, rewriter, rewriter.getType<LLVM::LLVMPointerType>(),
+                      getFileHandleFuncName, wrapperFunc.args_end()[-1]);
     for (auto memref : memrefs)
       createLibCall(
           loc, rewriter,
@@ -367,6 +376,77 @@ struct CreateHostMainPass
     return results;
   }
 
+  SmallVector<hivm::AddressSpace>
+  getUsedMemorySpaces(IRRewriter &rewriter, FunctionOpInterface func) {
+    DenseMap<hivm::AddressSpace, BlockArgument> addressSpaceArgs;
+    SmallVector<hivm::AddressSpace> argSpaces;
+    auto getOrUpdateMemorySpaces = [&](hivm::AddressSpace memorySpace) {
+      if (auto it = addressSpaceArgs.find(memorySpace);
+          it != addressSpaceArgs.end())
+        return it->getSecond();
+      argSpaces.push_back(memorySpace);
+      func.insertArgument(
+          func.getNumArguments(),
+          MemRefType::get(
+              {ShapedType::kDynamic}, rewriter.getI8Type(),
+              MemRefLayoutAttrInterface(),
+              rewriter.getAttr<hivm::AddressSpaceAttr>(memorySpace)),
+          rewriter.getDictionaryAttr({rewriter.getNamedAttr(
+              execution_engine::MemoryPoolAttr::name, rewriter.getUnitAttr())}),
+          rewriter.getUnknownLoc());
+      return addressSpaceArgs[memorySpace] = func.getArguments().back();
+    };
+    func.walk([&](Operation *op) {
+      for (auto result : op->getResults()) {
+        if (const auto memrefType =
+                dyn_cast<BaseMemRefType>(result.getType())) {
+          hivm::AddressSpaceAttr memorySpace = nullptr;
+          if (const auto memrefSpace = memrefType.getMemorySpace()) {
+            memorySpace = dyn_cast<hivm::AddressSpaceAttr>(memrefSpace);
+            if (!memorySpace)
+              llvm::report_fatal_error(
+                  ("Unsupported memory space in " + llvm::to_string(memrefType))
+                      .c_str());
+          }
+          const auto addressSpace = memorySpace ? memorySpace.getAddressSpace()
+                                                : hivm::AddressSpace::Zero;
+          getOrUpdateMemorySpaces(addressSpace);
+        }
+      }
+    });
+    func.walk([&](CallOpInterface op) {
+      auto callee =
+          cast<FunctionOpInterface>(SymbolTable::lookupNearestSymbolFrom(
+              op, op.getCallableForCallee().get<SymbolRefAttr>()));
+      for (auto neededMemSpace : getUsedMemorySpaces(rewriter, callee))
+        op.getArgOperandsMutable().append(
+            getOrUpdateMemorySpaces(neededMemSpace));
+    });
+    return argSpaces;
+  }
+
+  SmallVector<ShapedValue> getUsedMemorySpaceArgs(IRRewriter &rewriter,
+                                                  func::FuncOp wrapperFunc,
+                                                  func::FuncOp kernelFunc) {
+    SmallVector<ShapedValue> pools;
+    for (auto neededMemSpace : getUsedMemorySpaces(rewriter, kernelFunc)) {
+      wrapperFunc.insertArgument(
+          wrapperFunc.getNumArguments(), rewriter.getIndexType(),
+          rewriter.getDictionaryAttr({rewriter.getNamedAttr(
+              execution_engine::ArgTypeAttr::name,
+              rewriter.getAttr<execution_engine::ArgTypeAttr>(
+                  neededMemSpace))}),
+          rewriter.getUnknownLoc());
+      auto pool = rewriter.create<memref::AllocOp>(
+          rewriter.getUnknownLoc(),
+          ArrayRef<OpFoldResult>({wrapperFunc.args_end()[-1]}),
+          rewriter.getI8Type(),
+          rewriter.getAttr<hivm::AddressSpaceAttr>(neededMemSpace));
+      pools.push_back(cast<ShapedValue>(pool.getResult()));
+    }
+    return pools;
+  }
+
   void runOnOperation() override {
     auto kernelFunc =
         dyn_cast_or_null<func::FuncOp>(getKernelFunc().getOperation());
@@ -386,6 +466,7 @@ struct CreateHostMainPass
 
     // Step 1: Parse kernel arguments and create placeholders for unknowns
     auto memrefMetadata = getInputMetadata(rewriter, wrapperFunc, kernelFunc);
+    auto memPools = getUsedMemorySpaceArgs(rewriter, wrapperFunc, kernelFunc);
     // Step 2: Create Memrefs to pass to the kernel
     auto memrefs = getMemrefs(loc, rewriter, std::move(memrefMetadata));
 
@@ -398,9 +479,11 @@ struct CreateHostMainPass
         llvm::map_to_vector(memrefs, getUnrankedMemRefTypeWithoutMemScope);
     auto operands =
         adaptToTypes(rewriter, std::move(memrefs), unrankedMemRefTypes);
-    printTensors(rewriter, operands, wrapperFunc, 0);
+    printTensors(rewriter, operands, wrapperFunc,
+                 execution_engine::ArgType::InputFilePath);
 
     // Step 4: Call the kernel and get the results
+    operands.append(memPools);
     auto kernelOperands = adaptToTypes(
         rewriter, std::move(operands),
         llvm::map_to_vector(
@@ -415,9 +498,11 @@ struct CreateHostMainPass
     unrankedMemRefTypes =
         llvm::map_to_vector(results, getUnrankedMemRefTypeWithoutMemScope);
     operands = adaptToTypes(rewriter, std::move(results), unrankedMemRefTypes);
-    printTensors(rewriter, operands, wrapperFunc, 1);
+    printTensors(rewriter, operands, wrapperFunc,
+                 execution_engine::ArgType::OutputFilePath);
 
     rewriter.create<func::ReturnOp>(loc);
+    LDBG("Finished creating a host main function");
   }
 };
 } // namespace

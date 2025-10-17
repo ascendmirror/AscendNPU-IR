@@ -21,6 +21,10 @@ def ExecutionEngine_Dialect : Dialect {
     Execution Engine dialect.
   }];
   let cppNamespace = "::mlir::execution_engine";
+  let useDefaultAttributePrinterParser = 1;
+  let dependentDialects = [
+    "hivm::HIVMDialect"
+  ];
 }
 
 #endif // BISHENGIR_DIALECT_EXECUTION_ENGINE_IR_EXECUTIONENGINEBASE_TD
