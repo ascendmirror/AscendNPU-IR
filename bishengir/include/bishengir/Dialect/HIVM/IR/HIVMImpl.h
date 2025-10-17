@@ -82,14 +82,14 @@ std::optional<Operation *> traceDefOp(Value v, bool isSingleChain = false) {
                  v.getDefiningOp<memref::ReinterpretCastOp>()) {
     return traceDefOp<OpType>(reinterpretCastOp.getViewSource(), isSingleChain);
   } else if (auto blockArg = dyn_cast_if_present<BlockArgument>(v)) {
-    if (auto scfForOp = dyn_cast_if_present<scf::ForOp>(
+    if (auto loop = dyn_cast_if_present<LoopLikeOpInterface>(
             blockArg.getOwner()->getParentOp())) {
-      if (OpOperand *iterArgOperand = scfForOp.getTiedLoopInit(blockArg))
+      if (OpOperand *iterArgOperand = loop.getTiedLoopInit(blockArg))
         return traceDefOp<OpType>(iterArgOperand->get(), isSingleChain);
     }
-  } else if (auto forOp = v.getDefiningOp<scf::ForOp>()) {
+  } else if (auto loopLikeOp = v.getDefiningOp<LoopLikeOpInterface>()) {
     const unsigned int index = cast<OpResult>(v).getResultNumber();
-    Value yieldedValue = forOp.getYieldedValues()[index];
+    Value yieldedValue = loopLikeOp.getYieldedValues()[index];
     return traceDefOp<OpType>(yieldedValue, isSingleChain);
   } else if (auto ifOp = v.getDefiningOp<scf::IfOp>()) {
     const unsigned int index = cast<OpResult>(v).getResultNumber();
