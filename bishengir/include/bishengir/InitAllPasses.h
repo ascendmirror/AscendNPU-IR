@@ -39,7 +39,7 @@
 #include "bishengir/Transforms/Passes.h"
 
 #if MLIR_ENABLE_EXECUTION_ENGINE
-#include "bishengir/ExecutionEngine/Passes.h"
+#include "bishengir/Dialect/ExecutionEngine/Transforms/Passes.h"
 #endif
 
 #if BISHENGIR_ENABLE_TORCH_CONVERSIONS

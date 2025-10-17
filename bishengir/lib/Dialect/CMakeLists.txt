@@ -1,6 +1,11 @@
 add_subdirectory(Analysis)
 add_subdirectory(Annotation)
 add_subdirectory(Bufferization)
+
+if(MLIR_ENABLE_EXECUTION_ENGINE)
+  add_subdirectory(ExecutionEngine)
+endif()
+
 add_subdirectory(HACC)
 add_subdirectory(HFusion)
 add_subdirectory(HIVM)

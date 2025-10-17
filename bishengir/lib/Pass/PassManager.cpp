@@ -19,7 +19,7 @@
 #include "bishengir/Tools/BiShengIRConfigBase/Config.h"
 
 #if MLIR_ENABLE_EXECUTION_ENGINE
-#include "bishengir/ExecutionEngine/Passes.h"
+#include "bishengir/Dialect/ExecutionEngine/Transforms/Passes.h"
 #include "bishengir/Pass/CPURunnerMetadata.h"
 #include "bishengir/Pass/PassManager.h"
 #include "mlir/Pass/Pass.h"

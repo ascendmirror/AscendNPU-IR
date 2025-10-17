@@ -1,5 +1,5 @@
 // REQUIRES: execution-engine
-// RUN: bishengir-opt --lower-for-cpu-runner-pipeline="wrapper-name=main" %s | bishengir-cpu-runner -e main --execution-arguments=5,5 --entry-point-result=void --shared-libs=%lib/libbishengir_runner_utils.so,%lib/libmlir_runner_utils.so,%lib/libmlir_c_runner_utils.so
+// RUN: mkdir %t.dir && bishengir-opt --lower-for-cpu-runner-pipeline="wrapper-name=main" %s | bishengir-cpu-runner -e main --execution-input=%t.dir/input.txt --execution-output=%t.dir/output.txt --execution-arguments=5,5 --entry-point-result=void --shared-libs=%lib/libbishengir_runner_utils.so,%lib/libmlir_runner_utils.so,%lib/libmlir_c_runner_utils.so
 
 module {
     func.func @kernel(%arg0: tensor<?x5xf16>, %arg1: tensor<?x5xf16>) -> (tensor<5xf16>, tensor<5xf16>, tensor<5xf16>) attributes {hacc.function_kind = #hacc.function_kind<HOST>, hacc.host_func_type = #hacc.host_func_type<host_entry>} {

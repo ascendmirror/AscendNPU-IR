@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "bishengir/Dialect/ExecutionEngine/Transforms/Passes.h"
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
-#include "bishengir/ExecutionEngine/Passes.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -33,7 +33,7 @@
 
 namespace mlir {
 #define GEN_PASS_DEF_EXECUTIONENGINEHIVMTOUPSTREAMCONVERSION
-#include "bishengir/ExecutionEngine/Passes.h.inc"
+#include "bishengir/Dialect/ExecutionEngine/Transforms/Passes.h.inc"
 } // namespace mlir
 
 namespace {
@@ -1023,8 +1023,7 @@ struct ConvertHIVMToUpstream
 
   using Base::Base;
 
-  template <typename T>
-  static T getIfNotHIVM(T &&thing) {
+  template <typename T> static T getIfNotHIVM(T &&thing) {
     return thing && isa<hivm::HIVMDialect>(thing.getDialect()) ? T{} : thing;
   }
 

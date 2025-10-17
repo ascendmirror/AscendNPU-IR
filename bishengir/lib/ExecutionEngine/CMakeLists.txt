@@ -3,32 +3,11 @@
 
 set(LLVM_OPTIONAL_SOURCES
   BiShengIRRunnerUtils.cpp
-  ConvertHIVMToUpstream.cpp
-  CreateHostMain.cpp
-  ExecutionEnginePipelines.cpp
 )
 
 if(NOT MLIR_ENABLE_EXECUTION_ENGINE)
   return()
 endif()
-
-get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
-get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
-
-add_bishengir_extension_library(BiShengIRExecutionEngineTransforms
-  ConvertHIVMToUpstream.cpp
-  CreateHostMain.cpp
-  ExecutionEnginePipelines.cpp
-
-  DEPENDS
-  BiShengIRExecutionEngineTransformsIncGen
-
-  LINK_LIBS PUBLIC
-  ${conversion_libs}
-  ${dialect_libs}
-  BiShengIRHACCUtils
-  MLIRPass
-)
 
 # When -fPIC is not provided, shared libraries cannot be built if it links against
 # non-PIC code.

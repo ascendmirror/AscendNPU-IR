@@ -1,4 +1,9 @@
 add_subdirectory(Annotation)
+
+if(MLIR_ENABLE_EXECUTION_ENGINE)
+  add_subdirectory(ExecutionEngine)
+endif()
+
 add_subdirectory(HACC)
 add_subdirectory(HFusion)
 add_subdirectory(HIVM)

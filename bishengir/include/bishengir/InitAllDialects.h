@@ -43,6 +43,10 @@
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/IR/MLIRContext.h"
 
+#if MLIR_ENABLE_EXECUTION_ENGINE
+#include "bishengir/Dialect/ExecutionEngine/IR/ExecutionEngine.h"
+#endif // MLIR_ENABLE_EXECUTION_ENGINE
+
 #if BISHENGIR_ENABLE_TORCH_CONVERSIONS
 #include "torch-mlir-dialects/Dialect/TMTensor/IR/TMTensorDialect.h"
 #include "torch-mlir/Dialect/Torch/IR/TorchDialect.h"
@@ -64,6 +68,12 @@ inline void registerAllDialects(mlir::DialectRegistry &registry) {
                   mlir::symbol::SymbolDialect,
                   bishengir::memref_ext::MemRefExtDialect>();
   // clang-format on
+
+#if MLIR_ENABLE_EXECUTION_ENGINE
+  // clang-format off
+  registry.insert<mlir::execution_engine::ExecutionEngineDialect>();
+  // clang-format on
+#endif // MLIR_ENABLE_EXECUTION_ENGINE
 
 #if BISHENGIR_ENABLE_TORCH_CONVERSIONS
   // clang-format off

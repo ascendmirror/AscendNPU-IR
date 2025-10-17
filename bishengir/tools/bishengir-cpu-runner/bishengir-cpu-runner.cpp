@@ -13,11 +13,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "bishengir/InitAllDialects.h"
+#include "bishengir/InitAllExtensions.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/ExecutionEngine/JitRunner.h"
-#include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/Verifier.h"
+#include "mlir/InitAllDialects.h"
 #include "mlir/Target/LLVMIR/Dialect/All.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -31,13 +32,11 @@
 
 static llvm::cl::opt<std::string> executionInputOpt{
     "execution-input",
-    llvm::cl::desc("File path to which the generated input is dumped."),
-    llvm::cl::init("-")};
+    llvm::cl::desc("File path to which the generated input is dumped.")};
 
 static llvm::cl::opt<std::string> executionOutputOpt{
     "execution-output",
-    llvm::cl::desc("File path to which the generated output is dumped."),
-    llvm::cl::init("-")};
+    llvm::cl::desc("File path to which the generated output is dumped.")};
 
 static llvm::cl::list<std::size_t> executionArgumentsOpt{
     "execution-arguments",
@@ -117,6 +116,7 @@ replaceEntryPointArgs(mlir::Operation *op,
    */
   entryPointFuncOp.setFunctionType(LLVM::LLVMFunctionType::get(
       entryPointFuncOp.getFunctionType().getReturnType(), {}, false));
+  entryPointFuncOp.removeArgAttrsAttr();
   while (entryPointBody.getNumArguments() > 0)
     entryPointBody.eraseArgument(entryPointBody.getNumArguments() - 1);
 
@@ -132,9 +132,10 @@ int main(int argc, char **argv) {
   llvm::InitializeNativeTargetAsmParser();
 
   mlir::DialectRegistry registry;
-  registry.insert<mlir::DLTIDialect>();
   mlir::registerAllToLLVMIRTranslations(registry);
+  mlir::registerAllDialects(registry);
   bishengir::registerAllDialects(registry);
+  bishengir::registerAllExtensions(registry);
 
   mlir::JitRunnerConfig config;
   config.mlirTransformer = replaceEntryPointArgs;
