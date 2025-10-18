@@ -1,10 +1,10 @@
 // RUN: bishengir-opt %s --normalize-last-dim-unaligned-tensor-op --split-input-file | FileCheck %s
 
 // CHECK-LABEL: test_basic_concat_2d
-func.func @test_basic_concat_2d(%A: tensor<16x32xf32>, %B: tensor<16x63xf32>) -> tensor<16x95xf32> {
+func.func @test_basic_concat_2d(%A: tensor<16x31xf32>, %B: tensor<16x63xf32>) -> tensor<16x94xf32> {
   // CHECK: tensor.concat dim(0)
-  %0 = tensor.concat dim(1) %A, %B : (tensor<16x32xf32>, tensor<16x63xf32>) ->  tensor<16x95xf32>
-  func.return %0 : tensor<16x95xf32>
+  %0 = tensor.concat dim(1) %A, %B : (tensor<16x31xf32>, tensor<16x63xf32>) ->  tensor<16x94xf32>
+  func.return %0 : tensor<16x94xf32>
 }
 
 // -----
@@ -98,4 +98,40 @@ func.func @test_rank_1_pad(%arg0: tensor<2047xf32>) -> tensor<4093xf32> {
     tensor.yield %cst : f32
   } : tensor<2047xf32> to tensor<4093xf32>
   return %padded : tensor<4093xf32>
+}
+
+// -----
+
+// CHECK-LABEL: test_dynamic_concat_0
+// CHECK: linalg.transpose
+// CHECK: linalg.transpose
+// CHECK: tensor.concat
+// CHECK: linalg.transpose
+func.func @test_dynamic_concat_0(%arg0: tensor<32x?x32x1xf32>, %arg1: tensor<32x?x32x1xf32>) -> tensor<32x?x32x2xf32> {
+  %concat = tensor.concat dim(3) %arg0, %arg1 : (tensor<32x?x32x1xf32>, tensor<32x?x32x1xf32>) -> tensor<32x?x32x2xf32>
+  return %concat : tensor<32x?x32x2xf32>
+}
+
+// -----
+
+// CHECK-LABEL: test_dynamic_concat_1
+// CHECK: linalg.transpose
+// CHECK: linalg.transpose
+// CHECK: tensor.concat
+// CHECK: linalg.transpose
+func.func @test_dynamic_concat_1(%arg0: tensor<32x?x32x?xf32>, %arg1: tensor<32x?x32x?xf32>) -> tensor<32x?x32x?xf32> {
+  %concat = tensor.concat dim(3) %arg0, %arg1 : (tensor<32x?x32x?xf32>, tensor<32x?x32x?xf32>) -> tensor<32x?x32x?xf32>
+  return %concat : tensor<32x?x32x?xf32>
+}
+
+// -----
+
+// CHECK-LABEL: test_dynamic_concat_2
+// CHECK: linalg.transpose
+// CHECK: linalg.transpose
+// CHECK: tensor.concat dim(0) {{.*}} (tensor<?x1xf32>, tensor<?x1xf32>)
+// CHECK: linalg.transpose
+func.func @test_dynamic_concat_2(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>) -> tensor<1024xf32> {
+  %concat = tensor.concat dim(0) %arg0, %arg1 : (tensor<?xf32>, tensor<?xf32>) -> tensor<1024xf32>
+  return %concat : tensor<1024xf32>
 }
