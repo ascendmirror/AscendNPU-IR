@@ -739,7 +739,8 @@ void removeModuleCoreTypeAttr(ModuleOp mod) {
 
 FailureOr<SmallVector<Operation *>>
 traceForPotentialMatrixC(Value v, Block *storeBlock) {
-  if (llvm::isa<hivm::MmadL1Op, hivm::BatchMmadL1Op>(v.getDefiningOp())) {
+  if (llvm::isa<hivm::MmadL0Op, hivm::MmadL1Op, hivm::BatchMmadL1Op>(
+          v.getDefiningOp())) {
     return SmallVector<Operation *>{v.getDefiningOp()};
   }
 
@@ -1027,6 +1028,18 @@ Value createNestedIndexModular(OpBuilder &builder, Operation *op, int modular) {
 
   // Insert at the beginning of the For loop.
   auto forOp = cast<scf::ForOp>(parentLoop.getOperation());
+  builder.setInsertionPointToStart(forOp.getBody());
+  return createNestedIndexModularUsingLoopInfo(builder, forOp->getLoc(),
+                                               loopInfoVec, modular);
+}
+
+Value mlir::hivm::createNestedIndexModular(OpBuilder &builder,
+                                           LoopLikeOpInterface loopOp,
+                                           int modular) {
+  auto loopInfoVec = getLoopsInfo(loopOp);
+  // Insert at the beginning of the For loop.
+  auto forOp = dyn_cast<scf::ForOp>(loopOp.getOperation());
+  assert(forOp != nullptr);
   builder.setInsertionPointToStart(forOp.getBody());
   return createNestedIndexModularUsingLoopInfo(builder, forOp->getLoc(),
                                                loopInfoVec, modular);
