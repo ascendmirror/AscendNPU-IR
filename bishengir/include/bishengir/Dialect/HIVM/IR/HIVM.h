@@ -120,6 +120,9 @@ void printHIVMStructuredDPSOp(OpAsmPrinter &p, Operation *op, ValueRange inputs,
 
 /// Return the elementType as string for library call name.
 std::string getTypeName(Location loc, Type type);
+
+uint8_t getTypeSize(Location loc, Type type);
+
 } // namespace detail
 
 /// Populates rules for lowering HIVM AddressSpaceAttribute to integer
@@ -139,6 +142,8 @@ constexpr llvm::StringLiteral kMultibufferUnrollAttrName =
     "multibuffer_unroll_factor";
 constexpr llvm::StringLiteral kPipelinedLoopCoreTypeAttrName =
     "hivm.loop_core_type";
+constexpr llvm::StringLiteral kDecomposedMMadl1LoopAttrName =
+    "hivm_decomposed_mmadl1_loop";
 } // namespace hivm
 } // namespace mlir
 
