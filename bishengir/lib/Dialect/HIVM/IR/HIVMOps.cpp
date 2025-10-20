@@ -412,3 +412,31 @@ std::string hivm::detail::getTypeName(Location loc, Type type) {
   return unknown;
 }
 
+uint8_t hivm::detail::getTypeSize(Location loc, Type type) {
+  uint8_t unknown = -1;
+  if (auto iType = dyn_cast<IntegerType>(type)) {
+    switch (iType.getWidth()) {
+    case 8:
+    case 16:
+    case 32:
+    case 64:
+      return iType.getWidth() / 8;
+    default:
+      emitError(loc, "unrecognized integer type: ") << type;
+      return unknown;
+    }
+  }
+  if (auto fType = dyn_cast<FloatType>(type)) {
+    switch (fType.getWidth()) {
+    case 16:
+    case 32:
+    case 64:
+      return fType.getWidth() / 8;
+    default:
+      emitError(loc, "unrecognized float type: ") << type;
+      return unknown;
+    }
+  }
+  emitError(loc, "unsupported type: ") << type;
+  return unknown;
+}
