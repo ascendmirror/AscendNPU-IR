@@ -36,6 +36,7 @@ readonly LONG_OPTS=(
   "cxx-compiler:"
   "disable-ccache"
   "enable-assertion"
+  "enable-ir-print"
   "fast-build"
   "help"
   "install-prefix:"
@@ -70,6 +71,7 @@ LLVM_SOURCE_DIR="$THIRD_PARTY_FOLDER/llvm-project"
 TORCH_MLIR_SOURCE_DIR="$THIRD_PARTY_FOLDER/torch-mlir"
 BISHENGIR_SOURCE_DIR="$GIT_ROOT"
 ENABLE_ASSERTION="OFF"
+ENABLE_IR_PRINT="OFF"
 PYTHON_BINDING="OFF"
 BUILD_TORCH_MLIR="OFF"
 CCACHE_BUILD="ON"
@@ -190,6 +192,10 @@ while true; do
     ;;
   --enable-assertion)
     ENABLE_ASSERTION="ON"
+    shift
+    ;;
+  --enable-ir-print)
+    ENABLE_IR_PRINT="ON"
     shift
     ;;
   --fast-build)
@@ -329,6 +335,7 @@ cmake_generate() {
     -DLLVM_TARGETS_TO_BUILD="${LLVM_BUILD_TARGETS}" \
     ${torch_mlir_option} \
     -DLLVM_ENABLE_ASSERTIONS="${ENABLE_ASSERTION}" \
+    -DBISHENGIR_ENABLE_PM_CL_OPTIONS="${ENABLE_IR_PRINT}" \
     -DMLIR_ENABLE_BINDINGS_PYTHON="${PYTHON_BINDING}" \
     -DLLVM_CCACHE_BUILD="${build_ccache_build}" \
     -DCMAKE_C_FLAGS="${C_FLAGS}" \
