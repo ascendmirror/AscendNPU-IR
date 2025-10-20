@@ -381,6 +381,122 @@ def NZ2NDOp : HIVM_DmaOp<"nz2nd",
   let extraClassDeclaration = DmaOpBaseDecl;
 }
 
+def LoadL0AOp : HIVM_DmaOp<"load_l1_to_l0a", [
+  SinglePipeOpTrait, OpPipeTrait<"PIPE::PIPE_MTE1">,
+  HIVMCoreTypeInterface, CubeCoreTypeTrait]> {
+  let summary = "load l1 to l0a";
+  let description = [{
+    load l1 to l0a
+  }];
+  let arguments = (ins TensorOrMemref:$src,
+                       TensorOrMemref:$dst,
+                       AnyTypeOf<[AnyInteger, Index]>: $k_part_idx,
+                       AnyTypeOf<[AnyInteger, Index]>: $k_part,
+                       AnyTypeOf<[AnyInteger, Index]>: $k_part_ceil,
+                       AnyTypeOf<[AnyInteger, Index]>: $k_part_loop,
+                       AnyTypeOf<[AnyInteger, Index]>: $k_part_actual,
+                       AnyTypeOf<[AnyInteger, Index]>: $m,
+                       OptionalAttr<UnitAttr>:$a_transpose
+
+  );
+  let results = (outs Variadic<AnyRankedTensor>:$result_tensor);
+  let assemblyFormat = [{
+    attr-dict
+    `ins` `(` $src  
+      `,` $k_part_idx 
+      `,` $k_part 
+      `,` $k_part_ceil 
+      `,` $k_part_loop 
+      `,` $k_part_actual 
+      `,` $m 
+      `:` 
+      `,` type($src) 
+      `,` type($k_part_idx) 
+      `,` type($k_part) 
+      `,` type($k_part_ceil) 
+      `,` type($k_part_loop) 
+      `,` type($k_part_actual)
+      `,` type($m)
+    `)`
+    `outs` `(` $dst `:` type($dst) `)`
+    (`->` type($result_tensor)^)?
+  }];
+
+  let extraClassDeclaration = DmaOpBaseDecl;
+}
+
+def LoadL0BOp : HIVM_DmaOp<"load_l1_to_l0b", [
+  SinglePipeOpTrait, OpPipeTrait<"PIPE::PIPE_MTE1">,
+  HIVMCoreTypeInterface, CubeCoreTypeTrait]> {
+  let summary = "load l1 to l0a";
+  let description = [{
+    load l1 to l0a
+  }];
+  let arguments = (ins TensorOrMemref:$src,
+                       TensorOrMemref:$dst,
+                       AnyTypeOf<[AnyInteger, Index]>: $k_part_idx,
+                       AnyTypeOf<[AnyInteger, Index]>: $k_part,
+                       AnyTypeOf<[AnyInteger, Index]>: $k_part_ceil,
+                       AnyTypeOf<[AnyInteger, Index]>: $k_part_loop,
+                       AnyTypeOf<[AnyInteger, Index]>: $k_part_actual,
+                       AnyTypeOf<[AnyInteger, Index]>: $m,
+                       OptionalAttr<UnitAttr>:$b_transpose
+
+  );
+  let results = (outs Variadic<AnyRankedTensor>:$result_tensor);
+  let assemblyFormat = [{
+    attr-dict
+    `ins` `(` $src  
+      `,` $k_part_idx 
+      `,` $k_part 
+      `,` $k_part_ceil 
+      `,` $k_part_loop 
+      `,` $k_part_actual 
+      `,` $m 
+      `:` 
+      `,` type($src) 
+      `,` type($k_part_idx) 
+      `,` type($k_part) 
+      `,` type($k_part_ceil) 
+      `,` type($k_part_loop) 
+      `,` type($k_part_actual)
+      `,` type($m)
+    `)`
+    `outs` `(` $dst `:` type($dst) `)`
+    (`->` type($result_tensor)^)?
+  }];
+
+  let extraClassDeclaration = DmaOpBaseDecl;
+}
+  
+def LoadMatMulBiasOp : HIVM_DmaOp<"load_matmul_bias", [
+  SinglePipeOpTrait, OpPipeTrait<"PIPE::PIPE_MTE1">,
+  HIVMCoreTypeInterface, CubeCoreTypeTrait]> {
+  let summary = "load matmul bias";
+  let description = [{
+    load matmul bias
+  }];
+  let arguments = (ins TensorOrMemref:$src,
+                       TensorOrMemref:$dst,
+                       AnyTypeOf<[AnyInteger, Index]>: $n
+
+  );
+  let results = (outs Variadic<AnyRankedTensor>:$result_tensor);
+  let assemblyFormat = [{
+    attr-dict
+    `ins` `(` $src  
+      `,` $n 
+      `:` 
+      `,` type($src) 
+      `,` type($n)
+    `)`
+    `outs` `(` $dst `:` type($dst) `)`
+    (`->` type($result_tensor)^)?
+  }];
+
+  let extraClassDeclaration = DmaOpBaseDecl;
+}
+
 def AtomicCasOp : HIVM_Op<"atomic_cas", [
   OperElemTypeConstraints<[0], [I8, I16, I32, F16, F32, I64]>
 ]> {

@@ -61,6 +61,9 @@ int64_t getUsersNum(Value v) {
 }
 
 bool isLocalMatmulInit(Operation *op, Value v) {
+  if (auto mmadL0Op = dyn_cast_if_present<hivm::MmadL0Op>(op)) {
+    return mmadL0Op.getC() == v;
+  }
   if (auto mmadL1Op = dyn_cast_if_present<hivm::MmadL1Op>(op)) {
     return mmadL1Op.getC() == v;
   }

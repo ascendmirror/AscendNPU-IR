@@ -52,7 +52,94 @@ class HIVM_MacroOp<string mnemonic, list<Trait> traits = []> :
 }
 
 //===----------------------------------------------------------------------===//
-// HIVM Local MMAD op definitions.
+// HIVM Local L0->L0 MMAD op definitions. (not a macro op)
+//===----------------------------------------------------------------------===//
+
+class HIVM_Local0MmadOp<string mnemonic, list<Trait> traits = []> :
+  HIVM_StructuredOp<mnemonic, !listconcat(
+    [DeclareOpInterfaceMethods<HIVMStructuredOpInterface, ["getIteratorTypesArray"]>, 
+    SinglePipeOpTrait, OpPipeTrait<"PIPE::PIPE_M">, 
+    CubeCoreTypeTrait, HIVMUnitFlagEnabledInterface], traits)> {
+  let arguments = (ins Arg<TensorOrMemref, "Matrix A">:$a,
+                       Arg<TensorOrMemref, "Matrix B">:$b,
+                       Arg<TensorOrMemref, "Matrix C">:$c,
+                       Arg<I64, "real_n">:$n,
+                       Arg<I64, "l0c_m_size">:$m,
+                       Arg<I64, "k_part_actual">:$k_part_actual,
+                       Arg<I1, "is_outer_k_start">:$is_first_iter,
+                       Arg<I1, "is_outer_k_end">:$is_last_iter,
+                       Arg<I1, "k_direction_align">:$k_direction_align,
+                       Arg<I1, "init_condition">:$init_condition, 
+                       Arg<I1, "is_with_bias">:$is_with_bias, 
+                       Arg<Optional<I1>, "unit_flag_cond">:$unit_flag_cond,
+                       Arg<OptionalAttr<UnitAttr>, "enable_hf32">:$enable_hf32,
+                       Arg<OptionalAttr<HIVM_UnitFlagAttr>, "unit_flag_mode">:$unit_flag_mode
+                       );
+  let results = (outs Variadic<AnyRankedTensor>:$result_tensors);
+
+  code localMmadBaseDecls = [{
+    // Implement functions necessary for DestinationStyleOpInterface.
+    ::mlir::MutableOperandRange getDpsInitsMutable() {
+      return getCMutable();
+    }
+    bool isInitConstant(std::optional<bool> cst = std::nullopt);
+    void setInitCondition(Value init);
+    // MatmulBiasMode getMatmulBiasMode();
+    // bool shouldDecomposeBiasByElementAdd();
+    // Needed for unit-flag-enabled interface.
+    ::std::optional<::mlir::hivm::UnitFlagAttr> getUnitFlagModeValue();
+    ::std::optional<::mlir::Value> getUnitFlagModeCondition();
+  }];
+
+  let assemblyFormat = [{
+    attr-dict `ins` `(`
+    $a
+    `,` $b
+    `,` $n
+    `,` $m
+    `,` $k_part_actual
+    `,` $is_first_iter
+    `,` $is_last_iter
+    `,` $k_direction_align
+    `,` $init_condition
+    `,` $is_with_bias
+    `:`
+    type($a)
+    `,` type($b)
+    `,` type($n)
+    `,` type($m)
+    `,` type($k_part_actual)
+    `,` type($is_first_iter)
+    `,` type($is_last_iter)
+    `,` type($k_direction_align)
+    `,` type($init_condition)
+    `,` type($is_with_bias)
+    `)`
+    `outs` `(` $c `:` type($c) `)`
+    (`unit_flag` `[` $unit_flag_mode^ (`,` $unit_flag_cond^)? `]`)?
+    (`->` type($result_tensors)^)?
+  }];
+}
+
+def MmadL0Op : HIVM_Local0MmadOp<"mmadL0",
+  [OpLayoutInterface]> {
+  let summary = [{
+    Matrix Multiply and Add Op with inputs from L0 memory hierarchy.
+  }];
+  let description = "";
+  let extraClassDeclaration = localMmadBaseDecls # [{
+    // Declare functions necessary for OpLayoutInterface.
+    FailureOr<DataLayoutAttr> getOperandALayout();
+    FailureOr<DataLayoutAttr> getOperandBLayout();
+    FailureOr<DataLayoutAttr> getOperandCLayout();
+    // FailureOr<DataLayoutAttr> getOperandBiasLayout();
+    llvm::SmallDenseMap<Value, DataLayoutAttr> getOperandsTargetLayout();
+    llvm::SmallDenseMap<Value, DataLayoutAttr> getOperandsCurrentLayout();
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// HIVM Local L1->L0 MMAD op definitions.
 //===----------------------------------------------------------------------===//
 
 class HIVM_LocalMmadOp<string mnemonic, list<Trait> traits = []> :
