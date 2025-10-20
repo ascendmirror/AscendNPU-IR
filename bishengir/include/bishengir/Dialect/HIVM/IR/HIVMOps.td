@@ -192,6 +192,66 @@ def SetFFTSBaseAddrOp : HIVM_Op<"set_ffts_base_addr", [CubeVectorCoreTypeTrait]>
   }];
 }
 
+def MmadL0Op
+    : HIVM_StructuredOp<
+          "mmadl0", [DeclareOpInterfaceMethods<HIVMStructuredOpInterface>,
+                     CubeCoreTypeTrait, HIVMUnitFlagEnabledInterface,
+                     SinglePipeOpTrait, OpPipeTrait<"PIPE::PIPE_M">]> {
+  let arguments = (ins Arg<TensorOrMemref, "Matrix A">:$a,
+      Arg<TensorOrMemref, "Matrix B">:$b, Arg<TensorOrMemref, "Matrix C">:$c,
+      Arg<I64, "real_n">:$n, Arg<I64, "l0c_m_size">:$m,
+      Arg<I64, "k_part_actual">:$k_part_actual,
+      Arg<I1, "is_outer_k_start">:$is_first_iter,
+      Arg<I1, "is_outer_k_end">:$is_last_iter,
+      Arg<I1, "k_direction_align">:$k_direction_align,
+      Arg<I1, "init_condition">:$init_condition,
+      Arg<I1, "is_with_bias">:$is_with_bias,
+      Arg<Optional<I1>, "unit_flag_cond">:$unit_flag_cond,
+      Arg<OptionalAttr<UnitAttr>, "enable_hf32">:$enable_hf32,
+      Arg<OptionalAttr<HIVM_UnitFlagAttr>, "unit_flag_mode">:$unit_flag_mode);
+  let results = (outs Variadic<AnyRankedTensor>:$result_tensors);
+
+  code extraClassDeclaration = [{
+    // Implement functions necessary for DestinationStyleOpInterface.
+    ::mlir::MutableOperandRange getDpsInitsMutable() {
+      return getCMutable();
+    }
+    void setInitCondition(Value init);
+    // Needed for unit-flag-enabled interface.
+    ::std::optional<::mlir::hivm::UnitFlagAttr> getUnitFlagModeValue();
+    ::std::optional<::mlir::Value> getUnitFlagModeCondition();
+  }];
+
+  let assemblyFormat = [{
+    attr-dict `ins` `(`
+    $a
+    `,` $b
+    `,` $n
+    `,` $m
+    `,` $k_part_actual
+    `,` $is_first_iter
+    `,` $is_last_iter
+    `,` $k_direction_align
+    `,` $init_condition
+    `,` $is_with_bias
+    `:`
+    type($a)
+    `,` type($b)
+    `,` type($n)
+    `,` type($m)
+    `,` type($k_part_actual)
+    `,` type($is_first_iter)
+    `,` type($is_last_iter)
+    `,` type($k_direction_align)
+    `,` type($init_condition)
+    `,` type($is_with_bias)
+    `)`
+    `outs` `(` $c `:` type($c) `)`
+    (`unit_flag` `[` $unit_flag_mode^ (`,` $unit_flag_cond^)? `]`)?
+    (`->` type($result_tensors)^)?
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // HIVM Debug op definitions.
 //===----------------------------------------------------------------------===//

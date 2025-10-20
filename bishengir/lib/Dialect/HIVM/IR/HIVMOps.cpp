@@ -40,7 +40,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 
-//For function inliner support
+// For function inliner support
 #include "mlir/Transforms/InliningUtils.h"
 
 #include <numeric>
@@ -213,12 +213,20 @@ LogicalResult PointerCastOp::verify() {
 //===----------------------------------------------------------------------===//
 // LoadScalarOp
 //===----------------------------------------------------------------------===//
- 
+
 LogicalResult LoadScalarOp::verify() {
   auto ptrTy = cast<LLVM::LLVMPointerType>(getAddr().getType());
   if (ptrTy.getAddressSpace() != 1)
     return emitOpError("expecting GM address");
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// MmadL0Op
+//===----------------------------------------------------------------------===//
+
+void MmadL0Op::setInitCondition(Value init) {
+  getInitConditionMutable().assign(init);
 }
 
 //===----------------------------------------------------------------------===//
@@ -423,3 +431,31 @@ std::string hivm::detail::getTypeName(Location loc, Type type) {
   return unknown;
 }
 
+uint8_t hivm::detail::getTypeSize(Location loc, Type type) {
+  uint8_t unknown = -1;
+  if (auto iType = dyn_cast<IntegerType>(type)) {
+    switch (iType.getWidth()) {
+    case 8:
+    case 16:
+    case 32:
+    case 64:
+      return iType.getWidth() / 8;
+    default:
+      emitError(loc, "unrecognized integer type: ") << type;
+      return unknown;
+    }
+  }
+  if (auto fType = dyn_cast<FloatType>(type)) {
+    switch (fType.getWidth()) {
+    case 16:
+    case 32:
+    case 64:
+      return fType.getWidth() / 8;
+    default:
+      emitError(loc, "unrecognized float type: ") << type;
+      return unknown;
+    }
+  }
+  emitError(loc, "unsupported type: ") << type;
+  return unknown;
+}
