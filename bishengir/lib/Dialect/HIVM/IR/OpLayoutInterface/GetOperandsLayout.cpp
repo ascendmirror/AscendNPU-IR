@@ -100,3 +100,69 @@ llvm::SmallDenseMap<Value, DataLayoutAttr> MmadL1Op::getOperandsTargetLayout() {
   }
   return valLayoutMap;
 }
+
+//===----------------------------------------------------------------------===//
+// MmadL0Op
+//===----------------------------------------------------------------------===//
+
+llvm::SmallDenseMap<Value, DataLayoutAttr>
+MmadL0Op::getOperandsCurrentLayout() {
+  llvm::SmallDenseMap<Value, DataLayoutAttr> valLayoutMap;
+
+  auto aLayoutAttr = getOperandALayout();
+  assert(succeeded(aLayoutAttr) && "Cannot get layout for Matrix A");
+  valLayoutMap[getDpsInputOperand(0)->get()] = *aLayoutAttr;
+
+  auto bLayoutAttr = getOperandBLayout();
+  assert(succeeded(bLayoutAttr) && "Cannot get layout for Matrix B");
+  valLayoutMap[getDpsInputOperand(1)->get()] = *bLayoutAttr;
+
+  auto cLayoutAttr = getOperandCLayout();
+  assert(succeeded(cLayoutAttr) && "Cannot get layout for Matrix C");
+  valLayoutMap[getDpsInitOperand(0)->get()] = *cLayoutAttr;
+
+  // if (getPerChannelBias()) {
+  //   auto biasLayoutAttr = getOperandBiasLayout();
+  //   assert(succeeded(biasLayoutAttr) && "Cannot get layout for bias");
+  //   valLayoutMap[getDpsInputOperand(getNumDpsInputs() - 1)->get()] =
+  //       *biasLayoutAttr;
+  // }
+  return valLayoutMap;
+}
+
+llvm::SmallDenseMap<Value, DataLayoutAttr> MmadL0Op::getOperandsTargetLayout() {
+  llvm::SmallDenseMap<Value, DataLayoutAttr> valLayoutMap;
+
+  auto operA = getA();
+  bool isATranspose = false; // getATranspose().has_value();
+  auto aBlockSizes = getBlockSizes(operA);
+  auto mALayoutAttr = DataLayoutAttr::get(
+      getContext(), isATranspose ? DataLayout::nZ : DataLayout::zN,
+      std::nullopt,
+      mlir::DenseI64ArrayAttr::get(getContext(), ArrayRef(aBlockSizes)));
+  valLayoutMap[operA] = mALayoutAttr;
+
+  auto operB = getB();
+  bool isBTranspose = false; // getBTranspose().has_value();
+  auto bBlockSizes = getBlockSizes(operB);
+  auto mBLayoutAttr = DataLayoutAttr::get(
+      getContext(), isBTranspose ? DataLayout::nZ : DataLayout::zN,
+      std::nullopt,
+      mlir::DenseI64ArrayAttr::get(getContext(), ArrayRef(bBlockSizes)));
+  valLayoutMap[operB] = mBLayoutAttr;
+
+  llvm::SmallVector<int64_t> cBlockSizes;
+  cBlockSizes.push_back(utils::FRACTAL_BLOCK_NUM);
+  cBlockSizes.push_back(utils::FRACTAL_BLOCK_NUM);
+  auto mCLayoutAttr = DataLayoutAttr::get(
+      getContext(), DataLayout::zN, std::nullopt,
+      mlir::DenseI64ArrayAttr::get(getContext(), ArrayRef(cBlockSizes)));
+  valLayoutMap[getC()] = mCLayoutAttr;
+
+  // if (auto bias = getPerChannelBias()) {
+  //   auto biasLayoutAttr = DataLayoutAttr::get(getContext(), DataLayout::ND,
+  //                                             std::nullopt, std::nullopt);
+  //   valLayoutMap[bias] = biasLayoutAttr;
+  // }
+  return valLayoutMap;
+}

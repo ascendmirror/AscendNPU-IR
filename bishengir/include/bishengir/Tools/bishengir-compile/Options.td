@@ -150,6 +150,14 @@ def EnableLIRCompile : FeatureControlOptions<
 }
 #endif
 
+def EnableHIVMGraphSyncSolver : FeatureControlOptions<
+  "Use hivm graph-sync-solver instead of inject-sync.",
+  "bool",
+  "true"
+> {
+  bit isSharedWithDownstreamToolchain = 1;
+}
+
 def DisableHIVMAutoInjectSync : FeatureControlOptions<
   "Disable auto inject sync intra core.",
   "bool",
@@ -365,6 +373,12 @@ def EnableHIVMUnitFlagSync : HIVMOptimizationControlOptions<
 
 def EnableHIVMAssumeAliveLoops : HIVMOptimizationControlOptions<
   "Assume that all loops (forOp whileOp) will execute at least once.",
+  "bool",
+  "false"
+>;
+
+def EnableHIVMDecomposeMmadl1 : HIVMOptimizationControlOptions<
+  "decompose mmadl1",
   "bool",
   "false"
 >;

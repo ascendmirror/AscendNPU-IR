@@ -533,6 +533,108 @@ bool BatchMmadL1Op::shouldDecomposeBiasByElementAdd() {
 }
 
 //===----------------------------------------------------------------------===//
+// MmadL0Op
+//===----------------------------------------------------------------------===//
+
+FailureOr<DataLayoutAttr> MmadL0Op::getOperandALayout() {
+  auto rank = getRankFromShapedTypeValue(getA());
+  if (failed(rank)) {
+    return failure();
+  }
+  bool isTranspose = false; // getATranspose().has_value();
+  switch (*rank) {
+  case kDimTwo:
+    return DataLayoutAttr::get(getContext(), DataLayout::DOTA_ND, isTranspose);
+  case kDimFour:
+    return DataLayoutAttr::get(getContext(),
+                               isTranspose ? DataLayout::nZ : DataLayout::zN);
+  default:
+    return failure();
+  }
+}
+
+FailureOr<DataLayoutAttr> MmadL0Op::getOperandBLayout() {
+  auto rank = getRankFromShapedTypeValue(getB());
+  if (failed(rank)) {
+    return failure();
+  }
+  bool isTranspose = false; // getBTranspose().has_value();
+  switch (*rank) {
+  case kDimTwo:
+    return DataLayoutAttr::get(getContext(), DataLayout::DOTB_ND, isTranspose);
+  case kDimFour:
+    return DataLayoutAttr::get(getContext(),
+                               isTranspose ? DataLayout::nZ : DataLayout::zN);
+  default:
+    return failure();
+  }
+}
+
+FailureOr<DataLayoutAttr> MmadL0Op::getOperandCLayout() {
+  auto rank = getRankFromShapedTypeValue(getC());
+  if (failed(rank)) {
+    return failure();
+  }
+  switch (*rank) {
+  case kDimTwo:
+    return DataLayoutAttr::get(getContext(), DataLayout::DOTC_ND);
+  case kDimFour:
+    return DataLayoutAttr::get(getContext(), DataLayout::zN);
+  default:
+    return failure();
+  }
+}
+
+// FailureOr<DataLayoutAttr> MmadL0Op::getOperandBiasLayout() {
+//   auto rank = getRankFromShapedTypeValue(getPerChannelBias());
+//   if (failed(rank)) {
+//     return failure();
+//   }
+//   switch (*rank) {
+//   case kDimOne:
+//   case kDimTwo:
+//     return DataLayoutAttr::get(getContext(), DataLayout::ND);
+//   case kDimFour:
+//     return DataLayoutAttr::get(getContext(), DataLayout::zN);
+//   default:
+//     return failure();
+//   }
+// }
+
+bool MmadL0Op::isInitConstant(std::optional<bool> cst) {
+  return isInitConstantForLocalMmadOp<MmadL0Op>(this, cst);
+}
+
+void MmadL0Op::setInitCondition(Value init) {
+  getInitConditionMutable().assign(init);
+}
+
+// MatmulBiasMode MmadL0Op::getMatmulBiasMode() {
+//   return getMatmulLikeBiasMode<MmadL0Op>(*this);
+// }
+
+// bool MmadL0Op::shouldDecomposeBiasByElementAdd() {
+//   if (this->getMatmulBiasMode() != MatmulBiasMode::ElementwiseAdd ||
+//       !isInitConstant(false)) {
+//     // Type of C is not used for accumulating
+//     return false;
+//   }
+
+//   if (isSingleChainMmadToMmad<MmadL0Op>(*this)) {
+//     // One of accumulating situation is C to C:
+//     // the C can be stored in L0c and directly be the init operand of local
+//     // matmul like op, so no need decomposing by mmad op and additionally vector
+//     // add.
+//     return false;
+//   }
+
+//   // The other of accumulating situation is :
+//   // should decompose local matmul like op with bias to local matmul like op and
+//   // additional vector add op.
+//   return true;
+// }
+
+//===----------------------------------------------------------------------===//
 // MatmulOp
 //===----------------------------------------------------------------------===//
 
