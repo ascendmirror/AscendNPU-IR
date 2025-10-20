@@ -139,6 +139,7 @@ constexpr llvm::StringLiteral kMultibufferUnrollAttrName =
     "multibuffer_unroll_factor";
 constexpr llvm::StringLiteral kPipelinedLoopCoreTypeAttrName =
     "hivm.loop_core_type";
+constexpr llvm::StringLiteral kParallelLoopAttrName = "hivm.parallel_loop";
 } // namespace hivm
 } // namespace mlir
 
