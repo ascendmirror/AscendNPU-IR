@@ -26,6 +26,7 @@
 #include "bishengir/Pass/PassManager.h"
 #include "bishengir/Tools/Utils/Utils.h"
 #include "bishengir/Tools/bishengir-compile/BiShengIRCompile.h"
+#include "bishengir/Version/Version.h"
 
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllExtensions.h"
@@ -36,6 +37,10 @@
 #include "mlir/Target/LLVMIR/Dialect/All.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
+
+static void printVersion(llvm::raw_ostream &os) {
+  os << bishengir::getBiShengIRToolFullVersion("bishengir-compile") << '\n';
+}
 
 void registerAndParseCLIOptions(int argc, char **argv) {
   // Register any command line options.
@@ -48,6 +53,8 @@ void registerAndParseCLIOptions(int argc, char **argv) {
   mlir::registerPassManagerCLOptions();
 #endif
 
+  // Register version printer
+  llvm::cl::SetVersionPrinter(printVersion);
   // Parse pass names in main to ensure static initialization completed.
   llvm::cl::ParseCommandLineOptions(argc, argv, "BiShengIR Compile Tool\n");
 }
