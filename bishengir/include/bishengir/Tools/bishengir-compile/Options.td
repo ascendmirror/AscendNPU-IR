@@ -150,6 +150,14 @@ def EnableLIRCompile : FeatureControlOptions<
 }
 #endif
 
+def DisableAutoInjectBlockSync : FeatureControlOptions<
+  "Disable generating blocksync wait/set by injectBlockSync pass.",
+  "bool",
+  "false"
+> {
+  bit isSharedWithDownstreamToolchain = 1;
+}
+ 
 def DisableHIVMAutoInjectSync : FeatureControlOptions<
   "Disable auto inject sync intra core.",
   "bool",

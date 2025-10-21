@@ -965,6 +965,46 @@ void setSubBlockMapping(RewriterBase &rewriter, Operation *loop) {
   });
 }
 
+Operation *getNextNonSyncOp(Operation *startOp, Operation *endOp) {
+  if (!startOp)
+    return nullptr;
+ 
+  Operation *current = startOp->getNextNode();
+  Operation *previous = startOp;
+  bool foundSyncOp = false;
+ 
+  // Handle case where endOp is null - iterate until end of block
+  if (!endOp) {
+    while (current) {
+      bool isSyncOp = isa<hivm::SyncBlockSetOp, hivm::SyncBlockWaitOp>(current);
+ 
+      if (!isSyncOp) {
+        return previous;
+      }
+ 
+      previous = current;
+      current = current->getNextNode();
+    }
+    return previous;
+  }
+ 
+  while (current->isBeforeInBlock(endOp)) {
+    bool isSyncOp = isa<hivm::SyncBlockSetOp, hivm::SyncBlockWaitOp>(current);
+ 
+    if (isSyncOp) {
+      foundSyncOp = true;
+    } else if (foundSyncOp) {
+      // Found first non-sync op after encountering sync op
+      return previous;
+    }
+ 
+    previous = current;
+    current = current->getNextNode();
+  }
+ 
+  return foundSyncOp ? previous : startOp;
+}
+ 
 LoopLikeOpInterface getParentLoop(Value val) {
   auto *valDefOp = val.getDefiningOp();
   if (!valDefOp)
