@@ -39,10 +39,6 @@ let summary = "Fold tensor empty";
 
 def NormalizeTensorOps : Pass<"normalize-tensor-ops", "func::FuncOp"> {
   let summary = "Optimization patterns for tensor ops";
-  let options = [
-    Option<"skipAlignedSlice", "skip-aligned-slice", "bool", "false", 
-           "Skip FoldInsertSliceToConcat pattern for aligned slice.">,
-  ];
   let constructor = "mlir::tensor::createNormalizeTensorOpsPass()";
   let dependentDialects = [
     "tensor::TensorDialect",
