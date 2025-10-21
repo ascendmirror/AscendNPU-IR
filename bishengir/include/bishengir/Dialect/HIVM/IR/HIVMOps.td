@@ -29,6 +29,7 @@ include "bishengir/Dialect/HIVM/IR/HIVMTraits.td"
 
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
+include "mlir/Dialect/LLVMIR/LLVMTypes.td"
 
 //===----------------------------------------------------------------------===//
 // HIVM Dialect operations.
@@ -77,6 +78,14 @@ def GetSubBlockNumOp : HIVM_Op<"get_sub_block_num", [Pure, CubeVectorCoreTypeTra
 def SetMaskNormOp : HIVM_Op<"set_mask_norm"> {
   let summary = "hivm set mask norm";
   let assemblyFormat = "attr-dict";
+}
+
+def LoadScalarOp : HIVM_Op<"load_scalar"> {
+  let summary = "hivm load scalar";
+  let arguments = (ins LLVMPointerType:$addr);
+  let results = (outs AnyTypeOf<[AnyInteger, AnyFloat]>:$result);
+  let assemblyFormat = "attr-dict $addr `:` type($addr) `->` type($result)";
+  let hasVerifier = 1;
 }
 
 def DCCIOp : HIVM_Op<"dcci"> {
