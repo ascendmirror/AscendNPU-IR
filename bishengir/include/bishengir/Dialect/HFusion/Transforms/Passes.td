@@ -176,8 +176,12 @@ def Normalize : Pass<"hfusion-normalize-ops", "func::FuncOp"> {
 
 def NormalizeSliceOps : Pass<"hfusion-normalize-slice-ops", "func::FuncOp"> {
   let summary = "Normalize Slice Ops.";
+  let options = [
+    Option<"skipAlignedSlice", "skip-aligned-slice", "bool", "false", 
+           "Skip FoldInsertSliceToConcat pattern for aligned slice.">,
+  ];
   let constructor = "mlir::hfusion::createHFusionNormalizeSliceOpsPass()";
-  let dependentDialects = ["hfusion::HFusionDialect"];
+  let dependentDialects = ["hfusion::HFusionDialect", "annotation::AnnotationDialect"];
 }
 
 def PackTilingData : Pass<"hfusion-pack-tiling-data", "ModuleOp"> {
