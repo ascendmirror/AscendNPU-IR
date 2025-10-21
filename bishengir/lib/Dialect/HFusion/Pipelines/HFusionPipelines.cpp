@@ -73,8 +73,7 @@ canonicalizationPipeline(OpPassManager &pm,
   options.enableExtendedPattern = true;
   options.disabledPatterns = phaseToDisabledMap[phase];
   pm.addPass(createCanonicalizerPass(options));
-  pm.nest<func::FuncOp>().addPass(tensor::createNormalizeTensorOpsPass(
-      /*skipAlignedSlice=*/hfusionOptions.enableTritonKernelCompile));
+  pm.nest<func::FuncOp>().addPass(tensor::createNormalizeTensorOpsPass());
 }
 
 static void preProcess(OpPassManager &pm,
@@ -104,7 +103,8 @@ static void preProcess(OpPassManager &pm,
   decomposeOptions.hfusionDecomposePhase =
       bishengir::DecomposePhase::NO_CONSTRAINT;
   pm.nest<func::FuncOp>().addPass(createDecomposePass(decomposeOptions));
-  pm.nest<func::FuncOp>().addPass(createHFusionNormalizeSliceOpsPass());
+  pm.nest<func::FuncOp>().addPass(createHFusionNormalizeSliceOpsPass(
+      /*skipAlignedSlice=*/options.enableTritonKernelCompile));
   pm.nest<func::FuncOp>().addPass(createHFusionNormalizeOpsPass());
   pm.addPass(createLegalizeBoolPass());
   pm.nest<func::FuncOp>().addPass(createSimplifyOpsPass());

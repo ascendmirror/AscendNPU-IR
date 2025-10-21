@@ -139,7 +139,8 @@ std::unique_ptr<Pass> createHFusionNormalizeOpsPass();
 
 /// Create a pass to normalize slice operations, including
 /// extract_slice/insert_slice.
-std::unique_ptr<Pass> createHFusionNormalizeSliceOpsPass();
+std::unique_ptr<Pass>
+createHFusionNormalizeSliceOpsPass(bool skipAlignedSlice = false);
 
 /// Create a pass to inline broadcast-like op
 std::unique_ptr<Pass> createHFusionInlineBrcPass();

@@ -1,5 +1,4 @@
 // RUN: bishengir-opt --normalize-tensor-ops -split-input-file %s | FileCheck %s
-// RUN: bishengir-opt --normalize-tensor-ops="skip-aligned-slice=true" -split-input-file %s | FileCheck %s -check-prefix=CHECK-TRITON
 
 func.func @fold_insert_pad_fill(%arg0 : tensor<1x1x2047xf32>) -> tensor<4093xf32> {
   //CHECK-LABEL : @fold_insert_pad_fill
@@ -96,71 +95,6 @@ func.func @fold_double_pad(%arg0 : tensor<1x1x2047xf32>) -> tensor<4093xf32> {
 
 // -----
 
-// CHECK-LABEL: func.func @normalize_insert_slice_to_concat_0(
-// CHECK-SAME: %[[arg0:.*]]: tensor<2x2xf32>, %[[arg1:.*]]: tensor<2xf32>
-// CHECK: %[[expanded:.*]] = tensor.expand_shape
-// CHECK: %[[extracted:.*]] = tensor.extract_slice %[[arg0]]{{\[}}1, 0] {{\[}}1, 2] {{\[}}1, 1]
-// CHECK: tensor.concat dim(0) %[[expanded]], %[[extracted]] : (tensor<1x2xf32>, tensor<1x2xf32>) -> tensor<2x2xf32>
-func.func @normalize_insert_slice_to_concat_0(%arg0: tensor<2x2xf32>, %arg1: tensor<2xf32>) -> tensor<2x2xf32> 
-attributes {hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>} {
-  %expanded = tensor.expand_shape %arg1 [[0, 1]] output_shape [1, 2] : tensor<2xf32> into tensor<1x2xf32>
-  %inserted_slice = tensor.insert_slice %expanded into %arg0[0, 0] [1, 2] [1, 1] : tensor<1x2xf32> into tensor<2x2xf32>
-  return %inserted_slice : tensor<2x2xf32>
-}
-
-// -----
-
-// CHECK-LABEL: func.func @normalize_insert_slice_to_concat_1(
-// CHECK-SAME: %[[arg0:.*]]: tensor<2048x32x192xbf16>, %[[arg1:.*]]: tensor<2048x32x128xbf16>
-// CHECK: %[[extracted:.*]] = tensor.extract_slice %[[arg0]]{{\[}}0, 0, 128] {{\[}}2048, 32, 64] {{\[}}1, 1, 1]
-// CHECK: tensor.concat dim(2) %[[arg1]], %[[extracted]] : (tensor<2048x32x128xbf16>, tensor<2048x32x64xbf16>) -> tensor<2048x32x192xbf16>
-func.func @normalize_insert_slice_to_concat_1(%arg0: tensor<2048x32x192xbf16>, %arg1: tensor<2048x32x128xbf16>) -> tensor<2048x32x192xbf16> 
-attributes {hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>} {
-  %inserted_slice = tensor.insert_slice %arg1 into %arg0[0, 0, 0] [2048, 32, 128] [1, 1, 1] : tensor<2048x32x128xbf16> into tensor<2048x32x192xbf16>
-  return %inserted_slice : tensor<2048x32x192xbf16>
-}
-
-// -----
-
-// CHECK-LABEL: func.func @normalize_insert_slice_to_concat_2
-// CHECK-SAME: %[[arg0:.*]]: tensor<2048x32x192xbf16>, %[[arg1:.*]]: tensor<2048x32x64xbf16>
-// CHECK: %[[extracted:.*]] = tensor.extract_slice %[[arg0]]{{\[}}0, 0, 0] {{\[}}2048, 32, 128] {{\[}}1, 1, 1]
-// CHECK: tensor.concat dim(2) %[[extracted]], %[[arg1]]
-func.func @normalize_insert_slice_to_concat_2(%arg0: tensor<2048x32x192xbf16>, %arg1: tensor<2048x32x64xbf16>) -> tensor<2048x32x192xbf16> 
-attributes {hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>} {
-  %inserted_slice = tensor.insert_slice %arg1 into %arg0[0, 0, 128] [2048, 32, 64] [1, 1, 1] : tensor<2048x32x64xbf16> into tensor<2048x32x192xbf16>
-  return %inserted_slice : tensor<2048x32x192xbf16>
-}
-
-// -----
-// CHECK-LABEL: func.func @normalize_dynamic_offset_insert_slice_0
-// CHECK-SAME: %[[arg0:.*]]: tensor<1x37xf32>, %[[arg1:.*]]: tensor<432x37xf32>
-// CHECK: %[[offset:.*]] = arith.index_cast
-// CHECK: %[[extract:.*]] = tensor.extract_slice %[[arg1]][0, 0] [%[[offset]], 37]
-// CHECK: %[[extract0:.*]] = tensor.extract_slice %[[arg1]]
-// CHECK: tensor.concat dim(0) %[[extract]], %[[arg0]], %[[extract0]]
-func.func @normalize_dynamic_offset_insert_slice_0(%arg0: tensor<1x37xf32>, %arg1: tensor<432x37xf32>, %arg2: i32) -> tensor<432x37xf32> {
-  %offset = arith.index_cast %arg2 : i32 to index
-  %inserted_slice = tensor.insert_slice %arg0 into %arg1[%offset, 0] [1, 37] [1, 1] : tensor<1x37xf32> into tensor<432x37xf32>
-  return %inserted_slice : tensor<432x37xf32>
-}
-
-// -----
-
-// CHECK-LABEL: func.func @not_normalize_insert_slice_to_concat_0
-// CHECK-NOT: tensor.concat
-func.func @not_normalize_insert_slice_to_concat_0(%arg0: tensor<8x4x64xf16>, %arg1: tensor<8x4x64xf16>) -> tensor<8x4x128xf16> {
-  %0 = tensor.empty() : tensor<8x4x64xf16>
-  %1 = linalg.elemwise_binary {fun = #linalg.binary_fn<mul>} ins(%arg0, %arg1 : tensor<8x4x64xf16>, tensor<8x4x64xf16>) outs(%0 : tensor<8x4x64xf16>) -> tensor<8x4x64xf16>
-  %2 = linalg.elemwise_binary {fun = #linalg.binary_fn<add>} ins(%arg0, %1 : tensor<8x4x64xf16>, tensor<8x4x64xf16>) outs(%0 : tensor<8x4x64xf16>) -> tensor<8x4x64xf16>
-  %3 = tensor.empty() : tensor<8x4x128xf16>
-  %inserted_slice = tensor.insert_slice %1 into %3[0, 0, 0] [8, 4, 64] [1, 1, 2] : tensor<8x4x64xf16> into tensor<8x4x128xf16>
-  %inserted_slice_0 = tensor.insert_slice %2 into %inserted_slice[0, 0, 1] [8, 4, 64] [1, 1, 2] : tensor<8x4x64xf16> into tensor<8x4x128xf16>
-  return %inserted_slice_0 : tensor<8x4x128xf16>
-}
-
-// -----
-
 // CHECK-LABEL: func.func @normalize_last_dim_concat_to_interleave_0
 // CHECK: %[[input0:.*]] = hfusion.elemwise_unary
 // CHECK: %[[input1:.*]] = hfusion.elemwise_unary
@@ -214,24 +148,4 @@ func.func @fold_static_negative_high_pad_0(%arg0: tensor<4x768x13x13xf32>) -> te
   %1 = linalg.elemwise_binary {fun = #linalg.binary_fn<mul>} ins(%padded, %cst : tensor<3072x12x12xf32>, f32) outs(%0 : tensor<3072x12x12xf32>) -> tensor<3072x12x12xf32>
   %expanded = tensor.expand_shape %1 [[0, 1], [2], [3]] output_shape [4, 768, 12, 12] : tensor<3072x12x12xf32> into tensor<4x768x12x12xf32>
   return %expanded : tensor<4x768x12x12xf32>
-}
-
-// -----
-// CHECK-TRITON-LABEL: triton_avoid_normalize_aligned_insert_slice_0
-// CHECK-TRITON-NOT：concat
-func.func @triton_avoid_normalize_aligned_insert_slice_0(
-    %arg0: tensor<1xf32>, %arg1: tensor<4xf32>, %arg2: tensor<33xf32>) -> (tensor<4xf32>, tensor<33xf32>) {
-  %inserted_slice_0 = tensor.insert_slice %arg0 into %arg1[0] [1] [1] : tensor<1xf32> into tensor<4xf32>
-  %inserted_slice_1 = tensor.insert_slice %arg0 into %arg2[32] [1] [1] : tensor<1xf32> into tensor<33xf32>
-  return %inserted_slice_0, %inserted_slice_1 : tensor<4xf32>, tensor<33xf32>
-}
-
-// -----
-// CHECK-TRITON-LABEL: triton_normalize_unaligned_insert_slice_0
-// CHECK-TRITON：concat
-func.func @triton_normalize_unaligned_insert_slice_0(
-    %arg0: tensor<1xf32>, %arg1: tensor<4xf32>, %arg2: tensor<33xf32>) -> (tensor<4xf32>, tensor<33xf32>) {
-  %inserted_slice_0 = tensor.insert_slice %arg0 into %arg1[1] [1] [1] : tensor<1xf32> into tensor<4xf32>
-  %inserted_slice_1 = tensor.insert_slice %arg0 into %arg2[3] [1] [1] : tensor<1xf32> into tensor<33xf32>
-  return %inserted_slice_0, %inserted_slice_1 : tensor<4xf32>, tensor<33xf32>
 }
