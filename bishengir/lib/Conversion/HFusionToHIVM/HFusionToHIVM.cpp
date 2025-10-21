@@ -38,13 +38,23 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeRange.h"
 #include "mlir/IR/ValueRange.h"
 #include "mlir/Interfaces/DestinationStyleOpInterface.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Target/LLVMIR/Dialect/ArmNeon/ArmNeonToLLVMIRTranslation.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/LogicalResult.h"
+#include <cstdint>
 #include <type_traits>
 
 namespace mlir {
@@ -104,8 +114,7 @@ private:
   Operation *op;
 };
 
-hivm::CompareMode
-mapCompareModeHFusionToHiVM(hfusion::CompareFn hsCmpMode) {
+hivm::CompareMode mapCompareModeHFusionToHiVM(hfusion::CompareFn hsCmpMode) {
   switch (hsCmpMode) {
   case hfusion::CompareFn::veq:
     return hivm::CompareMode::EQ;
@@ -547,9 +556,26 @@ struct LinalgToHIVMTransposeOp : public OpRewritePattern<linalg::TransposeOp> {
     }
     auto resultTypeRange =
         op.hasPureBufferSemantics() ? TypeRange() : TypeRange(op.getResult());
+    Operation *withoutAlignMarkOp = nullptr;
+    for (auto *user : op->getUsers()) {
+      if (auto markOp = dyn_cast<annotation::MarkOp>(user)) {
+        if (markOp->getAttrDictionary().contains("transpose_without_align")) {
+          withoutAlignMarkOp = user;
+          break;
+        }
+      }
+    }
+
+    bool disableAlign = false;
+    if (withoutAlignMarkOp) {
+      rewriter.eraseOp(withoutAlignMarkOp);
+      disableAlign = true;
+    }
+
     rewriter.replaceOpWithNewOp<hivm::VTransposeOp>(op, resultTypeRange,
                                                     op.getInput(), op.getInit(),
-                                                    op.getPermutationAttr());
+                                                    op.getPermutationAttr(),
+                                                    disableAlign);
     return success();
   }
 };

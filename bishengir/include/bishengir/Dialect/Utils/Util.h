@@ -270,6 +270,9 @@ SmallVector<std::optional<Operation *>>
 getAnnotateOpWithAttrForEachOperand(const SmallVectorImpl<Value> &operands,
                                     StringRef name);
 
+Value getReshapedValue(RewriterBase &rewriter, Location loc, Value v,
+                        llvm::ArrayRef<int64_t> newShape);
+
 /// get value according to the indices of every dimension
 Value getScalarValue(
     RewriterBase &rewriter, Location loc, Value v,
