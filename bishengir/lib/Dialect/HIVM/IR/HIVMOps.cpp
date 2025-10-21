@@ -211,6 +211,17 @@ LogicalResult PointerCastOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// LoadScalarOp
+//===----------------------------------------------------------------------===//
+ 
+LogicalResult LoadScalarOp::verify() {
+  auto ptrTy = cast<LLVM::LLVMPointerType>(getAddr().getType());
+  if (ptrTy.getAddressSpace() != 1)
+    return emitOpError("expecting GM address");
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // Printer and Parser for HIVM Ops that follows Destination Style Op
 // Interface
 //===----------------------------------------------------------------------===//
