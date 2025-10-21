@@ -288,6 +288,11 @@ AlignKind isBrcOpAligned(VBrcOp vbrcOp, int dim, int rank);
 // set bind sub block attr
 void setSubBlockMapping(RewriterBase &rewriter, Operation *loop);
 
+// Given Ops as start and end. Find SyncBlockSetOp/SyncBlockWaitOp in between.
+// If found, find the next Non SyncBlockSetOp/SyncBlockWaitOp op and return its
+// pervious op. If not found, return the start op.
+Operation *getNextNonSyncOp(Operation *startOp, Operation *endOp = nullptr);
+
 /// find vector ops between store and targetOp
 template <typename OpType>
 LogicalResult traceHIVMOpUntil(RewriterBase &rewriter, Operation *op,
