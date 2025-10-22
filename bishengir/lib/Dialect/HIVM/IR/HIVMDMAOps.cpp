@@ -531,7 +531,7 @@ void FixpipeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                       FixpipePreReluModeAttr pre_relu, BoolAttr channel_split) {
   build(odsBuilder, odsState, result, src, dst, /*unit_flag_cond*/ Value{},
         enable_nz2nd, pre_quant, pre_relu, channel_split,
-        /*unit_flag_mode*/ UnitFlagAttr{});
+        /*unit_flag_mode*/ UnitFlagAttr{}, AtomicKindAttr{});
 }
 
 void FixpipeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
@@ -540,7 +540,7 @@ void FixpipeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                       FixpipePreReluModeAttr pre_relu, BoolAttr channel_split) {
   build(odsBuilder, odsState, result, src, dst, /*unit_flag_cond*/ Value{},
         enable_nz2nd, pre_quant, pre_relu, channel_split,
-        /*unit_flag_mode*/ UnitFlagAttr{});
+        /*unit_flag_mode*/ UnitFlagAttr{}, AtomicKindAttr{});
 }
 
 enum FixpipeState {
