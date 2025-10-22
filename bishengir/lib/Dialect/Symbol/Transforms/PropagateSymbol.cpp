@@ -347,8 +347,45 @@ LogicalResult unifySymbols(ArrayRef<Value> symbolsToUnify,
   return success();
 }
 
+std::optional<Value> getBindSymbolForDim(Value value, int64_t dim) {
+  // get binded symbol for `value` of corresponding `dim`
+  auto shapedType = llvm::cast<ShapedType>(value.getType());
+  auto dynIndex = getIndexForDynamicDim(shapedType.getShape(), dim);
+  assert(dynIndex.has_value());
+  auto bindOp = utils::getAnyUserOfType<BindSymbolicShapeOp>(value);
+  if (!bindOp.has_value())
+    return std::nullopt;
+  auto val = bindOp->getShapeSymbols()[dynIndex.value()];
+  return val;
+}
+
+SmallVector<Value> getBindSymbolForDim(ArrayRef<Value> values, int64_t dim) {
+  SmallVector<Value> result;
+  for (Value value : values) {
+    auto symbolMaybe = getBindSymbolForDim(value, dim);
+    if (symbolMaybe.has_value()) {
+      result.push_back(symbolMaybe.value());
+    }
+  }
+  return result;
+}
+
+LogicalResult unifySymbolsForDim(ArrayRef<Value> values, int64_t dim,
+                                 PatternRewriter &rewriter) {
+  // collect symbols from `values` of corresponding `dim`
+  SmallVector<Value> symbols;
+  for (Value value : values) {
+    auto symbol = getBindSymbolForDim(value, dim);
+    if (symbol.has_value()) {
+      symbols.push_back(symbol.value());
+    }
+  }
+  return unifySymbols(symbols, rewriter);
+}
+
+/// Unfiy op with same operands and results by merging symbols of all values
 template <typename OpType>
-class UnifySameOperandsShapeSymbol : public OpRewritePattern<OpType> {
+class UnifySameOperandsAndResultShape : public OpRewritePattern<OpType> {
 public:
   using OpRewritePattern<OpType>::OpRewritePattern;
 
@@ -408,30 +445,183 @@ public:
       return type.getShape() == shape;
     });
   }
+};
 
-  LogicalResult unifySymbolsForDim(ArrayRef<Value> values, int64_t dim,
-                                   PatternRewriter &rewriter) const {
-    // collect symbols from `values` of corresponding `dim`
-    SmallVector<Value> symbols;
-    for (Value value : values) {
-      auto symbol = getBindSymbolForDim(value, dim);
-      if (symbol.has_value()) {
-        symbols.push_back(symbol.value());
+/// Unify op with same inits and results by merging the symbols for
+/// corresponding init and result values
+template <typename OpType>
+class UnifySameInitsAndResults : public OpRewritePattern<OpType> {
+public:
+  using OpRewritePattern<OpType>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(OpType op,
+                                PatternRewriter &rewriter) const final {
+    SmallVector<Value> inits = op.getDpsInits();
+    SmallVector<Value> results = op->getResults();
+    if (inits.size() != results.size()) {
+      return rewriter.notifyMatchFailure(op, "inits and results size mismatch");
+    }
+    if (llvm::none_of(results, [](Value v) {
+          auto shapedType = dyn_cast<ShapedType>(v.getType());
+          return shapedType && !shapedType.hasStaticShape();
+        })) {
+      return rewriter.notifyMatchFailure(op,
+                                         "should have dynamic shaped result");
+    }
+
+    bool changed = false;
+    for (auto [init, result] : llvm::zip(inits, results)) {
+      auto shapedType = dyn_cast<ShapedType>(result.getType());
+      if (!shapedType || shapedType.hasStaticShape()) {
+        continue;
+      }
+      SmallVector<Value> values{init, result};
+      for (int64_t dim = 0; dim < shapedType.getRank(); ++dim) {
+        if (!shapedType.isDynamicDim(dim)) {
+          continue;
+        }
+        LogicalResult unifyResult = unifySymbolsForDim(values, dim, rewriter);
+        if (succeeded(unifyResult)) {
+          changed = true;
+        }
       }
     }
-    return unifySymbols(symbols, rewriter);
+    return success(changed);
+  }
+};
+
+/// Unify op with partial equal dims between inputs and inits/results, by
+/// merging the symbols for these equal dims in corresponding inputs and
+/// inits/results values.
+/// Constraint:
+/// 1. all inits/results should have the same shape
+/// 2. all inputs should have the same shape
+template <typename OpType>
+class UnifyPartialEquivalentDims : public OpRewritePattern<OpType> {
+public:
+  using OpRewritePattern<OpType>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(OpType op,
+                                PatternRewriter &rewriter) const final {
+    SmallVector<Value> inputs = getInputs(op);
+    SmallVector<Value> outputs = getOutputs(op);
+    if (inputs.empty() || outputs.empty()) {
+      return rewriter.notifyMatchFailure(op, "cannot get inputs and outputs");
+    }
+
+    if (!hasSameShape(inputs) || !hasSameShape(outputs)) {
+      return rewriter.notifyMatchFailure(
+          op, "inputs or outputs should have same shape");
+    }
+
+    auto outputType = llvm::cast<ShapedType>(outputs[0].getType());
+    SmallVector<int64_t> map = getDimMap(op);
+
+    int64_t outputRank = outputType.getRank();
+    bool changed = false;
+    for (int64_t dim = 0; dim < outputRank; ++dim) {
+      if (!outputType.isDynamicDim(dim) || map[dim] == -1) {
+        continue;
+      }
+      auto outputSymbols = getBindSymbolForDim(outputs, dim);
+      auto inputSymbols = getBindSymbolForDim(inputs, map[dim]);
+      if (outputSymbols.empty() || inputSymbols.empty()) {
+        continue;
+      }
+      SmallVector<Value> symbols;
+      symbols.append(outputSymbols);
+      symbols.append(inputSymbols);
+      LogicalResult unifyResult = unifySymbols(symbols, rewriter);
+      if (succeeded(unifyResult)) {
+        changed = true;
+      }
+    }
+    return success(changed);
   }
 
-  std::optional<Value> getBindSymbolForDim(Value value, int64_t dim) const {
-    // get binded symbol for `value` of corresponding `dim`
-    auto shapedType = llvm::cast<ShapedType>(value.getType());
-    auto dynIndex = getIndexForDynamicDim(shapedType.getShape(), dim);
-    assert(dynIndex.has_value());
-    auto bindOp = utils::getAnyUserOfType<BindSymbolicShapeOp>(value);
-    if (!bindOp.has_value())
-      return std::nullopt;
-    auto val = bindOp->getShapeSymbols()[dynIndex.value()];
-    return val;
+  bool hasSameShape(ArrayRef<Value> values) const {
+    assert(!values.empty() && "values cannot be empty");
+    auto firstType = dyn_cast<ShapedType>(values[0].getType());
+    if (!firstType) {
+      return false;
+    }
+    for (Value value : llvm::drop_begin(values)) {
+      auto curType = dyn_cast<ShapedType>(value.getType());
+      if (curType.getShape() != firstType.getShape()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  SmallVector<Value> getInputs(OpType op) const {
+    SmallVector<Value> inputs;
+    if constexpr (std::is_same_v<linalg::BroadcastOp, OpType>) {
+      inputs = {op.getInput()};
+    } else if constexpr (std::is_same_v<linalg::ReduceOp, OpType> ||
+                         std::is_same_v<tensor::ConcatOp, OpType>) {
+      inputs = op.getInputs();
+    } else {
+      llvm_unreachable("unsupported op type for UnifyPartialEquivalentDims");
+    }
+    return inputs;
+  }
+
+  SmallVector<Value> getOutputs(OpType op) const {
+    SmallVector<Value> outputs;
+    if constexpr (std::is_same_v<linalg::BroadcastOp, OpType>) {
+      outputs.push_back(op.getInit());
+      outputs.push_back(op->getResult(0));
+    } else if constexpr (std::is_same_v<linalg::ReduceOp, OpType>) {
+      SmallVector<Value> inits = op.getInits();
+      SmallVector<Value> results = op->getResults();
+      outputs.append(inits);
+      outputs.append(results);
+    } else if constexpr (std::is_same_v<tensor::ConcatOp, OpType>) {
+      outputs.push_back(op.getResult());
+    } else {
+      llvm_unreachable("unsupported op type for UnifyPartialEquivalentDims");
+    }
+    return outputs;
+  }
+
+  SmallVector<int64_t> getDimMap(linalg::BroadcastOp op) const {
+    DenseSet<int64_t> brcDims(op.getDimensions().begin(),
+                              op.getDimensions().end());
+    auto dstType = llvm::cast<ShapedType>(op.getInit().getType());
+    int64_t cnt = 0;
+    int64_t rank = dstType.getRank();
+    SmallVector<int64_t> map(rank, -1);
+    for (int64_t dim = 0; dim < rank; ++dim) {
+      if (brcDims.contains(dim)) {
+        cnt -= 1;
+        continue;
+      }
+      map[dim] = dim + cnt;
+    }
+    return map;
+  }
+
+  SmallVector<int64_t> getDimMap(linalg::ReduceOp op) const {
+    DenseSet<int64_t> reduceDims(op.getDimensions().begin(),
+                                 op.getDimensions().end());
+    auto srcType = llvm::cast<ShapedType>(op.getInputs()[0].getType());
+    int64_t rank = srcType.getRank();
+    SmallVector<int64_t> map;
+    for (int64_t i = 0; i < rank; ++i) {
+      if (reduceDims.contains(i)) {
+        continue;
+      }
+      map.push_back(i);
+    }
+    return map;
+  }
+
+  SmallVector<int64_t> getDimMap(tensor::ConcatOp op) const {
+    int64_t rank = op.getResultType().getRank();
+    SmallVector<int64_t> map = llvm::to_vector(llvm::seq<int64_t>(0, rank));
+    map[op.getDim()] = -1;
+    return map;
   }
 };
 
@@ -516,11 +706,22 @@ void PropagateSymbolPass::runOnOperation() {
 
   patterns.add<BindReifyResultShape>(ctx);
   patterns.add<PropagateSymbolByTensorDim>(ctx);
-
-  patterns.add<UnifySameOperandsShapeSymbol<linalg::ElemwiseBinaryOp>>(ctx);
-  patterns.add<UnifySameOperandsShapeSymbol<hfusion::ElemwiseBinaryOp>>(ctx);
-
   patterns.add<FoldSymbolToTensorEmpty>(ctx);
+
+  patterns.add<UnifySameOperandsAndResultShape<linalg::ElemwiseBinaryOp>>(ctx);
+  patterns.add<UnifySameOperandsAndResultShape<hfusion::ElemwiseBinaryOp>>(ctx);
+  patterns.add<UnifySameOperandsAndResultShape<linalg::ElemwiseUnaryOp>>(ctx);
+  patterns.add<UnifySameOperandsAndResultShape<hfusion::ElemwiseUnaryOp>>(ctx);
+  patterns.add<UnifySameOperandsAndResultShape<hfusion::CastOp>>(ctx);
+  patterns.add<UnifySameOperandsAndResultShape<hfusion::LoadOp>>(ctx);
+  patterns.add<UnifySameOperandsAndResultShape<hfusion::StoreOp>>(ctx);
+
+  // patterns.add<UnifySameInitsAndResults<linalg::BroadcastOp>>(ctx);
+  // patterns.add<UnifySameInitsAndResults<linalg::ReduceOp>>(ctx);
+
+  patterns.add<UnifyPartialEquivalentDims<linalg::BroadcastOp>>(ctx);
+  patterns.add<UnifyPartialEquivalentDims<linalg::ReduceOp>>(ctx);
+  patterns.add<UnifyPartialEquivalentDims<tensor::ConcatOp>>(ctx);
 
   if (failed(applyPatternsGreedily(func, std::move(patterns)))) {
     signalPassFailure();
