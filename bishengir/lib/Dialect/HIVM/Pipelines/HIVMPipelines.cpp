@@ -133,6 +133,10 @@ static void hivmPreBufferizationOptimizationPipeline(
   pm.addPass(mlir::hivm::createNormalizeMatmulPass());
   pm.addPass(mlir::hivm::createInlineFixpipePass());
   pm.nest<func::FuncOp>().addPass(createTileBatchMMIntoLoopPass());
+  // Clone load when it is used by cube and vector at the same time.
+  // Note: It contains CSE pass.
+  pm.nest<func::FuncOp>().addPass(mlir::hivm::createInsertDuplicateLoadPass());
+  pm.nest<func::FuncOp>().addPass(createCloneTensorEmptyPass());
   if (!hivmPipelineOptions.disableAutoCVWorkSpaceManage) {
     pm.nest<func::FuncOp>().addPass(
         mlir::hivm::createInsertLoadStoreForMixCVPass());
