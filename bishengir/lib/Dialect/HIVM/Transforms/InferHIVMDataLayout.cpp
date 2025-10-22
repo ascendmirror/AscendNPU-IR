@@ -477,12 +477,27 @@ void DataLayoutInferAndPropagateHelper::initAnchorLayout() {
         auto targetLayout = targetLayoutMap[operand];
         // Layout Information is appended on to the root alloc.
         FailureOr<memref::AllocOp> status = getMemRefAlloc(operand);
+        FailureOr<memref::AllocOp> status2 = failure();
+
         if (failed(status)) {
           LLVM_DEBUG(llvm::dbgs() << "  Cannot find root alloc for operand: "
                                   << operand << "\n";);
           continue;
         }
+        if (operand.getDefiningOp()->getOperands().size() > 0)
+          if (BlockArgument blockArg = dyn_cast_or_null<BlockArgument>(
+                  operand.getDefiningOp()->getOperand(0))) {
+            if (scf::ForOp forOp = dyn_cast_or_null<scf::ForOp>(
+                    blockArg.getParentRegion()->getParentOp())) {
+            status2 = getMemRefAlloc(
+                forOp.getTiedLoopYieldedValue(blockArg)->get());
+            }
+          }
         (void)updateLayoutIfChanged(*status, {currentLayout, targetLayout});
+        if (failed(status2)) {
+          continue;
+        }
+        (void)updateLayoutIfChanged(*status2, {currentLayout, targetLayout});
       }
       return WalkResult::advance();
     }
