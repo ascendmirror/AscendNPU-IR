@@ -96,6 +96,7 @@ BaseMemRefType getBaseMemRefTypeWithNewScope(BaseMemRefType type,
 /// is unsupported Ops on the search path or if the defining op is not a MemRef
 /// AllocOp.
 FailureOr<memref::AllocOp> getMemRefAlloc(Value operand);
+FailureOr<memref::AllocOp> getMemRefAllocFromYield(Value operand, DenseSet<Value> &valSet);
 
 SmallVector<Value>
 getValueListFromMixedTypeLists(SmallVector<Value> dynamicValues,
