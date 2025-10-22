@@ -83,6 +83,25 @@ FailureOr<memref::AllocOp> getMemRefForBlockArgument(BlockArgument bbArg) {
   return bbParentOp->emitError("Unsupported block op type");
 }
 
+/// Find the root memerf alloc for yield op.
+FailureOr<memref::AllocOp> getMemRefForBlockArgumentFromYield(BlockArgument bbArg, DenseSet<Value> &valSet) {
+  if (!valSet.insert(bbArg).second)
+    return failure();
+  auto *bbOwner = bbArg.getOwner();
+  if (!bbOwner) {
+    llvm_unreachable("parentOp doesn't exist");
+    return failure();
+  }
+  auto *bbParentOp = bbOwner->getParentOp();
+  if (!bbParentOp)
+    return failure();
+  if (auto loopOp = dyn_cast<LoopLikeOpInterface>(bbParentOp)) {
+    auto *operand = loopOp.getTiedLoopYieldedValue(bbArg);
+    return getMemRefAllocFromYield(operand->get(), valSet);
+  }
+  return bbParentOp->emitError("Unsupported block op type");
+}
+
 /// Find the root memerf alloc for the OpResult.
 FailureOr<memref::AllocOp> getMemRefForOpResult(OpResult result) {
   return TypeSwitch<Operation *, FailureOr<memref::AllocOp>>(
@@ -99,6 +118,30 @@ FailureOr<memref::AllocOp> getMemRefForOpResult(OpResult result) {
       })
       .Case<bufferization::ToTensorOp>([&](bufferization::ToTensorOp op) {
         return getMemRefAlloc(op.getMemref());
+      })
+      .Default([&](Operation *op) {
+        op->emitOpError("Unsupported op for finding the root alloc.");
+        return failure();
+      });
+}
+
+FailureOr<memref::AllocOp> getMemRefForOpResultYieldFirst(OpResult result, DenseSet<Value> &valSet) {
+  if (!valSet.insert(result).second)
+    return failure();
+  return TypeSwitch<Operation *, FailureOr<memref::AllocOp>>(
+             result.getDefiningOp())
+      .Case<memref::AllocOp>([&](memref::AllocOp op) { return op; })
+      // We could pursue view_source of current traced op with
+      // viewLikeOpInterface trait.
+      .Case<mlir::ViewLikeOpInterface>([&](ViewLikeOpInterface viewLikeOp) {
+        return getMemRefAllocFromYield(viewLikeOp.getViewSource(), valSet);
+      })
+      .Case<mlir::LoopLikeOpInterface>([&](LoopLikeOpInterface loopOp) {
+        Value initSource = loopOp.getInits()[result.getResultNumber()];
+        return getMemRefAllocFromYield(initSource, valSet);
+      })
+      .Case<bufferization::ToTensorOp>([&](bufferization::ToTensorOp op) {
+        return getMemRefAllocFromYield(op.getMemref(), valSet);
       })
       .Default([&](Operation *op) {
         op->emitOpError("Unsupported op for finding the root alloc.");
@@ -229,6 +272,15 @@ FailureOr<memref::AllocOp> getMemRefAlloc(Value operand) {
   auto result = dyn_cast<OpResult>(operand);
   assert(result != nullptr);
   return getMemRefForOpResult(result);
+}
+
+FailureOr<memref::AllocOp> getMemRefAllocFromYield(Value operand, DenseSet<Value> &valSet) {
+  if (auto bbArg = dyn_cast<BlockArgument>(operand)) {
+    return getMemRefForBlockArgumentFromYield(bbArg, valSet);
+  }
+  auto result = dyn_cast<OpResult>(operand);
+  assert(result != nullptr);
+  return getMemRefForOpResultYieldFirst(result, valSet);
 }
 
 // New helper function to get the updated BaseMemRefType
