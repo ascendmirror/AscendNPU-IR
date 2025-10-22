@@ -225,7 +225,8 @@ FailureOr<TCoreType> getCoreType(Operation *op) {
           .getTcoretype();
     }
   }
-
+  if (isa<hivm::LoadOp>(op) && op->hasAttr("LoadOnlyForCube"))
+    return TCoreType::CUBE;
   if (auto opCoreType = hivm::detail::queryCoreTypeHelper(op))
     return opCoreType.value();
 

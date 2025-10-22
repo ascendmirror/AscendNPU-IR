@@ -59,6 +59,9 @@ struct InsertLoadStoreForMixCVPass
 };
 
 enum class InsertMode { LoadOnly = 0, StoreOnly, LoadAndStore };
+enum class LoadCoreType { ForAic = 0, ForAiv, Other};
+constexpr StringRef loadOnlyForCube = "LoadOnlyForCube";
+constexpr StringRef loadOnlyForVector = "LoadOnlyForVector";
 
 Value insertLoadOperation(PatternRewriter &rewriter, Location loc,
                           OpOperand *consumerOperand, Operation **lastInsertOp,
@@ -96,6 +99,7 @@ Value insertStoreOperation(PatternRewriter &rewriter, Location loc,
 Value inertLoadStoreOperation(PatternRewriter &rewriter, Location loc,
                               OpOperand *consumerOperand,
                               Operation **lastInsertOp,
+                              LoadCoreType loadType = LoadCoreType::Other,
                               std::optional<Value> insertInit = std::nullopt) {
   Type type = consumerOperand->get().getType();
   Type elemType = getElementTypeOrSelf(type);
@@ -111,6 +115,16 @@ Value inertLoadStoreOperation(PatternRewriter &rewriter, Location loc,
   *lastInsertOp = rewriter.create<hivm::LoadOp>(
       loc, isBufferized ? TypeRange() : TypeRange(type),
       isBufferized ? storeInit : storeOp->getResults()[0], loadInit);
+  switch (loadType) {
+  case LoadCoreType::ForAic:
+    (*lastInsertOp)->setAttr(loadOnlyForCube, rewriter.getI32IntegerAttr(1));
+    break;
+  case LoadCoreType::ForAiv:
+    (*lastInsertOp)->setAttr(loadOnlyForVector, rewriter.getI32IntegerAttr(1));
+    break;
+  default:
+    break;
+  }
   return isBufferized ? loadInit : (*lastInsertOp)->getResult(0);
 }
 
@@ -118,7 +132,8 @@ LogicalResult
 insertLoadStoreOp(PatternRewriter &rewriter, Location loc,
                   const llvm::SmallVector<OpOperand *> &consumerOperands,
                   InsertMode insertMode,
-                  std::optional<Value> insertInit = std::nullopt) {
+                  std::optional<Value> insertInit = std::nullopt,
+                  LoadCoreType loadType = LoadCoreType::Other) {
   if (consumerOperands.empty()) {
     return failure();
   }
@@ -134,8 +149,8 @@ insertLoadStoreOp(PatternRewriter &rewriter, Location loc,
       replaceOperand = insertStoreOperation(rewriter, loc, consumerOperand,
                                             &lastInsertOp, insertInit);
     } else if (insertMode == InsertMode::LoadAndStore) {
-      replaceOperand = inertLoadStoreOperation(rewriter, loc, consumerOperand,
-                                               &lastInsertOp, insertInit);
+      replaceOperand = inertLoadStoreOperation(
+          rewriter, loc, consumerOperand, &lastInsertOp, loadType, insertInit);
     }
     if (!lastInsertOp) {
       llvm_unreachable("lastInsertOp not defined");
@@ -304,7 +319,8 @@ struct InsertLoadStoreOpBetweenCrossLoopVectorAndCube
       }
     }
     return insertLoadStoreOp(rewriter, op.getLoc(), consumerOperands,
-                             InsertMode::LoadAndStore);
+                             InsertMode::LoadAndStore, std::nullopt,
+                             LoadCoreType::ForAic);
   }
 };
 
