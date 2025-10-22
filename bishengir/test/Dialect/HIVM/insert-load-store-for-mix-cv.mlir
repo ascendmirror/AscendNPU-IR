@@ -285,6 +285,31 @@ func.func @insert_load_between_vector_and_load(%arg0: memref<16x16xf16>, %arg1: 
 }
 
 // -----
+// CHECK-LABEL: @insert_load_store_for_SCFYield_after_vector
+func.func @insert_load_store_for_SCFYield_after_vector(%arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>) -> tensor<128x128xf32> {
+  %cst = arith.constant 3.200000e+01 : f32
+  %c16 = arith.constant 16 : index
+  %true = arith.constant true
+  %c8_i32 = arith.constant 8 : i32
+  %c32_i32 = arith.constant 32 : i32
+  %c0_i32 = arith.constant 0 : i32
+  %0 = tensor.empty() : tensor<128x128xf32>
+  %1 = scf.for %arg2 = %c0_i32 to %c32_i32 step %c8_i32 iter_args(%arg3 = %0) -> (tensor<128x128xf32>)  : i32 {
+    %2 = tensor.empty() : tensor<128x128xf32>
+    %3 = tensor.empty() : tensor<128x128xf32>
+    %4 = hivm.hir.mmadL1 ins(%arg3, %2, %true, %c16, %c16, %c16 : tensor<128x128xf32>, tensor<128x128xf32>, i1, index, index, index) outs(%3 : tensor<128x128xf32>) -> tensor<128x128xf32>
+    %5 = tensor.empty() : tensor<128x128xf32>
+    %6 = hivm.hir.vadd ins(%4, %cst : tensor<128x128xf32>, f32) outs(%5 : tensor<128x128xf32>) -> tensor<128x128xf32>
+    // CHECK: %[[VAL1:.*]] = hivm.hir.vadd ins(%{{.*}}, %{{.*}} : tensor<128x128xf32>, f32) outs(%{{.*}} : tensor<128x128xf32>) -> tensor<128x128xf32>
+    // CHECK: %[[VAL2:.*]] = hivm.hir.store ins(%[[VAL1]] : tensor<128x128xf32>) outs(%{{.*}} : tensor<128x128xf32>) -> tensor<128x128xf32>
+    // CHECK: %[[VAL3:.*]] = hivm.hir.load ins(%[[VAL2]] : tensor<128x128xf32>) outs(%{{.*}} : tensor<128x128xf32>) {LoadOnlyForCube = 1 : i32} init_out_buffer = false may_implicit_transpose_with_last_axis = false -> tensor<128x128xf32>
+    // CHECK: scf.yield %[[VAL3]] : tensor<128x128xf32>
+    scf.yield %6 : tensor<128x128xf32>
+  }
+  return %1 : tensor<128x128xf32>
+}
+
+// -----
 // CHECK-LABEL: @collapse
 func.func @collapse(%arg0: memref<2x8x16xf16>, %arg1: memref<16x16xf16>) -> tensor<16x16xf32> {
   %c16 = arith.constant 16 : index
