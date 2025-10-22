@@ -192,7 +192,7 @@ module {
     %4 = linalg.fill ins(%cst : f32) outs(%0 : tensor<f32>) -> tensor<f32>
     %5 = linalg.fill ins(%cst : f32) outs(%1 : tensor<i32>) -> tensor<i32>
     %6 = linalg.elemwise_unary {fun = #linalg.unary_fn<negf>} ins(%arg0 : tensor<4xf32>) outs(%2 : tensor<4xf32>) -> tensor<4xf32>
-    %7:2 = hfusion.reduce_with_index <max> ins(%6, %arg1 : tensor<4xf32>, tensor<4xi32>) outs(%0, %1 : tensor<f32>, tensor<i32>) dimensions = [0]  -> tensor<f32>, tensor<i32>
+    %7:2 = hfusion.reduce_with_index {tie_break_left = true} <max> ins(%6, %arg1 : tensor<4xf32>, tensor<4xi32>) outs(%0, %1 : tensor<f32>, tensor<i32>) dimensions = [0]  -> tensor<f32>, tensor<i32>
     %8 = linalg.elemwise_unary {fun = #linalg.unary_fn<negf>} ins(%7#0 : tensor<f32>) outs(%3 : tensor<f32>) -> tensor<f32>
     return %8 : tensor<f32>
   }

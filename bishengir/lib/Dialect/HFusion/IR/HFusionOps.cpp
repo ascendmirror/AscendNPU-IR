@@ -15,7 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "bishengir/Config/bishengir-config.h"
 #include "bishengir/Dialect/HFusion/IR/HFusion.h"
 #include "bishengir/Dialect/HFusion/IR/HFusionImpl.h"
 #include "bishengir/Dialect/MathExt/IR/MathExt.h"
@@ -57,7 +56,7 @@
 #include <optional>
 #include <variant>
 
-#if BSPUB_DAVINCI_BISHENGIR
+#if BSPRIV_DAVINCI_BISHENGIR
 #include "mlir/Dialect/Linalg/IR/LinalgExtensions.h"
 #endif
 
@@ -801,8 +800,10 @@ void ReduceWithIndexOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                               TypeRange types, ValueRange inputs,
                               ValueRange inits,
                               ReduceWithIndexKindAttr reduce_kind,
+                              BoolAttr tie_break_left,
                               DenseI64ArrayAttr dimensions) {
   odsState.addAttribute("reduce_kind", reduce_kind);
+  odsState.addAttribute("tie_break_left", tie_break_left);
   odsState.addAttribute("dimensions", dimensions);
   buildStructuredOp(odsBuilder, odsState, types, inputs, inits, {},
                     ReduceWithIndexOp::getRegionBuilder());
@@ -812,8 +813,10 @@ void ReduceWithIndexOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                               TypeRange types, ValueRange inputs,
                               ValueRange inits,
                               ReduceWithIndexKindAttr reduce_kind,
+                              BoolAttr tie_break_left,
                               ArrayRef<int64_t> dimensions) {
   odsState.addAttribute("reduce_kind", reduce_kind);
+  odsState.addAttribute("tie_break_left", tie_break_left);
   odsState.addAttribute("dimensions",
                         odsBuilder.getDenseI64ArrayAttr(dimensions));
   buildStructuredOp(odsBuilder, odsState, types, inputs, inits, {},
@@ -1970,16 +1973,12 @@ FailureOr<SmallVector<Value>> IsFiniteOp::decomposeOperation(OpBuilder &b) {
 MutableOperandRange GatherOp::getDpsInitsMutable() { return getInitMutable(); }
 
 SmallVector<utils::IteratorType> GatherOp::getIteratorTypesArray() {
-#if BISHENGIR_BUILD_STANDALONE_IR_ONLY
-  llvm_unreachable("Not implemented");
-#else
   SmallVector<utils::IteratorType> result(getInit().getType().getRank() + 1,
                                           utils::IteratorType::parallel);
   // The gather dim for indicies and src each take a loop, since we want the src
   // loop (reduction dim) to be on the inside, we set the gatherDim+1 to reduce
   result[getAxis() + 1] = utils::IteratorType::gather;
   return result;
-#endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
 }
 
 /// The source gather axis will be inside the index gather axis. For src
@@ -2304,7 +2303,6 @@ void AtomicXchgOp::getEffects(
 //===----------------------------------------------------------------------===//
 void HFusionDialect::getCanonicalizationPatterns(
     RewritePatternSet &results) const {
-#if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
   results.add<
       mlir::linalg::InlineDenseSplatToGenericRegion<hfusion::ElemwiseBinaryOp>,
       mlir::linalg::InlineDenseSplatToGenericRegion<hfusion::ElemwiseUnaryOp>,
@@ -2313,7 +2311,6 @@ void HFusionDialect::getCanonicalizationPatterns(
       mlir::linalg::SimplifySplatDenseForBinary<hfusion::ElemwiseBinaryOp>,
       mlir::linalg::SimplifySplatDenseForBinary<hfusion::CompareOp>>(
       getContext());
-#endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
 }
 
 //===----------------------------------------------------------------------===//
@@ -2337,8 +2334,8 @@ LogicalResult SortOp::verify() {
 // HistogramOp
 //===----------------------------------------------------------------------===//
 LogicalResult HistogramOp::verify() {
-  auto inTy = mlir::dyn_cast<RankedTensorType>(getInput().getType());
-  auto outTy = mlir::dyn_cast<RankedTensorType>(getOutput().getType());
+  auto inTy = getInput().getType().dyn_cast<RankedTensorType>();
+  auto outTy = getOutput().getType().dyn_cast<RankedTensorType>();
   Value mask = getMask();
 
   // Input/output must be ranked tensors
@@ -2347,7 +2344,7 @@ LogicalResult HistogramOp::verify() {
 
   // Input element type must be i32 or i64
   Type inEltTy = inTy.getElementType();
-  if (!mlir::isa<IntegerType>(inEltTy) ||
+  if (!inEltTy.isa<IntegerType>() ||
       (inEltTy.getIntOrFloatBitWidth() != 32 &&
        inEltTy.getIntOrFloatBitWidth() != 64))
     return emitOpError() << "input element type must be i32 or i64";
@@ -2360,7 +2357,7 @@ LogicalResult HistogramOp::verify() {
 
   // Output element type must be i32 or i64
   Type outEltTy = outTy.getElementType();
-  if (!mlir::isa<IntegerType>(outEltTy) ||
+  if (!outEltTy.isa<IntegerType>() ||
       (outEltTy.getIntOrFloatBitWidth() != 32 &&
        outEltTy.getIntOrFloatBitWidth() != 64))
     return emitOpError() << "output element type must be i32 or i64";
@@ -2373,7 +2370,7 @@ LogicalResult HistogramOp::verify() {
 
   // If mask is provided, it must match input shape
   if (mask) {
-    auto maskTy = mlir::dyn_cast<RankedTensorType>(mask.getType());
+    auto maskTy = mask.getType().dyn_cast<RankedTensorType>();
     if (!maskTy)
       return emitOpError() << "mask must be a ranked tensor";
     if (maskTy.getElementType() != IntegerType::get(getContext(), 1))
@@ -2392,9 +2389,10 @@ FailureOr<SmallVector<Value>> HistogramOp::decomposeOperation(OpBuilder &b) {
   Location loc = getLoc();
 
   Value input = getInput();
+  int64_t bins = getNumBins();
   Value mask = getMask();
-  auto inTy = mlir::dyn_cast<RankedTensorType>(input.getType());
-  auto outTy = mlir::dyn_cast<RankedTensorType>(getOutput().getType());
+  auto inTy = input.getType().cast<RankedTensorType>();
+  auto outTy = getOutput().getType().cast<RankedTensorType>();
 
   Type outEltTy = outTy.getElementType();
   Type idxTy = b.getIndexType();

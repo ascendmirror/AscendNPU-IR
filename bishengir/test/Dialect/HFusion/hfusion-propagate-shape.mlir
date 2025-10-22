@@ -1424,7 +1424,7 @@ func.func @hfusion_reduce_with_index_expand(%input: tensor<6x7x8xf32>) -> tensor
     -> tensor<6x7x8xf32>
   %output = tensor.empty() : tensor<6x8xf32>
   %output_index = tensor.empty() : tensor<6x8xi32>
-  %reduce_result:2 = hfusion.reduce_with_index <max>
+  %reduce_result:2 = hfusion.reduce_with_index {tie_break_left = true} <max>
     ins(%unary : tensor<6x7x8xf32>) outs(%output, %output_index : tensor<6x8xf32>, tensor<6x8xi32>)
     dimensions = [1]
     -> tensor<6x8xf32>, tensor<6x8xi32>
@@ -1447,7 +1447,7 @@ func.func @hfusion_reduce_with_index_collapse(%input: tensor<2x3x7x8xf32>) -> te
   %collapsed = tensor.collapse_shape %unary [[0, 1], [2], [3]] : tensor<2x3x7x8xf32> into tensor<6x7x8xf32>
   %output = tensor.empty() : tensor<6x8xf32>
   %output_index = tensor.empty() : tensor<6x8xi32>
-  %reduce_result:2 = hfusion.reduce_with_index <min>
+  %reduce_result:2 = hfusion.reduce_with_index {tie_break_left = true} <min>
     ins(%collapsed : tensor<6x7x8xf32>) outs(%output, %output_index : tensor<6x8xf32>, tensor<6x8xi32>)
     dimensions = [1]
     -> tensor<6x8xf32>, tensor<6x8xi32>

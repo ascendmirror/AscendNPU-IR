@@ -126,12 +126,12 @@ func.func @test_reduce_min_with_index_ops() {
   // CHECK: %[[DST_INDEX:.*]] = memref.alloca() : memref<32xi32, #hivm.address_space<ub>>
   // CHECK: %[[EXPANDED0:.*]] = memref.expand_shape %[[DST]] {{\[}}[0, 1]] output_shape {{\[}}32, 1] : memref<32xf16, #hivm.address_space<ub>> into memref<32x1xf16, #hivm.address_space<ub>>
   // CHECK: %[[EXPANDED1:.*]] = memref.expand_shape %[[DST_INDEX]] {{\[}}[0, 1]] output_shape {{\[}}32, 1] : memref<32xi32, #hivm.address_space<ub>> into memref<32x1xi32, #hivm.address_space<ub>>
-  // CHECK: hivm.hir.vreduce <min_with_index> ins(%[[SRC]] : memref<32x2xf16, #hivm.address_space<ub>>) outs(%[[EXPANDED0]], %[[EXPANDED1]] : memref<32x1xf16, #hivm.address_space<ub>>, memref<32x1xi32, #hivm.address_space<ub>>) reduce_dims = [1]
+  // CHECK: hivm.hir.vreduce <min_with_index_left> ins(%[[SRC]] : memref<32x2xf16, #hivm.address_space<ub>>) outs(%[[EXPANDED0]], %[[EXPANDED1]] : memref<32x1xf16, #hivm.address_space<ub>>, memref<32x1xi32, #hivm.address_space<ub>>) reduce_dims = [1]
   %src = memref.alloca() : memref<32x2xf16, #hivm.address_space<ub>>
   %src_index = memref.alloca(): memref<32x2xi32, #hivm.address_space<ub>>
   %dst = memref.alloca() : memref<32xf16, #hivm.address_space<ub>>
   %dst_index = memref.alloca()  : memref<32xi32, #hivm.address_space<ub>>
-  hfusion.reduce_with_index <min>
+  hfusion.reduce_with_index {tie_break_left = true} <min>
                  ins(%src, %src_index : memref<32x2xf16, #hivm.address_space<ub>>, memref<32x2xi32, #hivm.address_space<ub>>)
                  outs(%dst, %dst_index : memref<32xf16, #hivm.address_space<ub>>, memref<32xi32, #hivm.address_space<ub>>)
                  dimensions = [1]
@@ -231,8 +231,8 @@ module {
     %true = arith.constant true
     %0 = tensor.empty() : tensor<256xf32>
     %1 = tensor.empty() : tensor<256xi32>
-    // CHECK: %[[REDUCED:.*]]:2 = hivm.hir.vreduce <max_with_index> ins(%[[INPUT0:.*]] : tensor<256x64xf32>) outs(%[[INIT0:.*]], %[[INIT1:.*]] : tensor<256x1xf32>, tensor<256x1xi32>) reduce_dims = [1] -> tensor<256x1xf32>, tensor<256x1xi32>
-    %2:2 = hfusion.reduce_with_index <max> ins(%arg0, %arg1 : tensor<256x64xf32>, tensor<256x64xi32>) outs(%0, %1 : tensor<256xf32>, tensor<256xi32>) dimensions = [1] -> tensor<256xf32>, tensor<256xi32>
+    // CHECK: %[[REDUCED:.*]]:2 = hivm.hir.vreduce <max_with_index_left> ins(%[[INPUT0:.*]] : tensor<256x64xf32>) outs(%[[INIT0:.*]], %[[INIT1:.*]] : tensor<256x1xf32>, tensor<256x1xi32>) reduce_dims = [1] -> tensor<256x1xf32>, tensor<256x1xi32>
+    %2:2 = hfusion.reduce_with_index {tie_break_left = true} <max> ins(%arg0, %arg1 : tensor<256x64xf32>, tensor<256x64xi32>) outs(%0, %1 : tensor<256xf32>, tensor<256xi32>) dimensions = [1] -> tensor<256xf32>, tensor<256xi32>
     return %2#0 : tensor<256xf32>
   }
 }
@@ -242,8 +242,8 @@ module {
 module {
   func.func @test_reduce_with_index(%arg0: memref<256x64xf32>, %arg1: memref<256x64xi32>, %arg2: memref<256xf32>, %arg3: memref<256xi32>) {
     %true = arith.constant true
-    // CHECK: hivm.hir.vreduce <max_with_index>
-    hfusion.reduce_with_index <max> ins(%arg0, %arg1 : memref<256x64xf32>, memref<256x64xi32>) outs(%arg2, %arg3 : memref<256xf32>, memref<256xi32>) dimensions = [1]
+    // CHECK: hivm.hir.vreduce <max_with_index_left>
+    hfusion.reduce_with_index {tie_break_left = true} <max> ins(%arg0, %arg1 : memref<256x64xf32>, memref<256x64xi32>) outs(%arg2, %arg3 : memref<256xf32>, memref<256xi32>) dimensions = [1]
     return
   }
 }
@@ -255,8 +255,8 @@ module {
     %true = arith.constant true
     %0 = tensor.empty() : tensor<256xf32>
     %1 = tensor.empty() : tensor<256xi32>
-    // CHECK: %[[REDUCED:.*]]:2 = hivm.hir.vreduce <min_with_index> ins(%[[INPUT0:.*]] : tensor<256x64xf32>) outs(%[[INIT0:.*]], %[[INIT1:.*]] : tensor<256x1xf32>, tensor<256x1xi32>) reduce_dims = [1] -> tensor<256x1xf32>, tensor<256x1xi32>
-    %2:2 = hfusion.reduce_with_index <min> ins(%arg0 : tensor<256x64xf32>) outs(%0, %1 : tensor<256xf32>, tensor<256xi32>) dimensions = [1] -> tensor<256xf32>, tensor<256xi32>
+    // CHECK: %[[REDUCED:.*]]:2 = hivm.hir.vreduce <min_with_index_left> ins(%[[INPUT0:.*]] : tensor<256x64xf32>) outs(%[[INIT0:.*]], %[[INIT1:.*]] : tensor<256x1xf32>, tensor<256x1xi32>) reduce_dims = [1] -> tensor<256x1xf32>, tensor<256x1xi32>
+    %2:2 = hfusion.reduce_with_index {tie_break_left = true} <min> ins(%arg0 : tensor<256x64xf32>) outs(%0, %1 : tensor<256xf32>, tensor<256xi32>) dimensions = [1] -> tensor<256xf32>, tensor<256xi32>
     return %2#0 : tensor<256xf32>
   }
 }
@@ -266,8 +266,8 @@ module {
 module {
   func.func @test_reduce_with_index(%arg0: memref<256x64xf32>, %arg1: memref<256xf32>, %arg2: memref<256xi32>) {
     %true = arith.constant true
-    // CHECK: hivm.hir.vreduce <min_with_index>
-    hfusion.reduce_with_index <min> ins(%arg0 : memref<256x64xf32>) outs(%arg1, %arg2 : memref<256xf32>, memref<256xi32>) dimensions = [1]
+    // CHECK: hivm.hir.vreduce <min_with_index_left>
+    hfusion.reduce_with_index {tie_break_left = true} <min> ins(%arg0 : memref<256x64xf32>) outs(%arg1, %arg2 : memref<256xf32>, memref<256xi32>) dimensions = [1]
     return
   }
 }
