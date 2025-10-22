@@ -160,19 +160,58 @@ public:
   }
 };
 
-namespace {
-struct HFusionInlineBrcPass
-    : public impl::HFusionInlineBrcBase<HFusionInlineBrcPass> {
+struct InlineInsertSliceWithScalarInput
+    : public OpRewritePattern<tensor::InsertSliceOp> {
 public:
-  void runOnOperation() override {
-    RewritePatternSet patterns(&getContext());
-    patterns.add<InlineBroadcastOpWithScalarInput>(patterns.getContext());
-    patterns.add<InlineFillOpWithScalarInput>(patterns.getContext());
-    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
-      signalPassFailure();
+  using OpRewritePattern<tensor::InsertSliceOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::InsertSliceOp sliceOp,
+                                PatternRewriter &rewriter) const override {
+    LDBG("Got InsertSliceOp: " << sliceOp);
+    auto source = sliceOp.getSource();
+    auto *sourceOp = source.getdDefiningOp();
+    if (sourceOp->getNumResults() != 1)
+      return failure();
+    Value result = sourceOp->getResults().front();
+    if (!utils::isScalarLike(result))
+      return failure();
+    auto type = result.getType();
+    llvm::SmallVector<Value> indices;
+    auto sourceLoc = sourceOp->getLoc();
+    if (auto shapedType = dyn_cast<shapedType>(type)) {
+      indices.assign(shapedType.getShape().size(),
+                     rewriter.create<arith::ConstantIndexOp>(sourceLoc, 0));
+    } else {
+      return failure();
     }
+    rewriter.setInsertionPointAfter(sourceOp);
+    auto extracted =
+        rewriter.create<tensor::ExtractOp>(sourceLoc, source, indices);
+    auto mixedOffsets = sliceOp.getMixedOffsets();
+    auto offsets =
+        getValueOrCreateConstantIndexOp(rewriter, sourceLoc, mixedOffsets);
+    rewriter.setInsertionPointAfter(extracted);
+    Value inserted = rewriter.create<tensor::InsertOp>(
+        sliceOp.getLoc(), extracted, sliceOp.getDest(), offsets);
+    rewriter.replaceOp(sliceOp, inserted);
+    return success();
   }
-};
+}
+
+namespace {
+  struct HFusionInlineBrcPass
+      : public impl::HFusionInlineBrcBase<HFusionInlineBrcPass> {
+  public:
+    void runOnOperation() override {
+      RewritePatternSet patterns(&getContext());
+      patterns.add<InlineBroadcastOpWithScalarInput>(patterns.getContext());
+      patterns.add<InlineFillOpWithScalarInput>(patterns.getContext());
+      patterns.add<InlineInsertSliceWithScalarInput>(patterns.getContext());
+      if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
+        signalPassFailure();
+      }
+    }
+  };
 } // anonymous namespace
 
 std::unique_ptr<Pass> mlir::hfusion::createHFusionInlineBrcPass() {
