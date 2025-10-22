@@ -652,4 +652,9 @@ def ConvertNonContiguousReshapeToCopy : Pass<"convert-non-contiguous-reshape-to-
   let dependentDialects = ["memref::MemRefDialect", "hivm::HIVMDialect"];
 }
 
+def InsertDuplicateLoad : Pass<"insert-duplicate-load", "func::FuncOp">{
+  let summary = "Duplicate load when the dst is used by cube and vector op at the same time";
+  let constructor = "mlir::hivm::createInsertDuplicateLoadPass()";
+}
+
 #endif // BISHENGIR_DIALECT_HIVM_TRANSFORMS_PASSES_TD
