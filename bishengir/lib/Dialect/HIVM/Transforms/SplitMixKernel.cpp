@@ -228,6 +228,7 @@ void SplitMixKernelPass::filterMixFunc(OpBuilder &builder,
       filterCoreType == TCoreType::CUBE ? TCoreType::VECTOR : TCoreType::CUBE;
 
   SmallVector<Operation *> toSinkOutOfLoop;
+  SmallVector<Operation *> toBeErased;
   mixedFunc.walk<WalkOrder::PostOrder>([&](Operation *op) {
     if (auto forOp = dyn_cast<scf::ForOp>(op)) {
       if (isLoopOfCoreType(forOp, filterCoreType)) {
@@ -242,12 +243,14 @@ void SplitMixKernelPass::filterMixFunc(OpBuilder &builder,
     }
     // If core type does not match, erase the operation
     if (res.value()) {
-      annotateOpOperand(builder, op, coreType);
-      replaceResultWithInitOperand(op);
-      op->erase();
+      toBeErased.push_back(op);
     }
   });
-
+  for (Operation *op : toBeErased) {
+    annotateOpOperand(builder, op, coreType);
+    replaceResultWithInitOperand(op);
+    op->erase();
+  }
   for (Operation *op : toSinkOutOfLoop)
     op->moveAfter(op->getParentOfType<scf::ForOp>());
 }
