@@ -33,6 +33,7 @@ namespace memref {
 std::unique_ptr<Pass> createFoldAllocReshapePass();
 std::unique_ptr<Pass> createDeadStoreEliminationPass();
 std::unique_ptr<Pass> createRemoveRedundantCopyPass();
+std::unique_ptr<Pass> createForwardUnitMemoryPass();
 
 #define GEN_PASS_REGISTRATION
 #include "bishengir/Dialect/MemRef/Transforms/Passes.h.inc"
