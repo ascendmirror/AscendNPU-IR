@@ -154,3 +154,32 @@ func.func @inline_brc_with_splat_dense(%arg0: tensor<1x4x2047x2047xf32>) -> tens
                                                              outs(%3 : tensor<1x4x2047x2047xf32>) -> tensor<1x4x2047x2047xf32>
   return %5 : tensor<1x4x2047x2047xf32>
 }
+
+// -----
+
+// CHECK-LABEL: func.func @test_insert_slice
+// CHECK: %extracted = tensor.extract %[[VAL:.*]]%[[VAL:.*]],%[[VAL:.*]] : tensor<1x1xf16>
+// CHECK: %[[INSERTED:.*]] = tensor.insert %[[VAL:.*]] into %arg0[%arg1, %arg2] : tensor<32x32xf16>
+func.func @test_insert_slice(%arg0: tensor<32x32xf16>, %arg1: index, %arg2: index, %arg3: memref<?xf16> ) -> tensor<32x32xf16>{
+  %c0 = arith.constant 0 : index
+  %reinterpret_cast = memref.reinterpret_cast %arg3 to offset: [%c0], sizes: [1], strides: [1] : memref<?xf16> to memref<1xf16, strided<[1], offset: ?>>
+  %0 = memref.load %reinterpret_cast[%c0] : memref<1xf16, strided<[1], offset: ?>>
+  %1 = tensor.empty() : tensor<1x1xf16>
+  %2 = linalg.fill ins(%0 : f16) outs(%1 : tensor<1x1xf16>) -> tensor<1x1xf16>
+  %inserted_slice = tensor.insert_slice %2 into %arg0[%arg1, %arg2] [1, 1] [32, 1] : tensor<1x1xf16> into tensor<32x32xf16>
+  return %inserted_slice : tensor<32x32xf16>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @test_expanded_insert_slice
+// CHECK: %extracted = tensor.extract %[[VAL:.*]]%[[VAL:.*]],%[[VAL:.*]] : tensor<1x1xi32>
+// CHECK: %[[INSERTED:.*]] = tensor.insert %[[VAL:.*]] into %arg0[%c0, %c0] : tensor<32x32xi32>
+func.func @test_expanded_insert_slice(%arg0: tensor<32x32xi32>, %arg1: index, %arg2: index) -> tensor<32x32xf16>{
+  %c0 = arith.constant 0 : index
+  %alloc_1 = memref.alloc() : memref<1xi32>
+  %1 = bufferization.to_tensor %alloc_1 restrict writable : memref<1xi32>
+  %expanded = tensor.expand_shape %1 [[0, 1]] output_shape [1, 1] : tensor<1xi32> into tensor<1x1xi32>
+  %inserted_slice = tensor.insert_slice %expanded into %arg0[%c0, 0] [1, 1] [1, 1] : tensor<1x1xi32> into tensor<32x32xi32>
+  return %inserted_slice : tensor<32x32xi32>
+}
