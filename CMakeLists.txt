@@ -195,7 +195,7 @@ endif()
 
 if(NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
   install(
-    DIRECTORY include/bishengir
+    DIRECTORY bishengir/include/bishengir
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     COMPONENT bishengir-headers
     FILES_MATCHING
@@ -206,7 +206,7 @@ if(NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
     PATTERN "LICENSE.TXT")
 
   install(
-    DIRECTORY ${BISHENGIR_BINARY_DIR}/include/bishengir
+    DIRECTORY ${BISHENGIR_BINARY_DIR}/bishengir/include/bishengir
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     COMPONENT bishengir-headers
     FILES_MATCHING
