@@ -46,4 +46,13 @@ def RemoveRedundantCopy : Pass<"memref-remove-redundant-copy", "func::FuncOp"> {
   ];
 }
 
+def ForwardUnitMemory
+    : Pass<"memref-forward-unit-memory", "func::FuncOp"> {
+  let summary = "Forward unit memory";
+  let constructor = "mlir::memref::createForwardUnitMemoryPass()";
+  let dependentDialects = [
+    "memref::MemRefDialect",
+  ];
+}
+
 #endif // BISHENGIR_DIALECT_MEMREF_TRANSFORMS_PASSES_TD
