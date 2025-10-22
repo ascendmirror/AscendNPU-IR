@@ -1,6 +1,7 @@
 add_bishengir_library(BiShengIRMemRefTransforms
-  FoldAllocReshape.cpp
   DeadStoreElimination.cpp
+  FoldAllocReshape.cpp
+  ForwardUnitMemory.cpp
   RemoveRedundantCopy.cpp
   PropagateReshape/PropagateMemrefCollapseDown.cpp
   PropagateReshape/PropagateMemrefExpandUp.cpp
