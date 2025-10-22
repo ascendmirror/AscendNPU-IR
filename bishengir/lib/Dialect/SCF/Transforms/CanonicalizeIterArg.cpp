@@ -15,7 +15,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/Interfaces/LoopLikeInterface.h"
+#include "mlir/Transforms/CSE.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/Support/Debug.h"
 
@@ -30,54 +33,92 @@ namespace mlir {
 
 using namespace mlir;
 
-/// "Unchanged" in this context means it is not modified before being passed
-/// back to the yield. Here we check specifically for nested scf structures.
-static bool isIterArgUnchanged(Value yielded, BlockArgument iterArg,
-                               SetVector<Value> &possibleInitAlias) {
-  possibleInitAlias.insert(yielded);
+static void handleIfElse(scf::IfOp ifOp, OpResult ifResult,
+                         SetVector<Value> &equivalenceSet,
+                         SmallVector<Value> &dfsStack) {
+  // Add defined trace value to tentative list
+  equivalenceSet.insert(ifResult);
+  unsigned pos = ifResult.getResultNumber();
+  dfsStack.push_back(ifOp.thenYield().getOperand(pos));
+  dfsStack.push_back(ifOp.elseYield().getOperand(pos));
+}
 
-  if (yielded == iterArg)
-    return true;
+static void handleLoops(LoopLikeOpInterface loop, BlockArgument iterArg,
+                        SetVector<Value> &equivalenceSet,
+                        SmallVector<Value> &dfsStack) {
+  equivalenceSet.insert(loop.getTiedLoopResult(iterArg));
+  equivalenceSet.insert(iterArg);
+  dfsStack.push_back(loop.getTiedLoopYieldedValue(iterArg)->get());
+  dfsStack.push_back(loop.getTiedLoopInit(iterArg)->get());
+}
 
-  auto loop =
-      dyn_cast<LoopLikeOpInterface>(iterArg.getParentBlock()->getParentOp());
-  assert(loop && "expecting iterarg to be block argument of loop-like op");
-  Value tiedInit = loop.getTiedLoopInit(iterArg)->get();
-  if (tiedInit == yielded)
-    return true;
+/// Try to use proof by contradiction to prove whether or not the block arg
+/// remains unchanged throughout all iterations
+static bool isIterArgUnchanged(LoopLikeOpInterface loop, BlockArgument arg,
+                               SetVector<Value> &equivalenceSet) {
+  Value initVal = loop.getTiedLoopInit(arg)->get();
+  // Build tentative equivalence set
+  equivalenceSet.insert(arg);
+  equivalenceSet.insert(initVal);
+  Value resultVal = loop.getTiedLoopResult(arg);
+  equivalenceSet.insert(resultVal);
 
-  auto res = dyn_cast<OpResult>(yielded);
-  // Don't think block argument will be valid in this case
-  if (!res)
-    return false;
-  unsigned resNo = res.getResultNumber();
-  Operation *defining = res.getOwner();
-  // The yielded value is different than init value at first glance, value is
-  // defined outside the loop, but is a different than the init value.
-  if (!loop->isAncestor(defining))
-    return false;
+  // Used to trace within nested scf structures
+  SmallVector<Value> dfsStack;
+  Value yieldVal = loop.getTiedLoopYieldedValue(arg)->get();
+  dfsStack.push_back(yieldVal);
+  while (!dfsStack.empty()) {
+    Value traceUp = dfsStack.pop_back_val();
 
-  // For IfOps, it is "unchanged" if both its yielded value are the same value
-  if (auto ifOp = dyn_cast<scf::IfOp>(defining)) {
-    Value thenYieldVal = ifOp.thenYield().getOperand(resNo);
-    // Since ifOp has a result, it must also have an else block
-    Value elseYieldVal = ifOp.elseYield().getOperand(resNo);
-    return isIterArgUnchanged(thenYieldVal, iterArg, possibleInitAlias) &&
-           isIterArgUnchanged(elseYieldVal, iterArg, possibleInitAlias);
+    // If we've already traced this value (init or iter arg), then this branch
+    // holds equivalence
+    LLVM_DEBUG(llvm::dbgs() << "\tTracing " << traceUp << "\n");
+    if (equivalenceSet.contains(traceUp))
+      continue;
+
+    // Value could be block arg or result, get the defining operation either way
+    Operation *defining = nullptr;
+    BlockArgument innerArg = nullptr;
+    auto opResult = dyn_cast<OpResult>(traceUp);
+    if (opResult) {
+      defining = opResult.getOwner();
+    } else {
+      assert(isa<BlockArgument>(traceUp) &&
+             "Expecting non-OpResult value to be block argument");
+      innerArg = cast<BlockArgument>(traceUp);
+      defining = innerArg.getParentBlock()->getParentOp();
+    }
+
+    // If the current value's defining op is not within the scope of the current
+    // loop being checked, we assume its not equivalent
+    if (!loop->isAncestor(defining)) {
+      LLVM_DEBUG(llvm::dbgs() << "\tNot ancestor\n");
+      return false;
+    }
+
+    // Trace both branches of the if op while adding the corresponding result to
+    // the equivalence set
+    if (auto ifOp = dyn_cast<scf::IfOp>(defining)) {
+      handleIfElse(ifOp, opResult, equivalenceSet, dfsStack);
+      continue;
+    }
+
+    auto innerLoop = dyn_cast<LoopLikeOpInterface>(defining);
+    // If the defining operation is not a loop/if op, then we say its unsafe to
+    // assume equivalence
+    if (!innerLoop) {
+      LLVM_DEBUG(llvm::dbgs() << "\tNot scf\n");
+      return false;
+    }
+
+    // Add values defined by the loop to tentative list, and trace values used
+    // by the loop
+    if (opResult)
+      innerArg = innerLoop.getTiedLoopRegionIterArg(opResult);
+
+    handleLoops(innerLoop, innerArg, equivalenceSet, dfsStack);
   }
-
-  // ForOps doesn't change the iterarg on each iteration if itself doesn't
-  // change its corresponding iterArg, also if its init value is the same as
-  // the iter arg
-  if (auto innerLoop = dyn_cast<LoopLikeOpInterface>(defining)) {
-    return isIterArgUnchanged(innerLoop.getInits()[resNo], iterArg,
-                              possibleInitAlias) &&
-           isIterArgUnchanged(innerLoop.getYieldedValues()[resNo],
-                              innerLoop.getRegionIterArgs()[resNo],
-                              possibleInitAlias);
-  }
-  // We don't check other cases... for now (tm)
-  return false;
+  return true;
 }
 
 namespace {
@@ -88,26 +129,40 @@ public:
   using OpRewritePattern<LoopT>::OpRewritePattern;
   LogicalResult
   matchAndRewrite(LoopT op, mlir::PatternRewriter &rewriter) const override {
+    LLVM_DEBUG(llvm::dbgs()
+               << "\n\n========================================================"
+                  "========================For loop\n"
+               << op << "\n\n");
     bool changed = false;
-    SetVector<Value> possibleInitAlias;
+    Operation *parentOp = op->getParentOp();
+    DominanceInfo domInfo(parentOp);
+    eliminateCommonSubExpressions(rewriter, domInfo, parentOp, &changed);
+
+    SetVector<Value> equivalenceSet;
     for (BlockArgument arg : op.getRegionIterArgs()) {
       Value yieldVal = op.getTiedLoopYieldedValue(arg)->get();
       Value initVal = op.getTiedLoopInit(arg)->get();
       Value resultVal = op.getTiedLoopResult(arg);
       // Additional check to make sure we didn't clean this already
-      if (yieldVal != initVal &&
-          isIterArgUnchanged(yieldVal, arg, possibleInitAlias)) {
-        LLVM_DEBUG(llvm::dbgs()
-                   << "Matched " << yieldVal << "\n\tas unchanged\n\n");
-        while (!possibleInitAlias.empty()) {
-          Value alias = possibleInitAlias.pop_back_val();
-          if (alias != initVal)
-            alias.replaceAllUsesWith(initVal);
-        }
+      if (yieldVal == initVal) {
+        if (resultVal.use_empty())
+          continue;
         resultVal.replaceAllUsesWith(initVal);
         changed = true;
       }
-      possibleInitAlias.clear();
+      if (!isIterArgUnchanged(op, arg, equivalenceSet)) {
+        equivalenceSet.clear();
+        continue;
+      }
+
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Matched " << yieldVal << "\n\tas unchanged\n\n");
+      while (!equivalenceSet.empty()) {
+        Value alias = equivalenceSet.pop_back_val();
+        if (alias != initVal)
+          alias.replaceAllUsesWith(initVal);
+      }
+      changed = true;
     }
     return success(changed);
   }
@@ -119,6 +174,7 @@ struct CanonicalizeIterArgPass
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
+    tensor::populateFoldTensorEmptyPatterns(patterns);
     patterns.insert<CanonicalizeIterArgPattern<scf::ForOp>,
                     CanonicalizeIterArgPattern<scf::WhileOp>>(
         patterns.getContext());
