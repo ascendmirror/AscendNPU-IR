@@ -244,10 +244,9 @@ void SplitMixKernelPass::filterMixFunc(OpBuilder &builder,
     if (res.value()) {
       annotateOpOperand(builder, op, coreType);
       replaceResultWithInitOperand(op);
-      op->erase();
+      op->erase(); 
     }
   });
-
   for (Operation *op : toSinkOutOfLoop)
     op->moveAfter(op->getParentOfType<scf::ForOp>());
 }

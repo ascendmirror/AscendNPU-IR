@@ -356,12 +356,14 @@ tracebackMemRefVecByTargetFn(Value memrefVal,
 /// Try to trace back the current mermef-typed value to the source value.
 /// This function always return a value.
 Value tracebackMemRef(Value memrefVal);
+SmallVector<Value> tracebackMemRefs(Value memrefVal);
 
 /// Try to trace back the current mermef-typed value to the source
 /// `mermef.alloc`.
 /// Return `std::nullopt` if max-iteration is reached, or that the value doesn't
 /// originate from a alloc op.
 std::optional<memref::AllocOp> tracebackMemRefToAlloc(Value memrefVal);
+std::optional<SmallVector<memref::AllocOp>> tracebackMemRefsToAlloc(Value memrefVal);
 
 void fillAncestorOfOperation(SmallPtrSet<Operation *, 3> &container,
                              Operation *op);
