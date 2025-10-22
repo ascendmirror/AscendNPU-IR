@@ -555,10 +555,47 @@ struct DuplicateTensorExtractForCube
 };
 
 template <typename OpType>
+struct InsertStoreForSCFYieldAfterVector
+    : public OpRewritePattern<hivm::MmadL1Op> {
+  using OpRewritePattern<hivm::MmadL1Op>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(hivm::MmadL1Op mmadop,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<OpOperand *> consumerOperands;
+    for (OpOperand &operand : mmadop->getOpOperands()) {
+      auto blockArg = dyn_cast_if_present<BlockArgument>(operand.get());
+      if (!blockArg) {
+        continue;
+      }
+      auto scfForOp = 
+          dyn_cast_if_present<scf::ForOp>(blockArg.getOwner()->getParentOp());
+      if (!scfForOp) {
+        continue;
+      }
+      OpOperand *initArgs = scfForOp.getTiedLoopInit(blockArg);
+      if (traceDefOp<hivm::StoreOp>(initArgs->get()).has_value() ||
+          traceDefOp<hivm::FixpipeOp>(initArgs->get()).has_value()) {
+        continue;
+      }
+      OpOperand *yieldOperand = scfForOp.getTiedLoopYieldedValue(blockArg);
+      if (traceDefOp<hivm::LoadOp>(yieldOperand->get()).has_value()) {
+        continue;
+      }
+      if (traceDefOp<OpType>(yieldOperand->get()).has_value()) {
+        consumerOperands.push_back(yieldOperand);
+      }
+    }
+    return insertLoadStoreOp(rewriter, mmadop.getLoc(), consumerOperands,
+                            InsertMode::LoadAndStore);
+  }
+};
+
+template <typename OpType>
 static void registerOne(RewritePatternSet &patterns) {
   patterns.add<InsertLoadStoreOpBetweenVectorAndCube<OpType>,
                InsertStoreOpBetweenVectorAndLoad<OpType>,
-               InsertLoadOpBetweenStoreLikeAndVectorOrCube<OpType>>(
+               InsertLoadOpBetweenStoreLikeAndVectorOrCube<OpType>,
+               InsertStoreForSCFYieldAfterVector<OpType>>(
       patterns.getContext());
 }
 

@@ -57,6 +57,7 @@ SmallVector<Value> tracebackImpl(Value memrefVal) {
             dyn_cast<scf::ForOp>(arg.getParentRegion()->getParentOp())) {
       if (arg.getArgNumber() > 0 &&
           forOp.getInitArgs().size() > arg.getArgNumber() - 1) {
+
         result.emplace_back(forOp.getInitArgs()[arg.getArgNumber() - 1]);
         result.emplace_back(forOp.getYieldedValues()[arg.getArgNumber() - 1]);
       }
@@ -265,8 +266,19 @@ checkUsersAllWithCondition(Value v, Operation *rootOp,
       assert(parentOp && "parent op cannot be nullptr");
       auto resCheck = checkUsersAllWithCondition(parentOp->getResult(resNum),
                                                  rootOp, condFn, skipFn);
-      if (!resCheck.has_value())
+      scf::ForOp forOp = cast<scf::ForOp>(parentOp);
+      std::optional<bool> regionIterArgCheck = std::nullopt;
+      if (forOp) 
+        regionIterArgCheck = checkUsersAllWithCondition(
+            forOp.getRegionIterArg(resNum), rootOp, condFn, skipFn);
+      if (!resCheck.has_value()) {
+        if (!regionIterArgCheck.has_value())
+          continue;
+        if (!regionIterArgCheck.value())
+          return false;
+        flag = true;
         continue;
+      }
 
       if (!resCheck.value())
         return false;
@@ -886,6 +898,14 @@ Value utils::tracebackMemRef(Value memrefVal) {
   return memrefValues[0];
 }
 
+SmallVector<Value> utils::tracebackMemRefs(Value memrefVal) {
+  SmallVector<Value> memrefValues = utils::tracebackMemRefVec(memrefVal);
+  if (memrefValues.empty()) {
+    return {memrefVal};
+  }
+  return memrefValues;
+}
+
 SmallVector<Value>
 utils::tracebackMemRefVecByTargetFn(Value memrefVal,
                                     std::function<bool(Value)> targetFn) {
@@ -925,6 +945,17 @@ std::optional<memref::AllocOp> utils::tracebackMemRefToAlloc(Value memrefVal) {
   return utils::isAllocLikeOp(tracedValue)
              ? tracedValue.getDefiningOp<memref::AllocOp>()
              : std::optional<memref::AllocOp>();
+}
+
+std::optional<SmallVector<memref::AllocOp>> 
+utils::tracebackMemRefsToAlloc(Value memrefVal) {
+  auto tracedValue = utils::tracebackMemRefs(memrefVal);
+  return llvm::all_of(tracedValue,
+                      [&](Value &val) { return utils::isAllocLikeOp(val); })
+             ? SmallVector<memref::AllocOp>(llvm::map_range(
+                   tracedValue,
+                   [](Value v) { return v.getDefiningOp<memref::AllocOp>(); }))
+             : std::optional<SmallVector<memref::AllocOp>>();
 }
 
 namespace reshape_utils {
