@@ -84,6 +84,8 @@ def AutoSchedule : Pass<"hfusion-auto-schedule", "ModuleOp"> {
               "allow cube tiling params tuning">,
        Option<"externalTilingFuncPath", "external-tiling-func-path", "std::string",
               "\"-\"", "auto add external tiling func">,
+       Option<"enableSymbolAnalysis", "enable-symbol-analysis", "bool",
+              "false", "Enable symbol analysis for tiling and fusion">,
   ];
 }
 

@@ -142,3 +142,52 @@ func.func @test_fold_symbol_to_tensor_empty(%arg0: tensor<?x1152xbf16>, %arg1: t
        outs(%1 : tensor<?x1024x1152xf32>) -> tensor<?x1024x1152xf32>
   return %2 : tensor<?x1024x1152xf32>
 }
+
+// -----
+
+// CHECK-LABEL: test_unify_same_operands_and_result_shape_0(
+// CHECK: %[[S0:.*]] = symbol.symbolic_int
+// CHECK-NOT: symbol.symbolic_int
+// CHECK: symbol.bind_symbolic_shape {{.*}} [%[[S0]]], affine_map<()[s0] -> (s0, 1024, 1152)>
+func.func @test_unify_same_operands_and_result_shape_0(%arg0: tensor<?x1024x1152xf32>, %arg1: tensor<?x1024x1152xf32>,
+          %arg2: i64, %arg3: i64, %arg4: i64, %arg5: i64, %arg6: i64, %arg7: i64, %arg8: i64) -> tensor<?x1024x1152xf16> {
+
+  %size = arith.index_cast %arg2 : i64 to index
+  %dst = tensor.empty(%size) : tensor<?x1024x1152xf32>
+  %load = hfusion.load ins(%arg0 : tensor<?x1024x1152xf32>) 
+          outs(%dst : tensor<?x1024x1152xf32>) -> tensor<?x1024x1152xf32>
+
+  %0 = arith.index_cast %arg3 : i64 to index
+  %1 = tensor.empty(%0) : tensor<?x1024x1152xf32>
+  %2 = linalg.elemwise_binary {fun = #linalg.binary_fn<mul>} 
+       ins(%load, %arg1 : tensor<?x1024x1152xf32>, tensor<?x1024x1152xf32>)
+       outs(%1 : tensor<?x1024x1152xf32>) -> tensor<?x1024x1152xf32>
+  
+  %3 = arith.index_cast %arg4 : i64 to index
+  %4 = tensor.empty(%3) : tensor<?x1024x1152xf32>
+  %5 = hfusion.elemwise_binary {fun = #hfusion.binary_fn<maxf>}
+       ins(%2, %arg1 : tensor<?x1024x1152xf32>, tensor<?x1024x1152xf32>)
+       outs(%4 : tensor<?x1024x1152xf32>) -> tensor<?x1024x1152xf32>
+  
+  %6 = arith.index_cast %arg5 : i64 to index
+  %7 = tensor.empty(%6) : tensor<?x1024x1152xf32>
+  %8 = linalg.elemwise_unary {fun = #linalg.unary_fn<log>} 
+       ins(%5 : tensor<?x1024x1152xf32>) outs(%7 : tensor<?x1024x1152xf32>) -> tensor<?x1024x1152xf32>
+
+  %9 = arith.index_cast %arg6 : i64 to index
+  %10 = tensor.empty(%9) : tensor<?x1024x1152xf32>
+  %11 = hfusion.elemwise_unary {fun = #hfusion.unary_fn<rec>} 
+        ins(%8 : tensor<?x1024x1152xf32>) outs(%10 : tensor<?x1024x1152xf32>) -> tensor<?x1024x1152xf32>
+
+  %12 = arith.index_cast %arg7 : i64 to index
+  %13 = tensor.empty(%12) : tensor<?x1024x1152xf16>
+  %cast = hfusion.cast {round_mode = #hfusion.round_mode<round>} 
+          ins(%11 : tensor<?x1024x1152xf32>) 
+          outs(%13 : tensor<?x1024x1152xf16>) -> tensor<?x1024x1152xf16>
+
+  %14 = arith.index_cast %arg8 : i64 to index
+  %15 = tensor.empty(%14) : tensor<?x1024x1152xf16>
+  %store = hfusion.store ins(%cast : tensor<?x1024x1152xf16>) 
+           outs(%15 : tensor<?x1024x1152xf16>) -> tensor<?x1024x1152xf16>
+  return %store : tensor<?x1024x1152xf16>
+}
