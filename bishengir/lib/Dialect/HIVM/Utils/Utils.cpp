@@ -83,6 +83,23 @@ FailureOr<memref::AllocOp> getMemRefForBlockArgument(BlockArgument bbArg) {
   return bbParentOp->emitError("Unsupported block op type");
 }
 
+/// Find the root memerf alloc for yield op.
+FailureOr<memref::AllocOp> getMemRefForBlockArgumentFromYield(BlockArgument bbArg) {
+  auto *bbOwner = bbArg.getOwner();
+  if (!bbOwner) {
+    llvm_unreachable("parentOp doesn't exist");
+    return failure();
+  }
+  auto *bbParentOp = bbOwner->getParentOp();
+  if (!bbParentOp)
+    return failure();
+  if (auto loopOp = dyn_cast<LoopLikeOpInterface>(bbParentOp)) {
+    auto *operand = loopOp.getTiedLoopYieldedValue(bbArg);
+    return getMemRefAlloc(operand->get());
+  }
+  return bbParentOp->emitError("Unsupported block op type");
+}
+
 /// Find the root memerf alloc for the OpResult.
 FailureOr<memref::AllocOp> getMemRefForOpResult(OpResult result) {
   return TypeSwitch<Operation *, FailureOr<memref::AllocOp>>(
@@ -225,6 +242,15 @@ Value createNestedIndexModularUsingLoopInfo(
 FailureOr<memref::AllocOp> getMemRefAlloc(Value operand) {
   if (auto bbArg = dyn_cast<BlockArgument>(operand)) {
     return getMemRefForBlockArgument(bbArg);
+  }
+  auto result = dyn_cast<OpResult>(operand);
+  assert(result != nullptr);
+  return getMemRefForOpResult(result);
+}
+
+FailureOr<memref::AllocOp> getMemRefAllocFromYield(Value operand) {
+  if (auto bbArg = dyn_cast<BlockArgument>(operand)) {
+    return getMemRefForBlockArgumentFromYield(bbArg);
   }
   auto result = dyn_cast<OpResult>(operand);
   assert(result != nullptr);
