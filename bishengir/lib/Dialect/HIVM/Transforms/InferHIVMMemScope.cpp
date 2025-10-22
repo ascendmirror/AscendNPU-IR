@@ -184,21 +184,21 @@ LogicalResult hivm::inferAndPropagateMemScopeForMmadL1(hivm::MmadL1Op op) {
   auto *mC = op.getDpsInitOperand(0);
 
   // mA, mB and mC must originate from an AllocOP
-  auto allocA = utils::tracebackMemRefToAlloc(mA->get());
-  auto allocB = utils::tracebackMemRefToAlloc(mB->get());
-  auto allocC = utils::tracebackMemRefToAlloc(mC->get());
+  auto allocAs = utils::tracebackMemRefsToAlloc(mA->get());
+  auto allocBs = utils::tracebackMemRefsToAlloc(mB->get());
+  auto allocCs = utils::tracebackMemRefsToAlloc(mC->get());
 
-  if (!allocA.has_value()) {
+  if (!allocAs.has_value()) {
     emitError(op.getLoc())
         << "Cannot find root memref.alloc for mA of this op.";
     return failure();
   }
-  if (!allocB.has_value()) {
+  if (!allocBs.has_value()) {
     emitError(op.getLoc())
         << "Cannot find root memref.alloc for mB of this op.";
     return failure();
   }
-  if (!allocC.has_value()) {
+  if (!allocCs.has_value()) {
     emitError(op.getLoc())
         << "Cannot find root memref.alloc for mC of this op.";
     return failure();
@@ -212,22 +212,28 @@ LogicalResult hivm::inferAndPropagateMemScopeForMmadL1(hivm::MmadL1Op op) {
   MemScopeInferAndPropagateHelper helper;
 
   // For MmadL1Op, operand mA should be in L1.
-  if (failed(helper.Run(*allocA, l1SpaceAttr))) {
-    return op->emitOpError("Failed to infer/propagate memory scope for mA");
+  for (memref::AllocOp allocA : *allocAs) {
+    if (failed(helper.Run(allocA, l1SpaceAttr))) {
+      return op->emitOpError("Failed to infer/propagate memory scope for mA");
+    }
   }
   LDBG("IR after setting mem scope for mA:\n"
        << *(op->getParentOfType<ModuleOp>()));
 
   // For MmadL1Op, operand mB should be in L1.
-  if (failed(helper.Run(*allocB, l1SpaceAttr))) {
-    return op->emitOpError("Failed to infer/propagate memory scope for mB");
+  for (memref::AllocOp allocB : *allocBs) {
+    if (failed(helper.Run(allocB, l1SpaceAttr))) {
+      return op->emitOpError("Failed to infer/propagate memory scope for mB");
+    }
   }
   LDBG("IR after setting mem scope for mB:\n"
        << *(op->getParentOfType<ModuleOp>()));
 
   // For MmadL1Op, operand mC should be in L0C.
-  if (failed(helper.Run(*allocC, l0cSpaceAttr))) {
-    return op->emitOpError("Failed to infer/propagate memory scope for mC");
+  for (memref::AllocOp allocC : *allocCs) {
+    if (failed(helper.Run(allocC, l0cSpaceAttr))) {
+      return op->emitOpError("Failed to infer/propagate memory scope for mC");
+    }
   }
   LDBG("IR after setting mem scope for mC:\n"
        << *(op->getParentOfType<ModuleOp>()));
