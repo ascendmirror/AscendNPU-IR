@@ -27,6 +27,7 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/TypeRange.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -389,13 +390,29 @@ struct LinalgToHFusionReduceWithIndex : OpRewritePattern<linalg::ReduceOp> {
       return failure();
     }
 
+    StringAttr linalgTieBreakAttr =
+        op->getAttrOfType<StringAttr>(StringRef("tie_break_left"));
+    if (!linalgTieBreakAttr) {
+      return failure();
+    }
+
+    bool tieBreakLeft;
+    if (linalgTieBreakAttr == "false") {
+      tieBreakLeft = false;
+    } else if (linalgTieBreakAttr == "true") {
+      tieBreakLeft = true;
+    } else {
+      return failure();
+    }
+
     ValueRange inits = op.getInits();
     auto reduceKindAttr =
         ReduceWithIndexKindAttr::get(rewriter.getContext(), reduceKind);
+    auto tieBreakLeftAttr = BoolAttr::get(rewriter.getContext(), tieBreakLeft);
     rewriter.replaceOpWithNewOp<hfusion::ReduceWithIndexOp>(
         op, TypeRange{inits[0].getType(), inits[1].getType()},
         /*input*/ op.getInputs(), /*outputValue&Index*/ inits, reduceKindAttr,
-        op.getDimensionsAttr());
+        tieBreakLeftAttr, op.getDimensionsAttr());
     return success();
   }
 };

@@ -460,8 +460,8 @@ func.func @test_tensor_cast_i32_f32(
 func.func @test_reduce_with_index_without_index_input(
   %input : memref<6x7xf32>,
   %output : memref<6xf32>, %output_index : memref<6xi32>) {
-  // CHECK: hfusion.reduce_with_index <min>
-  hfusion.reduce_with_index <min> 
+  // CHECK: hfusion.reduce_with_index {tie_break_left = true} <min>
+  hfusion.reduce_with_index {tie_break_left = true} <min> 
     ins(%input : memref<6x7xf32>)
     outs(%output, %output_index : memref<6xf32>, memref<6xi32>)
     dimensions = [1]
@@ -474,8 +474,8 @@ func.func @test_reduce_with_index_without_index_input(
 func.func @test_tensor_reduce_with_index_without_index_input(
   %input : tensor<6x7xf32>,
   %output : tensor<6xf32>, %output_index : tensor<6xi32>) {
-  // CHECK: hfusion.reduce_with_index <min>
-  %data, %index = hfusion.reduce_with_index <min>
+  // CHECK: hfusion.reduce_with_index {tie_break_left = true} <min>
+  %data, %index = hfusion.reduce_with_index {tie_break_left = true} <min>
     ins(%input : tensor<6x7xf32>)
     outs(%output, %output_index : tensor<6xf32>, tensor<6xi32>)
     dimensions = [1]
@@ -489,8 +489,8 @@ func.func @test_tensor_reduce_with_index_without_index_input(
 func.func @test_reduce_with_index_with_index_input(
   %input : memref<6x7xf32>, %input_index : memref<6x7xi32>,
   %output : memref<7xf32>, %output_index : memref<7xi32>) {
-  // CHECK: hfusion.reduce_with_index <max>
-  hfusion.reduce_with_index <max> 
+  // CHECK: hfusion.reduce_with_index {tie_break_left = true} <max>
+  hfusion.reduce_with_index {tie_break_left = true} <max> 
     ins(%input, %input_index : memref<6x7xf32>, memref<6x7xi32>)
     outs(%output, %output_index : memref<7xf32>, memref<7xi32>)
     dimensions = [0]
@@ -503,8 +503,8 @@ func.func @test_reduce_with_index_with_index_input(
 func.func @test_tensor_reduce_with_index_with_index_input(
   %input : tensor<6x7xf32>, %input_index : tensor<6x7xi32>,
   %output : tensor<7xf32>, %output_index : tensor<7xi32>) {
-  // CHECK: hfusion.reduce_with_index <max>
-  %data, %index = hfusion.reduce_with_index <max>
+  // CHECK: hfusion.reduce_with_index {tie_break_left = true} <max>
+  %data, %index = hfusion.reduce_with_index {tie_break_left = true} <max>
     ins(%input, %input_index : tensor<6x7xf32>, tensor<6x7xi32>)
     outs(%output, %output_index : tensor<7xf32>, tensor<7xi32>)
     dimensions = [0]
@@ -518,8 +518,8 @@ func.func @test_tensor_reduce_with_index_with_index_input(
 func.func @test_reduce_with_index_without_index_input_int(
   %input : memref<6x7xi32>,
   %output : memref<6xi32>, %output_index : memref<6xi32>) {
-  // CHECK: hfusion.reduce_with_index <max>
-  hfusion.reduce_with_index <max> 
+  // CHECK: hfusion.reduce_with_index {tie_break_left = true} <max>
+  hfusion.reduce_with_index {tie_break_left = true} <max> 
     ins(%input : memref<6x7xi32>)
     outs(%output, %output_index : memref<6xi32>, memref<6xi32>)
     dimensions = [1]
@@ -532,8 +532,8 @@ func.func @test_reduce_with_index_without_index_input_int(
 func.func @test_reduce_with_index_with_index_input_int(
   %input : memref<6x7xi32>, %input_index : memref<6x7xi32>,
   %output : memref<7xi32>, %output_index : memref<7xi32>) {
-  // CHECK: hfusion.reduce_with_index <min>
-  hfusion.reduce_with_index <min> 
+  // CHECK: hfusion.reduce_with_index {tie_break_left = true} <min>
+  hfusion.reduce_with_index {tie_break_left = true} <min> 
     ins(%input, %input_index : memref<6x7xi32>, memref<6x7xi32>)
     outs(%output, %output_index : memref<7xi32>, memref<7xi32>)
     dimensions = [0]
@@ -582,7 +582,7 @@ func.func @test_reduce_with_index_negative_dimension(
   %input : memref<6x7xi32>,
   %output : memref<6xi32>, %output_index : memref<6xi32>) {
   // expected-error @+1 {{dimensions for reduction should be in the range [0, 1]}}
-  hfusion.reduce_with_index <max>
+  hfusion.reduce_with_index {tie_break_left = true} <max>
     ins(%input : memref<6x7xi32>)
     outs(%output, %output_index : memref<6xi32>, memref<6xi32>)
     dimensions = [-1]
@@ -595,7 +595,7 @@ func.func @test_reduce_with_index_out_of_bound_dimension(
   %input : memref<6x7xi32>,
   %output : memref<6xi32>, %output_index : memref<6xi32>) {
   // expected-error @+1 {{dimensions for reduction should be in the range [0, 1]}}
-  hfusion.reduce_with_index <max>
+  hfusion.reduce_with_index {tie_break_left = true} <max>
     ins(%input : memref<6x7xi32>)
     outs(%output, %output_index : memref<6xi32>, memref<6xi32>)
     dimensions = [2]
@@ -608,7 +608,7 @@ func.func @test_reduce_with_index_decreasing(
   %input : memref<6x7xi32>,
   %output : memref<6xi32>, %output_index : memref<6xi32>) {
   // expected-error @+1 {{dense array attribute should be in increasing order}}
-  hfusion.reduce_with_index <max>
+  hfusion.reduce_with_index {tie_break_left = true} <max>
     ins(%input : memref<6x7xi32>)
     outs(%output, %output_index : memref<6xi32>, memref<6xi32>)
     dimensions = [1, 0]
@@ -621,7 +621,7 @@ func.func @test_reduce_with_index_non_increasing(
   %input : memref<6x7xi32>,
   %output : memref<6xi32>, %output_index : memref<6xi32>) {
   // expected-error @+1 {{dense array attribute should be in increasing order}}
-  hfusion.reduce_with_index <max>
+  hfusion.reduce_with_index {tie_break_left = true} <max>
     ins(%input : memref<6x7xi32>)
     outs(%output, %output_index : memref<6xi32>, memref<6xi32>)
     dimensions = [0, 0]
@@ -634,7 +634,7 @@ func.func @test_reduce_with_index_all(
   %input : memref<6x7xi32>,
   %output : memref<6xi32>, %output_index : memref<6xi32>) {
   // expected-error @+1 {{only supports one reduction dimension}}
-  hfusion.reduce_with_index <max>
+  hfusion.reduce_with_index {tie_break_left = true} <max>
     ins(%input : memref<6x7xi32>)
     outs(%output, %output_index : memref<6xi32>, memref<6xi32>)
     dimensions = [0, 1]

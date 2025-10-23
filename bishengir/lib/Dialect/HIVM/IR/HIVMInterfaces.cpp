@@ -33,6 +33,7 @@
 #include "bishengir/Dialect/HIVM/Interfaces/ExtraBufferOpInterface.cpp.inc"
 #include "bishengir/Dialect/HIVM/Interfaces/FlattenInterface.cpp.inc"
 #include "bishengir/Dialect/HIVM/Interfaces/ImplByScalarOpInterface.cpp.inc"
+#include "bishengir/Dialect/HIVM/Interfaces/LibraryFunctionOpInterface.cpp.inc"
 #include "bishengir/Dialect/HIVM/Interfaces/OpLayoutInterface.cpp.inc"
 #include "bishengir/Dialect/HIVM/Interfaces/OpPipeInterface.cpp.inc"
 #include "bishengir/Interfaces/AggregatedOpInterface.cpp.inc"
