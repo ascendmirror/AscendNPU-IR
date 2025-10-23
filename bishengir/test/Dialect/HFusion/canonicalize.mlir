@@ -234,7 +234,7 @@ func.func @test_reduce_with_index_canonicalized_to_linalg(%arg0: tensor<24x768x7
   %1 = linalg.fill ins(%c0_i64 : i64) outs(%0 : tensor<24x768xi64>) -> tensor<24x768xi64>
   %2 = tensor.empty() : tensor<24x768xf32>
   %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<24x768xf32>) -> tensor<24x768xf32>
-  %4:2 = hfusion.reduce_with_index <max> ins(%arg0 : tensor<24x768x768xf32>) outs(%3, %1 : tensor<24x768xf32>, tensor<24x768xi64>) dimensions = [2] -> tensor<24x768xf32>, tensor<24x768xi64>
+  %4:2 = hfusion.reduce_with_index {tie_break_left = true} <max> ins(%arg0 : tensor<24x768x768xf32>) outs(%3, %1 : tensor<24x768xf32>, tensor<24x768xi64>) dimensions = [2] -> tensor<24x768xf32>, tensor<24x768xi64>
   %expanded = tensor.expand_shape %4#0 [[0], [1, 2]] output_shape [24, 768, 1] : tensor<24x768xf32> into tensor<24x768x1xf32>
   return %expanded : tensor<24x768x1xf32>
 }
