@@ -18,6 +18,7 @@
 #include "bishengir/Dialect/HIVM/Utils/Utils.h"
 #include "bishengir/Dialect/Utils/Util.h"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/TypeUtilities.h"
 #include <algorithm>
 
@@ -595,6 +596,31 @@ Value calculateResFloatArgMinArgMax(RewriterBase &rewriter, hivm::VReduceOp op,
   return res;
 }
 
+template <typename SCALAROP>
+std::pair<Value, Value> getIndexTensorForArgmaxArgmin(
+    Type elemType, RewriterBase &rewriter, hivm::VReduceOp op,
+    llvm::SmallVector<Value, 4> scalarInputs,
+    llvm::SmallVector<Value, 4> scalarIndx, Value index,
+    arith::CmpIPredicate intPred, arith::CmpFPredicate floatPred) {
+
+  Value resTensor;
+  Value resIndex;
+  if (elemType.isInteger()) {
+    resIndex = calculateIndexIntegerArgMinArgMax(rewriter, op, scalarInputs,
+                                                 scalarIndx, intPred,
+                                                 scalarInputs[1], index);
+    resTensor = getScalarResult<hivm::VMinOp, SCALAROP>(rewriter, op.getLoc(),
+                                                        scalarInputs);
+  } else {
+    resIndex =
+        calculateIndexFloatArgMinArgMax(rewriter, op, scalarInputs, scalarIndx,
+                                        floatPred, scalarInputs[1], index);
+    resTensor = calculateResFloatArgMinArgMax(rewriter, op, scalarInputs,
+                                              floatPred, scalarInputs[1]);
+  }
+  return {resIndex, resTensor};
+}
+
 llvm::SmallVector<Value>
 createScalarReduceComputeOp(RewriterBase &rewriter, hivm::VReduceOp op,
                             llvm::SmallVector<Value, 4> scalarInputs,
@@ -625,37 +651,29 @@ createScalarReduceComputeOp(RewriterBase &rewriter, hivm::VReduceOp op,
   case hivm::ReduceOperation::xori:
     resTensor = rewriter.create<arith::XOrIOp>(op.getLoc(), scalarInputs);
     break;
-  case hivm::ReduceOperation::min_with_index:
-    if (elemType.isInteger()) {
-      resIndex = calculateIndexIntegerArgMinArgMax(
-          rewriter, op, scalarInputs, scalarIndx, arith::CmpIPredicate::sgt,
-          scalarInputs[1], index);
-      resTensor = getScalarResult<hivm::VMinOp, arith::MinSIOp>(
-          rewriter, op.getLoc(), scalarInputs);
-    } else {
-      resIndex = calculateIndexFloatArgMinArgMax(
-          rewriter, op, scalarInputs, scalarIndx, arith::CmpFPredicate::OGT,
-          scalarInputs[1], index);
-      resTensor = calculateResFloatArgMinArgMax(rewriter, op, scalarInputs,
-                                                arith::CmpFPredicate::OGT,
-                                                scalarInputs[1]);
-    }
+  case hivm::ReduceOperation::min_with_index_left:
+    std::tie(resIndex, resTensor) =
+        getIndexTensorForArgmaxArgmin<arith::MinSIOp>(
+            elemType, rewriter, op, scalarInputs, scalarIndx, index,
+            arith::CmpIPredicate::sgt, arith::CmpFPredicate::OGT);
     break;
-  case hivm::ReduceOperation::max_with_index:
-    if (elemType.isInteger()) {
-      resIndex = calculateIndexIntegerArgMinArgMax(
-          rewriter, op, scalarInputs, scalarIndx, arith::CmpIPredicate::slt,
-          scalarInputs[1], index);
-      resTensor = getScalarResult<hivm::VMinOp, arith::MaxSIOp>(
-          rewriter, op.getLoc(), scalarInputs);
-    } else {
-      resIndex = calculateIndexFloatArgMinArgMax(
-          rewriter, op, scalarInputs, scalarIndx, arith::CmpFPredicate::OLT,
-          scalarInputs[1], index);
-      resTensor = calculateResFloatArgMinArgMax(rewriter, op, scalarInputs,
-                                                arith::CmpFPredicate::OLT,
-                                                scalarInputs[1]);
-    }
+  case hivm::ReduceOperation::min_with_index_right:
+    std::tie(resIndex, resTensor) =
+        getIndexTensorForArgmaxArgmin<arith::MinSIOp>(
+            elemType, rewriter, op, scalarInputs, scalarIndx, index,
+            arith::CmpIPredicate::sge, arith::CmpFPredicate::OGE);
+    break;
+  case hivm::ReduceOperation::max_with_index_left:
+    std::tie(resIndex, resTensor) =
+        getIndexTensorForArgmaxArgmin<arith::MaxSIOp>(
+            elemType, rewriter, op, scalarInputs, scalarIndx, index,
+            arith::CmpIPredicate::slt, arith::CmpFPredicate::OLT);
+    break;
+  case hivm::ReduceOperation::max_with_index_right:
+    std::tie(resIndex, resTensor) =
+        getIndexTensorForArgmaxArgmin<arith::MaxSIOp>(
+            elemType, rewriter, op, scalarInputs, scalarIndx, index,
+            arith::CmpIPredicate::sle, arith::CmpFPredicate::OLE);
     break;
   default:
     llvm_unreachable("Unsupport Reduction Arith Attr.");
@@ -665,8 +683,7 @@ createScalarReduceComputeOp(RewriterBase &rewriter, hivm::VReduceOp op,
 
   // Order is important, so we only insert once we have inserted
   // min/max value while running max_with_index/min_with_index.
-  if (reduceOpAttr == hivm::ReduceOperation::min_with_index ||
-      reduceOpAttr == hivm::ReduceOperation::max_with_index) {
+  if (util::isArgminOrArgmax(reduceOpAttr)) {
     resTensors.push_back(resIndex);
   }
 
@@ -700,8 +717,7 @@ void insertReduceInitialization(RewriterBase &rewriter, hivm::VReduceOp op,
                                    op.getDpsInits()[0], dstIndexes);
 
   auto arith = op.getArithAttr().getReduceOp();
-  if (arith == hivm::ReduceOperation::max_with_index ||
-      arith == hivm::ReduceOperation::min_with_index) {
+  if (util::isArgminOrArgmax(arith)) {
     auto constIndexInit = rewriter.create<arith::ConstantOp>(
         op->getLoc(), IntegerAttr::get(rewriter.getI32Type(), -1));
     rewriter.create<memref::StoreOp>(op->getLoc(), constIndexInit,
@@ -747,8 +763,7 @@ void decomposeVReduceOpToScalarOpImpl(RewriterBase &rewriter, VReduceOp op) {
 
     auto reduceOpArith = op.getArithAttr();
     auto reduceOpAttr = reduceOpArith.getReduceOp();
-    if (reduceOpAttr == hivm::ReduceOperation::min_with_index ||
-        reduceOpAttr == hivm::ReduceOperation::max_with_index) {
+    if (util::isArgminOrArgmax(reduceOpAttr)) {
       // Load the Index value needed for update across iterations.
       auto loadIndOp = createSinglePointLoad(rewriter, op.getLoc(),
                                              op.getDpsInits()[1], dstIndexes);
