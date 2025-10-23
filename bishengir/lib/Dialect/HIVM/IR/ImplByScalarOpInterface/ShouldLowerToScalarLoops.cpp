@@ -142,6 +142,57 @@ bool VMulExtOp::shouldLowerToScalarLoops() {
 
 namespace mlir::hivm {
 
+static bool processIndexLeft(VReduceOp op, Type elemType) {
+  if (elemType.isInteger(64) || elemType.isInteger(32) ||
+      elemType.isInteger(16)) {
+    return true;
+  }
+
+  if (elemType.isF16() || elemType.isF32() || elemType.isBF16()) {
+    auto hivmFlattenInterfaceOp =
+        cast<hivm::FlattenInterface>(op.getOperation());
+    FlattenOptions flattenOptions;
+    flattenOptions.checkMarkStride = true;
+    auto flatttenResult = hivmFlattenInterfaceOp.getFlattened(flattenOptions);
+    assert(succeeded(flatttenResult));
+    auto flattenRank = flatttenResult->getRankAfterFlatten();
+    return flattenRank > 2;
+  }
+
+  return false;
+}
+
+static bool processIndexRight(VReduceOp op, Type elemType) {
+  MemRefType srcVecType = cast<MemRefType>(op.getSrc().getType());
+  int rank = srcVecType.getRank();
+  llvm::ArrayRef<int64_t> reduceDims = op.getReduceDims();
+  assert(reduceDims.size() == 1 &&
+         "reduce dimensions array is not decomposed yet");
+  bool lastAxis = reduceDims[0] == rank - 1;
+  bool isROrAR = rank == 1 || lastAxis;
+
+  if (elemType.isInteger(64) || elemType.isInteger(32) ||
+      elemType.isInteger(16) ||
+      (isROrAR &&
+       (elemType.isF16() || elemType.isF32() || elemType.isBF16()))) {
+
+    return true;
+  }
+
+  if (elemType.isF16() || elemType.isF32() || elemType.isBF16()) {
+    auto hivmFlattenInterfaceOp =
+        cast<hivm::FlattenInterface>(op.getOperation());
+    FlattenOptions flattenOptions;
+    flattenOptions.checkMarkStride = true;
+    auto flatttenResult = hivmFlattenInterfaceOp.getFlattened(flattenOptions);
+    assert(succeeded(flatttenResult));
+    auto flattenRank = flatttenResult->getRankAfterFlatten();
+    return flattenRank > 2;
+  }
+
+  return false;
+}
+
 bool shouldVReduceOpDecomposeToScalarImpl(VReduceOp op) {
   auto reduceOpArith = op.getArithAttr();
   auto reduceOpAttr = reduceOpArith.getReduceOp();
@@ -155,31 +206,18 @@ bool shouldVReduceOpDecomposeToScalarImpl(VReduceOp op) {
   case hivm::ReduceOperation::xori:
     shouldDecomposeToScalar = elemType.isInteger(64);
     break;
-  case hivm::ReduceOperation::max_with_index:
-  case hivm::ReduceOperation::min_with_index: {
-    if (elemType.isInteger(64) || elemType.isInteger(32) ||
-        elemType.isInteger(16)) {
-      shouldDecomposeToScalar = true;
-      break;
-    }
-
-    if (elemType.isF16() || elemType.isF32() || elemType.isBF16()) {
-      auto hivmFlattenInterfaceOp =
-          cast<hivm::FlattenInterface>(op.getOperation());
-      FlattenOptions flattenOptions;
-      flattenOptions.checkMarkStride = true;
-      auto flatttenResult = hivmFlattenInterfaceOp.getFlattened(flattenOptions);
-      assert(succeeded(flatttenResult));
-      auto flattenRank = flatttenResult->getRankAfterFlatten();
-      shouldDecomposeToScalar = flattenRank > 2;
-      break;
-    }
-
-    shouldDecomposeToScalar = false;
-    break;
-  default:
+  case hivm::ReduceOperation::max_with_index_left:
+  case hivm::ReduceOperation::min_with_index_left: {
+    shouldDecomposeToScalar = processIndexLeft(op, elemType);
     break;
   }
+  case hivm::ReduceOperation::max_with_index_right:
+  case hivm::ReduceOperation::min_with_index_right: {
+    shouldDecomposeToScalar = processIndexRight(op, elemType);
+    break;
+  }
+  default:
+    break;
   }
 
   return shouldDecomposeToScalar;
