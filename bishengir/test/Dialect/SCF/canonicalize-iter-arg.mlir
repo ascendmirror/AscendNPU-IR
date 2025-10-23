@@ -33,3 +33,40 @@ func.func @test() -> (tensor<?xi8>, tensor<?xi8>) {
   // CHECK: return [[INIT]], [[INIT]]
   return %res#0, %res#1 : tensor<?xi8>, tensor<?xi8>
 }
+
+// -----
+func.func @remove_two_iter_args(
+    %arg0: index, %arg1: index,
+    %arg2: tensor<32xi64>, %arg3: tensor<32xi32>) -> (index, index) {
+        %c0 = arith.constant 0 : index
+        %c1 = arith.constant 1 : index
+        %c32 = arith.constant 32 : index
+        %lb = arith.constant 0 : index
+        %ub = arith.addi %arg0, %c32 : index
+        %step = arith.constant 1 : index
+        %res:4 = scf.for %iv = %lb to %ub step %step
+        iter_args(%it0 = %arg2, %it1 = %arg3, %it2 = %arg0, %it3 = %c0)
+        -> (tensor<32xi64>, tensor<32xi32>, index, index) {
+        // A few ops to simulate body work; they must be side-effect-free.
+        %one = arith.constant 1 : index
+        %t0 = arith.addi %it2, %c32 : index
+        %t1 = arith.addi %iv, %one : index
+        // The “dead” yields: each derived only from its own iter_arg.
+        %y0 = arith.addi %it0, %it0 : tensor<32xi64>
+        %y1 = arith.addi %it1, %it1 : tensor<32xi32>
+
+        %y2 = arith.addi %it2, %c32 : index
+        %y3 = arith.addi %it3, %c32 : index
+        scf.yield %y0, %y1, %y2, %y3
+        : tensor<32xi64>, tensor<32xi32>, index, index
+        }
+        // Make only the last two results live.
+        // Drop uses of the first two results to enable removal.
+        // CHECK-LABEL: func.func @remove_two_iter_args
+        // CHECK: iter_args(%[[IT2:.*]] = %arg0, %[[IT3:.*]] = %c0) -> (index, index) {
+        // CHECK-NOT: arith.addi %{{.}} : tensor<32xi64>
+        // CHECK-NOT: arith.addi %{{.}} : tensor<32xi32>
+        // CHECK: scf.yield %{{.}}, %{{.*}} : index, index
+        // CHECK: return
+        return %res#2, %res#3 : index, index
+}
