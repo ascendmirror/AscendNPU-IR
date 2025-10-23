@@ -80,6 +80,7 @@ def ReduceWithIndexOp : HFusionStructuredBase_Op<"reduce_with_index",
   let arguments = (ins Variadic<AnyShaped>:$inputs,
                        Variadic<AnyShaped>:$inits,
                        HFusion_ReduceWithIndexOpAttr:$reduce_kind,
+                       BoolAttr:$tie_break_left,
                        ConfinedAttr<DenseI64ArrayAttr,
                          [DenseArrayStrictlySorted<DenseI64ArrayAttr>]>:$dimensions
   );
@@ -93,6 +94,7 @@ def ReduceWithIndexOp : HFusionStructuredBase_Op<"reduce_with_index",
         "ValueRange":$inputs,
         "ValueRange":$inits,
         "hfusion::ReduceWithIndexKindAttr":$reduce_kind,
+        "BoolAttr":$tie_break_left,
         "DenseI64ArrayAttr":$dimensions)
     >,
     OpBuilder<
@@ -101,6 +103,7 @@ def ReduceWithIndexOp : HFusionStructuredBase_Op<"reduce_with_index",
         "ValueRange":$inputs,
         "ValueRange":$inits,
         "hfusion::ReduceWithIndexKindAttr":$reduce_kind,
+        "BoolAttr":$tie_break_left,
         "ArrayRef<int64_t>":$dimensions)
     >
   ];

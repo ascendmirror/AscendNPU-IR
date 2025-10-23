@@ -24,6 +24,7 @@
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Matchers.h"
 
 #include "torch-mlir/Conversion/TorchToLinalg/Utils.h"
@@ -190,11 +191,12 @@ public:
 
     auto reduceKindAttr = mlir::hfusion::ReduceWithIndexKindAttr::get(
         rewriter.getContext(), reduceKind);
+    // TODO: get "tile_break_left" value instead of setting it to "true"
     auto hfusionOp = rewriter.create<hfusion::ReduceWithIndexOp>(
         loc, TypeRange{filledTensorVal.getType(), filledTensorIdx.getType()},
         /*input*/ ValueRange{input},
         /*outputValue&Index*/ ValueRange{filledTensorVal, filledTensorIdx},
-        reduceKindAttr, dims);
+        reduceKindAttr, BoolAttr::get(rewriter.getContext(), true), dims);
 
     if (!keepDim) {
       Value rVal = rewriter.create<tensor::CastOp>(loc, valResultType,
