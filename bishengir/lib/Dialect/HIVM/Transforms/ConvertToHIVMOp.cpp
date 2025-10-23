@@ -19,6 +19,7 @@
 #include "bishengir/Dialect/HACC/IR/HACC.h"
 #include "bishengir/Dialect/HACC/Utils/Utils.h"
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
+#include "bishengir/Dialect/HIVM/IR/HIVMImpl.h"
 #include "bishengir/Dialect/HIVM/Transforms/Passes.h"
 #include "bishengir/Dialect/HIVM/Utils/Utils.h"
 #include "bishengir/Dialect/Utils/Util.h"
@@ -126,13 +127,14 @@ getUniqueInitInfo(std::optional<memref::AllocOp> maybeAlloc,
 
 LogicalResult replaceMemCopyByHIVMLoadOp(memref::CopyOp copyOp,
                                          PatternRewriter &rewriter) {
+  Value src = copyOp.getSource();
   Value dst = copyOp.getTarget();
+  hivm::LoadOp loadOp =
+      rewriter.create<hivm::LoadOp>(copyOp->getLoc(), TypeRange(), src, dst);
+
   auto maybeAlloc = utils::tracebackMemRefToAlloc(dst);
   auto maybePadValue = getPadValue(maybeAlloc);
   auto maybeLeftPadNum = getLeftPadNum(rewriter, maybeAlloc);
-
-  auto loadOp = rewriter.create<hivm::LoadOp>(copyOp->getLoc(), TypeRange(),
-                                              copyOp.getSource(), dst);
   if (maybeLeftPadNum.has_value()) {
     loadOp.getLeftPaddingNumMutable().assign(maybeLeftPadNum.value());
   }
@@ -151,8 +153,8 @@ LogicalResult replaceMemCopyByHIVMLoadOp(memref::CopyOp copyOp,
     }
   }
   // TODO: change TA to create hivm.load/store op directly
-  auto implicitTransposeAttr =
-      utils::getAnnotateOpWithAttr(copyOp.getTarget(), "MayImplicitTransposeWithLastAxis");
+  auto implicitTransposeAttr = utils::getAnnotateOpWithAttr(
+      copyOp.getTarget(), "MayImplicitTransposeWithLastAxis");
   if (implicitTransposeAttr.has_value()) {
     loadOp.setMayImplicitTransposeWithLastAxis(true);
   }
@@ -187,8 +189,8 @@ struct MemrefCopyOpLowering : public OpRewritePattern<memref::CopyOp> {
       auto storeOp = rewriter.replaceOpWithNewOp<hivm::StoreOp>(
           copyOp, TypeRange(), src, dst);
       // TODO: change TA to create hivm.load/store op directly
-      auto implicitTransposeAttr =
-          utils::getAnnotateOpWithAttr(copyOp.getTarget(), "MayImplicitTransposeWithLastAxis");
+      auto implicitTransposeAttr = utils::getAnnotateOpWithAttr(
+          copyOp.getTarget(), "MayImplicitTransposeWithLastAxis");
       if (implicitTransposeAttr.has_value()) {
         storeOp.setMayImplicitTransposeWithLastAxis(true);
       }
