@@ -801,8 +801,10 @@ void ReduceWithIndexOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                               TypeRange types, ValueRange inputs,
                               ValueRange inits,
                               ReduceWithIndexKindAttr reduce_kind,
+                              BoolAttr tie_break_left,
                               DenseI64ArrayAttr dimensions) {
   odsState.addAttribute("reduce_kind", reduce_kind);
+  odsState.addAttribute("tie_break_left", tie_break_left);
   odsState.addAttribute("dimensions", dimensions);
   buildStructuredOp(odsBuilder, odsState, types, inputs, inits, {},
                     ReduceWithIndexOp::getRegionBuilder());
@@ -812,8 +814,10 @@ void ReduceWithIndexOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                               TypeRange types, ValueRange inputs,
                               ValueRange inits,
                               ReduceWithIndexKindAttr reduce_kind,
+                              BoolAttr tie_break_left,
                               ArrayRef<int64_t> dimensions) {
   odsState.addAttribute("reduce_kind", reduce_kind);
+  odsState.addAttribute("tie_break_left", tie_break_left);
   odsState.addAttribute("dimensions",
                         odsBuilder.getDenseI64ArrayAttr(dimensions));
   buildStructuredOp(odsBuilder, odsState, types, inputs, inits, {},
