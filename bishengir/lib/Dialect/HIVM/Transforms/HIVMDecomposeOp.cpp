@@ -17,6 +17,7 @@
 #include "bishengir/Dialect/HACC/Utils/Utils.h"
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
 #include "bishengir/Dialect/HIVM/IR/HIVMImpl.h"
+#include "bishengir/Dialect/HIVM/Transforms/AlignBuffer/Util.h"
 #include "bishengir/Dialect/HIVM/Transforms/Passes.h"
 #include "bishengir/Dialect/HIVM/Utils/Utils.h"
 #include "bishengir/Dialect/Utils/Util.h"
@@ -24,15 +25,20 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/Sequence.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/Support/RWMutex.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace mlir {
 #define GEN_PASS_DEF_HIVMDECOMPOSEOP
@@ -465,6 +471,136 @@ struct VCmpOpLowering : OpRewritePattern<VCmpOp> {
     rewriter.modifyOpInPlace(
         op, [&]() { op.getDpsInitsMutable()[0].assign(tmpAlloc); });
     return success();
+  }
+};
+
+struct UnalignTransposeOpLowering : OpRewritePattern<VTransposeOp> {
+  using OpRewritePattern<VTransposeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(VTransposeOp op,
+                                PatternRewriter &rewriter) const final {
+    if (!op.getDisableAlign()) {
+      return failure();
+    }
+
+    if (!op.hasPureBufferSemantics()) {
+      return failure();
+    }
+
+    auto src = op.getSrc();
+    auto srcMemrefType = cast<MemRefType>(src.getType());
+    auto srcSpace = srcMemrefType.getMemorySpace();
+    if (!srcSpace) {
+      return failure();
+    }
+
+    std::vector<std::unique_ptr<OperAlignInfo>> alignList;
+    if (getUnAlignSizeInfo(op, &alignList).failed()) {
+      return failure();
+    }
+
+    auto inputType = cast<ShapedType>(op.getSrc().getType());
+
+    auto inputShape = inputType.getShape();
+
+    auto elemTypeBytes =
+        inputType.getElementTypeBitWidth() / mlir::utils::INTR_BITS_PER_BYTE;
+
+    SmallVector<int64_t> transposeLoopDims;
+    op.getTransposeLoopDims(transposeLoopDims);
+
+    auto lastAlign = alignList[0]->alignBytes[0] / elemTypeBytes;
+    auto lastDim = inputShape[transposeLoopDims[1]];
+
+    // (K * lastAlign, lastDim) -> (K, lastAlign * lastDim) -> (lastAlign *
+    // lastDim, K)
+    auto firstStepResult = reshapeAndTranspose2DStep(rewriter, op.getLoc(),
+                                                     op.getSrc(), lastAlign);
+
+    // (lastAlign * lastDim, K) -> (lastAlign, lastDim * K) -> (lastDim * K,
+    // lastAlign)
+    auto secondStepResult = reshapeAndTranspose2DStep(rewriter, op.getLoc(),
+                                                      firstStepResult, lastDim);
+
+    // (lastDim * K, lastAlign) -> (lastDim, K * lastAlign)
+    auto rank = inputShape.size();
+    auto transposedInputShape = llvm::to_vector(inputShape);
+    std::swap(transposedInputShape[rank - 2], transposedInputShape[rank - 1]);
+    
+    auto thirdStepResult = getReshapedValue(
+        rewriter, op.getLoc(), secondStepResult, transposedInputShape);
+
+    rewriter.replaceAllUsesWith(op.getDst(), thirdStepResult);
+    rewriter.eraseOp(op);
+
+    return success();
+  }
+
+private:
+  Value reshapeAndTranspose2DStep(PatternRewriter &rewriter, Location loc,
+                                  Value v, int64_t reshapeCoef) const {
+    auto shapedType = cast<ShapedType>(v.getType());
+    auto elemType = shapedType.getElementType();
+
+    auto inputShape = shapedType.getShape();
+    auto rank = inputShape.size();
+
+    // 1. (Y*C, X) reshape to (Y, C*X)
+    llvm::SmallVector<int64_t> newShape(inputShape.begin(), inputShape.end());
+    newShape[rank - 2] /= reshapeCoef;
+    newShape[rank - 1] *= reshapeCoef;
+
+    auto reshapedValue = getReshapedValue(rewriter, loc, v, newShape);
+
+    // 2. (Y, C*X) transpsoe to (C*X, Y)
+    std::swap(newShape[rank - 2], newShape[rank - 1]);
+    auto transposedBuffer = utils::createTmpBufferOrTensorWithTargetType(
+        rewriter, loc, reshapedValue, elemType, newShape);
+
+    auto permArray = llvm::to_vector(llvm::iota_range<int64_t>(0, rank, false));
+    std::swap(permArray[rank - 2], permArray[rank - 1]);
+
+    auto defaultPerm = rewriter.getDenseI64ArrayAttr(permArray);
+    auto transposeOp = rewriter.create<hivm::VTransposeOp>(
+        loc, TypeRange(), reshapedValue, transposedBuffer, defaultPerm);
+
+    return transposeOp.getDst();
+  }
+
+  Value getReshapedValue(RewriterBase &rewriter, Location loc, Value v,
+                         llvm::ArrayRef<int64_t> newShape) const {
+    auto type = v.getType();
+    auto elemType = cast<ShapedType>(type).getElementType();
+
+    MemRefType newType = mlir::MemRefType::get(newShape, elemType);
+
+    auto prevMemSpace = cast<MemRefType>(v.getType()).getMemorySpace();
+    if (prevMemSpace) {
+      newType = cast<MemRefType>(getBaseMemRefTypeWithNewScope(
+          newType, cast<AddressSpaceAttr>(prevMemSpace)));
+    }
+
+    MemRefType idxsType = mlir::MemRefType::get(
+        ArrayRef<int64_t>(newShape.size()), rewriter.getI64Type());
+
+    auto gmSpaceAttr =
+        AddressSpaceAttr::get(rewriter.getContext(), hivm::AddressSpace::UB);
+    idxsType = cast<MemRefType>(getBaseMemRefTypeWithNewScope(idxsType, gmSpaceAttr));
+
+    auto memrefIdxs = rewriter.create<memref::AllocOp>(loc, idxsType);
+    for (auto [idx, dim] : llvm::enumerate(newShape)) {
+      auto idxValue = rewriter.create<arith::ConstantIndexOp>(loc, idx);
+      auto dimValue = rewriter.create<arith::ConstantOp>(
+          loc, rewriter.getI64IntegerAttr(dim));
+
+      rewriter.create<memref::StoreOp>(loc, dimValue, memrefIdxs,
+                                       ValueRange{idxValue});
+    }
+
+    Value reshapedValue =
+        rewriter.create<memref::ReshapeOp>(loc, newType, v, memrefIdxs);
+
+    return reshapedValue;
   }
 };
 
@@ -1043,8 +1179,8 @@ class AtomicCasOpLowering : public OpRewritePattern<hivm::AtomicCasOp> {
     // step2: condition = vcmp(dst, expected_val)
     //        dst = vsel(condition, new_val, dst)
     // create condition alloc
-    auto condUB = createTmpBufferOrTensorWithTargetType(
-        rewriter, loc, src0, rewriter.getI1Type());
+    auto condUB = createTmpBufferOrTensorWithTargetType(rewriter, loc, src0,
+                                                        rewriter.getI1Type());
     auto compareAttr =
         rewriter.getAttr<hivm::CompareModeAttr>(hivm::CompareMode::EQ);
     rewriter.create<hivm::VCmpOp>(op.getLoc(), TypeRange(),
@@ -1119,7 +1255,7 @@ void HIVMDecomposeOpPass::runOnOperation() {
       .add<MultiAxesVBrcLowering, VCastLowering, VAbsIntegerLowering,
            VRecOpHighPrecisionLowering, VReduceAnyLowering, VReduceAllLowering,
            VReduceInitInitializing, SyncBlockOpLowering, VCmpOpLowering,
-           DecomposeCastScalarToVecOp<arith::ExtFOp>,
+           UnalignTransposeOpLowering, DecomposeCastScalarToVecOp<arith::ExtFOp>,
            DecomposeCastScalarToVecOp<arith::ExtSIOp>,
            DecomposeCastScalarToVecOp<arith::ExtUIOp>,
            DecomposeCastScalarToVecOp<arith::FPToSIOp>,

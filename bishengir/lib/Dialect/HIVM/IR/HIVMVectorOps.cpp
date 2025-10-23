@@ -17,6 +17,7 @@
 
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
 #include "bishengir/Dialect/HIVM/IR/HIVMImpl.h"
+#include "bishengir/Dialect/HIVM/Transforms/AlignBuffer/Util.h"
 #include "bishengir/Dialect/HIVM/Utils/Utils.h"
 #include "bishengir/Dialect/Utils/Util.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -37,7 +38,8 @@ using namespace mlir::hivm;
 #include "bishengir/Dialect/HIVM/IR/HIVMVectorOps.cpp.inc"
 
 namespace {
-template <typename HIVMOP> LogicalResult verifyCumOp(HIVMOP op) {
+template <typename HIVMOP>
+LogicalResult verifyCumOp(HIVMOP op) {
   ArrayRef<int64_t> cumDims = op.getCumDims();
   ShapedType srcType = cast<ShapedType>(op.getSrc().getType());
   if (cumDims.empty()) {
@@ -720,14 +722,58 @@ LogicalResult VTransposeOp::verify() {
     }
   }
 
+  if (getDisableAlign()) {
+    if (!isLastTwoAxesTranspose(*this)) {
+      return emitOpError()
+             << "Disabled allign mode supports only last 2 axes transpose";
+    }
+
+    if (hasPureBufferSemantics()) {
+      auto srcMemRefType = cast<MemRefType>(getSrc().getType());
+      auto dstMemRefType = cast<MemRefType>(getDst().getType());
+      auto srcMemSpaceAttr = srcMemRefType.getMemorySpace();
+      auto dstMemSpaceAttr = dstMemRefType.getMemorySpace();
+      if (srcMemSpaceAttr && dstMemSpaceAttr) {
+        std::vector<std::unique_ptr<OperAlignInfo>> alignList;
+        if (getUnAlignSizeInfo(*this, &alignList).failed()) {
+          return failure();
+        }
+
+        auto srcShape = srcMemRefType.getShape();
+
+        auto elemTypeBytes = srcMemRefType.getElementTypeBitWidth() /
+                             mlir::utils::INTR_BITS_PER_BYTE;
+
+        SmallVector<int64_t> transposeLoopDims;
+        getTransposeLoopDims(transposeLoopDims);
+
+        auto firstAlign = alignList[1]->alignBytes[0] / elemTypeBytes;
+        auto firstDim = srcShape[transposeLoopDims[0]];
+
+        auto lastAlign = alignList[0]->alignBytes[0] / elemTypeBytes;
+        auto lastDim = srcShape[transposeLoopDims[1]];
+
+        if ((firstDim % firstAlign == 0) && (lastDim % lastAlign == 0)) {
+          return emitOpError("VTransposeOp supports unaligned mode only for "
+                             "tensors with second unaligned dim");
+        }
+
+        if (firstDim % (firstAlign * lastAlign)) {
+          return emitOpError("VTransposeOp supports unaligned mode only for "
+                             "tensors with double-aligned first axis");
+        }
+      }
+    }
+  }
+
   return success();
 }
 
 void VTransposeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                          TypeRange result, Value src, Value dst,
-                         DenseI64ArrayAttr permutation) {
+                         DenseI64ArrayAttr permutation, bool disable_align) {
   build(odsBuilder, odsState, result, src, dst, /*temp_buffer=*/nullptr,
-        permutation);
+        permutation, disable_align);
 }
 
 //===----------------------------------------------------------------------===//

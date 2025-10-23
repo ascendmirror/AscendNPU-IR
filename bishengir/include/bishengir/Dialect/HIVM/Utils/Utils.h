@@ -268,6 +268,8 @@ void getOpUsers(Operation *op, SmallVector<Operation *, 8> &userOps);
 
 bool isLastDimTranspose(hivm::VTransposeOp op);
 
+bool isLastTwoAxesTranspose(hivm::VTransposeOp op);
+
 // Create local workspace of current block
 Value createAllocLocalWorkSpace(OpBuilder &builder, Location loc,
                                 SmallVector<int64_t> shape, Type elementType);
