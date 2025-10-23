@@ -17,6 +17,7 @@
 
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
 #include "bishengir/Dialect/HIVM/IR/HIVMImpl.h"
+#include "bishengir/Dialect/HIVM/Transforms/AlignBuffer/Util.h"
 #include "bishengir/Dialect/Utils/Util.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 
@@ -871,4 +872,141 @@ FailureOr<SmallVector<Value>> VReduceOp::decomposeOperation(OpBuilder &b) {
   }
 
   return decomposeMultiAxesVReduceOp(*this, b);
+}
+
+//===----------------------------------------------------------------------===//
+// VTransposeOp
+//===----------------------------------------------------------------------===//
+
+namespace mlir::hivm {
+static Value getReshapedValue(OpBuilder &builder, Location loc, Value v,
+                              llvm::ArrayRef<int64_t> newShape) {
+  auto type = v.getType();
+  auto elemType = cast<ShapedType>(type).getElementType();
+
+  MemRefType newType = mlir::MemRefType::get(newShape, elemType);
+
+  auto prevMemSpace = cast<MemRefType>(v.getType()).getMemorySpace();
+  if (prevMemSpace) {
+    newType = cast<MemRefType>(getBaseMemRefTypeWithNewScope(
+        newType, cast<AddressSpaceAttr>(prevMemSpace)));
+  }
+
+  MemRefType idxsType = mlir::MemRefType::get(
+      ArrayRef<int64_t>(newShape.size()), builder.getI64Type());
+
+  auto gmSpaceAttr =
+      AddressSpaceAttr::get(builder.getContext(), hivm::AddressSpace::UB);
+  idxsType =
+      cast<MemRefType>(getBaseMemRefTypeWithNewScope(idxsType, gmSpaceAttr));
+
+  auto memrefIdxs = builder.create<memref::AllocOp>(loc, idxsType);
+  for (auto [idx, dim] : llvm::enumerate(newShape)) {
+    auto idxValue = builder.create<arith::ConstantIndexOp>(loc, idx);
+    auto dimValue =
+        builder.create<arith::ConstantOp>(loc, builder.getI64IntegerAttr(dim));
+
+    builder.create<memref::StoreOp>(loc, dimValue, memrefIdxs,
+                                    ValueRange{idxValue});
+  }
+
+  Value reshapedValue =
+      builder.create<memref::ReshapeOp>(loc, newType, v, memrefIdxs);
+
+  return reshapedValue;
+}
+
+static Value reshapeAndTranspose2DStep(OpBuilder &builder, Location loc,
+                                       Value v, int64_t reshapeCoef) {
+  auto shapedType = cast<ShapedType>(v.getType());
+  auto elemType = shapedType.getElementType();
+
+  auto inputShape = shapedType.getShape();
+  auto rank = inputShape.size();
+
+  // 1. (Y*C, X) reshape to (Y, C*X)
+  llvm::SmallVector<int64_t> newShape(inputShape.begin(), inputShape.end());
+  newShape[rank - 2] /= reshapeCoef;
+  newShape[rank - 1] *= reshapeCoef;
+
+  auto reshapedValue = getReshapedValue(builder, loc, v, newShape);
+
+  // 2. (Y, C*X) transpsoe to (C*X, Y)
+  std::swap(newShape[rank - 2], newShape[rank - 1]);
+  auto transposedBuffer = utils::createTmpBufferOrTensorWithTargetType(
+      builder, loc, reshapedValue, elemType, newShape);
+
+  auto permArray = llvm::to_vector(llvm::iota_range<int64_t>(0, rank, false));
+  std::swap(permArray[rank - 2], permArray[rank - 1]);
+
+  auto defaultPerm = builder.getDenseI64ArrayAttr(permArray);
+  auto transposeOp = builder.create<hivm::VTransposeOp>(
+      loc, TypeRange(), reshapedValue, transposedBuffer, defaultPerm);
+
+  return transposeOp.getDst();
+}
+
+static FailureOr<SmallVector<Value>>
+decomposeUnalignTransposeOp(VTransposeOp op, OpBuilder &builder) {
+  if (!op.getDisableAlign()) {
+    return failure();
+  }
+
+  if (!op.hasPureBufferSemantics()) {
+    return failure();
+  }
+
+  auto src = op.getSrc();
+  auto srcMemrefType = cast<MemRefType>(src.getType());
+  auto srcSpace = srcMemrefType.getMemorySpace();
+  if (!srcSpace) {
+    return failure();
+  }
+
+  std::vector<std::unique_ptr<OperAlignInfo>> alignList;
+  if (getUnAlignSizeInfo(op, &alignList).failed()) {
+    return failure();
+  }
+
+  auto inputType = cast<ShapedType>(op.getSrc().getType());
+
+  auto inputShape = inputType.getShape();
+
+  auto elemTypeBytes =
+      inputType.getElementTypeBitWidth() / mlir::utils::INTR_BITS_PER_BYTE;
+
+  SmallVector<int64_t> transposeLoopDims;
+  op.getTransposeLoopDims(transposeLoopDims);
+
+  auto lastAlign = alignList[0]->alignBytes[0] / elemTypeBytes;
+  auto lastDim = inputShape[transposeLoopDims[1]];
+
+  // (K * lastAlign, lastDim) -> (K, lastAlign * lastDim) -> (lastAlign *
+  // lastDim, K)
+  auto firstStepResult =
+      reshapeAndTranspose2DStep(builder, op.getLoc(), op.getSrc(), lastAlign);
+
+  // (lastAlign * lastDim, K) -> (lastAlign, lastDim * K) -> (lastDim * K,
+  // lastAlign)
+  auto secondStepResult = reshapeAndTranspose2DStep(builder, op.getLoc(),
+                                                    firstStepResult, lastDim);
+
+  // (lastDim * K, lastAlign) -> (lastDim, K * lastAlign)
+  auto rank = inputShape.size();
+  auto transposedInputShape = llvm::to_vector(inputShape);
+  std::swap(transposedInputShape[rank - 2], transposedInputShape[rank - 1]);
+
+  auto thirdStepResult = getReshapedValue(
+      builder, op.getLoc(), secondStepResult, transposedInputShape);
+
+  mlir::IRRewriter rewriter(builder);
+  rewriter.replaceAllUsesWith(op.getDst(), thirdStepResult);
+
+  return SmallVector<Value>();
+}
+
+} // namespace mlir::hivm
+
+FailureOr<SmallVector<Value>> VTransposeOp::decomposeOperation(OpBuilder &b) {
+  return decomposeUnalignTransposeOp(*this, b);
 }
