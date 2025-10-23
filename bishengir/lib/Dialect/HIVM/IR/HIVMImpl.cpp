@@ -210,6 +210,18 @@ std::optional<TFuncCoreType> queryFuncCoreType(Operation *funcOp) {
 }
 
 FailureOr<TCoreType> getCoreType(Operation *op) {
+  // annotation.mark has the highest priority for determining the core type
+  if (op->getNumResults() > 0) {
+    auto res = getAnnotateOpWithAttr(
+        op->getResult(0), "DuplicateTensorExtractForCube::coreTypeLabel");
+    if (res.has_value()) {
+      return static_cast<TCoreType>(
+          cast<IntegerAttr>(res.value()->getAttr(
+                                "DuplicateTensorExtractForCube::coreTypeLabel"))
+              .getInt());
+    }
+  }
+
   if (auto opCoreType = hivm::detail::queryCoreTypeHelper(op))
     return opCoreType.value();
 
