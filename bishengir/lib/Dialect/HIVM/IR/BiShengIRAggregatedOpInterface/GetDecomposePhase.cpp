@@ -75,3 +75,12 @@ DecomposePhase VPadOp::getDecomposePhase() {
 DecomposePhase VReduceOp::getDecomposePhase() {
   return DecomposePhase::BEFORE_HIVM_STRIDE_ALIGNMENT;
 }
+
+//===----------------------------------------------------------------------===//
+// VTransposeOp
+//===----------------------------------------------------------------------===//
+
+DecomposePhase VTransposeOp::getDecomposePhase() {
+  return DecomposePhase::AFTER_HIVM_STRIDE_ALIGNMENT;
+}
+

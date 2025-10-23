@@ -811,6 +811,16 @@ bool isLastDimTranspose(hivm::VTransposeOp op) {
   return true;
 }
 
+bool isLastTwoAxesTranspose(hivm::VTransposeOp op) {
+  if (!isLastDimTranspose(op)) {
+    return false;
+  }
+
+  SmallVector<int64_t> transposeLoopDims;
+  op.getTransposeLoopDims(transposeLoopDims);
+  return transposeLoopDims[0] == (transposeLoopDims[1] - 1);
+}
+
 Value createAllocLocalWorkSpace(OpBuilder &builder, Location loc,
                                 SmallVector<int64_t> shape, Type elementType) {
   assert(!ShapedType::isDynamicShape(shape) &&
