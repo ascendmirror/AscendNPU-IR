@@ -22,7 +22,6 @@ add_bishengir_dialect_library(BiShengIRHIVMDialect
   ${HIVM_VECTOR_BASE}
   HIVMCanonicalizations.cpp
   HIVMDialect.cpp
-  HIVMDialectExtension.cpp
   HIVMDMAOps.cpp
   HIVMImpl.cpp
   HIVMInterfaces.cpp
