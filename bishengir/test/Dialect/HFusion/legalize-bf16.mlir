@@ -313,11 +313,11 @@ func.func @test_gather(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<works
 // CHECK-LABEL: func.func @test_max_with_index
 // CHECK-SAME: %[[arg0:.*]]: tensor<1x22x39xbf16>, %[[arg1:.*]]: tensor<1x22x39xi32>
 // CHECK: %[[cast:.*]] = hfusion.cast {{.*}} ins({{.*}} : tensor<1x22x39xbf16>) outs({{.*}} : tensor<1x22x39xf32>)
-// CHECK: hfusion.reduce_with_index <max> ins(%[[cast]], %[[arg1]] : tensor<1x22x39xf32>, tensor<1x22x39xi32>)
+// CHECK: hfusion.reduce_with_index {tie_break_left = true} <max> ins(%[[cast]], %[[arg1]] : tensor<1x22x39xf32>, tensor<1x22x39xi32>)
 func.func @test_max_with_index(%arg0: tensor<1x22x39xbf16>, %arg1: tensor<1x22x39xi32>) -> (tensor<1x22xbf16>, tensor<1x22xi32>) {
   %0 = tensor.empty() : tensor<1x22xbf16>
   %1 = tensor.empty() : tensor<1x22xi32>
-  %2:2 = hfusion.reduce_with_index <max> ins(%arg0, %arg1 : tensor<1x22x39xbf16>, tensor<1x22x39xi32>) 
+  %2:2 = hfusion.reduce_with_index {tie_break_left = true} <max> ins(%arg0, %arg1 : tensor<1x22x39xbf16>, tensor<1x22x39xi32>) 
                                          outs(%0, %1 : tensor<1x22xbf16>, tensor<1x22xi32>) dimensions = [2]  -> tensor<1x22xbf16>, tensor<1x22xi32>
   return %2#0, %2#1 : tensor<1x22xbf16>, tensor<1x22xi32>
 }
