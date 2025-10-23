@@ -1726,12 +1726,12 @@ func.func @test_interleave_f16() -> tensor<4x2x128xf16> {
 // CHECK: %[[transposed0:.*]] = linalg.transpose ins(%[[arg0:.*]] : tensor<32x32x128xf32>) outs(%[[tmp_buf0]] : tensor<32x128x32xf32>) permutation = [0, 2, 1]
 // CHECK: %[[tmp_buf1:.*]] = tensor.empty() : tensor<32x128x32xi32>
 // CHECK: %[[transposed1:.*]] = linalg.transpose ins(%[[arg1:.*]] : tensor<32x32x128xi32>) outs(%[[tmp_buf1]] : tensor<32x128x32xi32>) permutation = [0, 2, 1]
-// CHECK: hfusion.reduce_with_index <min> ins(%[[transposed0]], %[[transposed1]] : tensor<32x128x32xf32>, tensor<32x128x32xi32>) outs(%[[res0]], %[[res1]] : tensor<32x128xf32>, tensor<32x128xi32>) dimensions = [2]
+// CHECK: hfusion.reduce_with_index {tie_break_left = true} <min> ins(%[[transposed0]], %[[transposed1]] : tensor<32x128x32xf32>, tensor<32x128x32xi32>) outs(%[[res0]], %[[res1]] : tensor<32x128xf32>, tensor<32x128xi32>) dimensions = [2]
 func.func @test_normalize_reduce_with_index_ra_to_ar(%arg0: tensor<32x32x128xf32>, %arg1: tensor<32x32x128xi32>) -> tensor<32x128xi32> {
   %true = arith.constant true
   %0 = tensor.empty() : tensor<32x128xf32>
   %1 = tensor.empty() : tensor<32x128xi32>
-  %reduced:2 = hfusion.reduce_with_index <min>
+  %reduced:2 = hfusion.reduce_with_index {tie_break_left = true} <min>
                 ins(%arg0, %arg1 : tensor<32x32x128xf32>, tensor<32x32x128xi32>)
                 outs(%0, %1 : tensor<32x128xf32>, tensor<32x128xi32>)
                 dimensions = [1] -> tensor<32x128xf32>, tensor<32x128xi32>
@@ -2098,8 +2098,8 @@ module {
 func.func @test_reduce_with_index_i1_return_value(%arg0: tensor<32x32x128xi1>, %arg1: tensor<32x32x128xi32>) -> tensor<32x128xi1> {
   %0 = tensor.empty() : tensor<32x128xi1>
   %1 = tensor.empty() : tensor<32x128xi32>
-  // CHECK %[[reduce:.*]] = hfusion.reduce_with_index <min>  ins(%[[arg0:.*]], %[[arg1:.*] : tensor<32x32x128xf16>
-  %reduced:2 = hfusion.reduce_with_index <min>
+  // CHECK %[[reduce:.*]] = hfusion.reduce_with_index {tie_break_left = true} <min>  ins(%[[arg0:.*]], %[[arg1:.*] : tensor<32x32x128xf16>
+  %reduced:2 = hfusion.reduce_with_index {tie_break_left = true} <min>
                 ins(%arg0, %arg1 : tensor<32x32x128xi1>, tensor<32x32x128xi32>)
                 outs(%0, %1 : tensor<32x128xi1>, tensor<32x128xi32>)
                 dimensions = [1] -> tensor<32x128xi1>, tensor<32x128xi32>
@@ -2112,8 +2112,8 @@ func.func @test_reduce_with_index_i1_return_value(%arg0: tensor<32x32x128xi1>, %
 func.func @test_reduce_with_index_i1_return_index(%arg0: tensor<32x32x128xi1>, %arg1: tensor<32x32x128xi32>) -> tensor<32x128xi32> {
   %0 = tensor.empty() : tensor<32x128xi1>
   %1 = tensor.empty() : tensor<32x128xi32>
-  // CHECK %[[reduce:.*]] = hfusion.reduce_with_index <min>  ins(%[[arg0:.*]], %[[arg1:.*] : tensor<32x32x128xf16>
-  %reduced:2 = hfusion.reduce_with_index <min>
+  // CHECK %[[reduce:.*]] = hfusion.reduce_with_index {tie_break_left = true} <min>  ins(%[[arg0:.*]], %[[arg1:.*] : tensor<32x32x128xf16>
+  %reduced:2 = hfusion.reduce_with_index {tie_break_left = true} <min>
                 ins(%arg0, %arg1 : tensor<32x32x128xi1>, tensor<32x32x128xi32>)
                 outs(%0, %1 : tensor<32x128xi1>, tensor<32x128xi32>)
                 dimensions = [1] -> tensor<32x128xi1>, tensor<32x128xi32>
@@ -2126,8 +2126,8 @@ func.func @test_reduce_with_index_i1_return_index(%arg0: tensor<32x32x128xi1>, %
 func.func @test_reduce_with_index_i64_return_index(%arg0: tensor<32x32x128xf32>, %arg1: tensor<32x32x128xi64>) -> tensor<32x128xf32> {
   %0 = tensor.empty() : tensor<32x128xf32>
   %1 = tensor.empty() : tensor<32x128xi64>
-  // CHECK: %[[reduce:.*]] = hfusion.reduce_with_index <min>  ins(%[[arg0:.*]], %[[arg1:.*]] : tensor<32x128x32xf32>, tensor<32x128x32xi32>
-  %reduced:2 = hfusion.reduce_with_index <min>
+  // CHECK: %[[reduce:.*]] = hfusion.reduce_with_index {tie_break_left = true} <min>  ins(%[[arg0:.*]], %[[arg1:.*]] : tensor<32x128x32xf32>, tensor<32x128x32xi32>
+  %reduced:2 = hfusion.reduce_with_index {tie_break_left = true} <min>
                 ins(%arg0, %arg1 : tensor<32x32x128xf32>, tensor<32x32x128xi64>)
                 outs(%0, %1 : tensor<32x128xf32>, tensor<32x128xi64>)
                 dimensions = [1] -> tensor<32x128xf32>, tensor<32x128xi64>
