@@ -1125,8 +1125,8 @@ func.func @flatten_with_reduce_index(%arg0: tensor<24x48x48xbf16>, %arg1: tensor
   %3 = linalg.fill ins(%c0_i64 : i64) outs(%2 : tensor<24x48xi64>) -> tensor<24x48xi64>
   %4 = tensor.empty() : tensor<24x48xf32>
   %5 = linalg.fill ins(%cst : f32) outs(%4 : tensor<24x48xf32>) -> tensor<24x48xf32>
-  %reduced:2 = hfusion.reduce_with_index <max> ins(%1 : tensor<24x48x48xf32>) outs(%5, %3 : tensor<24x48xf32>, tensor<24x48xi64>) dimensions = [2] -> tensor<24x48xf32>, tensor<24x48xi64>
-  %reduced_1:2 = hfusion.reduce_with_index <min> ins(%1, %arg1 : tensor<24x48x48xf32>, tensor<24x48x48xi64>) outs(%5, %3 : tensor<24x48xf32>, tensor<24x48xi64>) dimensions = [2] -> tensor<24x48xf32>, tensor<24x48xi64>
+  %reduced:2 = hfusion.reduce_with_index {tie_break_left = true} <max> ins(%1 : tensor<24x48x48xf32>) outs(%5, %3 : tensor<24x48xf32>, tensor<24x48xi64>) dimensions = [2] -> tensor<24x48xf32>, tensor<24x48xi64>
+  %reduced_1:2 = hfusion.reduce_with_index {tie_break_left = true} <min> ins(%1, %arg1 : tensor<24x48x48xf32>, tensor<24x48x48xi64>) outs(%5, %3 : tensor<24x48xf32>, tensor<24x48xi64>) dimensions = [2] -> tensor<24x48xf32>, tensor<24x48xi64>
   %expanded = tensor.expand_shape %reduced#0 [[0], [1, 2]] output_shape [24, 48, 1] : tensor<24x48xf32> into tensor<24x48x1xf32>
   %expanded_1 = tensor.expand_shape %reduced_1#1 [[0], [1, 2]] output_shape [24, 48, 1] : tensor<24x48xi64> into tensor<24x48x1xi64>
   return %expanded, %expanded_1 : tensor<24x48x1xf32>, tensor<24x48x1xi64>
