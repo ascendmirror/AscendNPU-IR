@@ -19,6 +19,7 @@
 #include "bishengir/Dialect/HACC/IR/HACC.h"
 #include "bishengir/Dialect/HACC/Utils/Utils.h"
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
+#include "bishengir/Dialect/HIVM/IR/HIVMImpl.h"
 #include "bishengir/Dialect/HIVM/Transforms/Passes.h"
 #include "bishengir/Dialect/HIVM/Utils/Utils.h"
 #include "bishengir/Dialect/Utils/Util.h"
@@ -126,13 +127,37 @@ getUniqueInitInfo(std::optional<memref::AllocOp> maybeAlloc,
 
 LogicalResult replaceMemCopyByHIVMLoadOp(memref::CopyOp copyOp,
                                          PatternRewriter &rewriter) {
+  Value src = copyOp.getSource();
   Value dst = copyOp.getTarget();
+  hivm::LoadOp loadOp;
+  if (getElementTypeOrSelf(dst.getType()).isInteger(1)) {
+    Type srcElemType = getElementTypeOrSelf(dst.getType());
+    Type dstElemType = rewriter.getType<Float16Type>();
+    // Convert I1 -> F16 by VCast
+    auto roundMode = hivm::RoundModeAttr::get(
+        rewriter.getContext(), mlir::utils::selectRoundMode<hivm::RoundMode>(
+                                   srcElemType, dstElemType));
+    auto castOp =
+        castTo(rewriter, copyOp->getLoc(), src, roundMode, dstElemType);
+    // Create load
+    Value castedDst = mlir::utils::createTmpBufferOrTensorWithTargetType(
+        rewriter, copyOp.getLoc(), dst, dstElemType);
+    loadOp = rewriter.create<hivm::LoadOp>(copyOp->getLoc(), TypeRange(),
+                                           castOp.getSingleDst(), castedDst);
+    // Convert F16 -> I1 by Vompare F16 != 0
+    Value floatZero = rewriter.create<arith::ConstantOp>(
+        copyOp.getLoc(), rewriter.getFloatAttr(dstElemType, 0.0));
+    auto cmpOp = rewriter.create<hivm::VCmpOp>(
+        copyOp.getLoc(), TypeRange(), ValueRange({castedDst, floatZero}), dst,
+        rewriter.getAttr<hivm::CompareModeAttr>(hivm::CompareMode::NE));
+  } else {
+    loadOp =
+        rewriter.create<hivm::LoadOp>(copyOp->getLoc(), TypeRange(), src, dst);
+  }
+
   auto maybeAlloc = utils::tracebackMemRefToAlloc(dst);
   auto maybePadValue = getPadValue(maybeAlloc);
   auto maybeLeftPadNum = getLeftPadNum(rewriter, maybeAlloc);
-
-  auto loadOp = rewriter.create<hivm::LoadOp>(copyOp->getLoc(), TypeRange(),
-                                              copyOp.getSource(), dst);
   if (maybeLeftPadNum.has_value()) {
     loadOp.getLeftPaddingNumMutable().assign(maybeLeftPadNum.value());
   }
@@ -151,8 +176,8 @@ LogicalResult replaceMemCopyByHIVMLoadOp(memref::CopyOp copyOp,
     }
   }
   // TODO: change TA to create hivm.load/store op directly
-  auto implicitTransposeAttr =
-      utils::getAnnotateOpWithAttr(copyOp.getTarget(), "MayImplicitTransposeWithLastAxis");
+  auto implicitTransposeAttr = utils::getAnnotateOpWithAttr(
+      copyOp.getTarget(), "MayImplicitTransposeWithLastAxis");
   if (implicitTransposeAttr.has_value()) {
     loadOp.setMayImplicitTransposeWithLastAxis(true);
   }
@@ -187,8 +212,8 @@ struct MemrefCopyOpLowering : public OpRewritePattern<memref::CopyOp> {
       auto storeOp = rewriter.replaceOpWithNewOp<hivm::StoreOp>(
           copyOp, TypeRange(), src, dst);
       // TODO: change TA to create hivm.load/store op directly
-      auto implicitTransposeAttr =
-          utils::getAnnotateOpWithAttr(copyOp.getTarget(), "MayImplicitTransposeWithLastAxis");
+      auto implicitTransposeAttr = utils::getAnnotateOpWithAttr(
+          copyOp.getTarget(), "MayImplicitTransposeWithLastAxis");
       if (implicitTransposeAttr.has_value()) {
         storeOp.setMayImplicitTransposeWithLastAxis(true);
       }
