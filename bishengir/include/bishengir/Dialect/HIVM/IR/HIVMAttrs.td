@@ -830,4 +830,11 @@ def HIVM_InsertSliceSourceIndexAttr
   }];
 }
 
+def HIVM_TransposeWithoutAllign :
+  HIVM_Attr<"TransposeWithoutAllign", "transpose_without_align"> {
+  let description = [{
+    HIVM transpose op disable alignment  
+  }];
+}
+
 #endif // BISHENGIR_DIALECT_HIVM_IR_HIVMATTRS_TD
