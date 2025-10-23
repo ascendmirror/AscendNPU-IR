@@ -117,6 +117,43 @@ Value tracebackImpl(Value memrefVal) {
 
 namespace utils {
 
+Value getReshapedValue(RewriterBase &rewriter, Location loc, Value v,
+                        llvm::ArrayRef<int64_t> newShape) {
+  auto type = v.getType();
+
+  bool isTensor = isa<TensorType>(type);
+  auto elemType = cast<ShapedType>(type).getElementType();
+
+  Type newType;
+  if (isTensor) {
+    newType = mlir::RankedTensorType::get(newShape, elemType);
+  } else {
+    newType = mlir::MemRefType::get(newShape, elemType);
+  }
+
+
+  Value reshapedValue;
+  if (isTensor) {
+    auto idxsType = mlir::RankedTensorType::get(ArrayRef<int64_t>(newShape.size()), rewriter.getI64Type());
+    auto denseIdxs = mlir::DenseElementsAttr::get(idxsType, newShape);
+    auto constantIdxs = rewriter.create<arith::ConstantOp>(loc, denseIdxs);
+    reshapedValue = rewriter.create<tensor::ReshapeOp>(loc, newType, v, constantIdxs);
+  } else {
+    auto idxsType = mlir::MemRefType::get(ArrayRef<int64_t>(newShape.size()), rewriter.getI64Type());
+    auto memrefIdxs = rewriter.create<memref::AllocOp>(loc, idxsType);
+    for (auto [idx, dim] : llvm::enumerate(newShape)) {
+      auto idxValue = rewriter.create<arith::ConstantIndexOp>(loc, idx);
+      auto dimValue = rewriter.create<arith::ConstantOp>(loc, rewriter.getI64IntegerAttr(dim));
+      
+      rewriter.create<memref::StoreOp>(loc, dimValue, memrefIdxs, ValueRange{idxValue});
+    }   
+    
+    reshapedValue = rewriter.create<memref::ReshapeOp>(loc, newType, v, memrefIdxs);
+  }
+
+  return reshapedValue;
+}
+
 Value getScalarValue(RewriterBase &rewriter, Location loc, Value v,
                      std::optional<const llvm::SmallVector<Value> *> indices) {
   if (isa<MemRefType>(v.getType())) {
