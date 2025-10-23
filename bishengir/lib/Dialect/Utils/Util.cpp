@@ -60,6 +60,10 @@ Value tracebackImpl(Value memrefVal) {
         return forOp.getInitArgs()[arg.getArgNumber() - 1];
       }
     }
+    if (auto whileOp =
+            dyn_cast<scf::WhileOp>(arg.getParentRegion()->getParentOp())) {
+      return whileOp.getTiedLoopInit(arg)->get();
+    }
   }
 
   Operation *def = memrefVal.getDefiningOp();
