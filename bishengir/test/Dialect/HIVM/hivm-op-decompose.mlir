@@ -239,6 +239,51 @@ func.func @test_vcast_op_tensor_i4_to_i8_not_empty_dyn(%d : index) -> tensor<2x?
 }
 
 //===----------------------------------------------------------------------===//
+// Test VTransposeOp with disabled align
+//===----------------------------------------------------------------------===//
+
+// -----
+func.func @test_vtranspose_disable_align() -> memref<2x3x256xf32, #hivm.address_space<ub>> {
+  // CHECK: %[[C256:.*]] = arith.constant 256 : i64
+  // CHECK: %[[C3:.*]] = arith.constant 3 : i64
+  // CHECK: %[[C96:.*]] = arith.constant 96 : i64
+  // CHECK: %[[C8:.*]] = arith.constant 8 : i64
+  // CHECK: %[[C24:.*]] = arith.constant 24 : i64
+  // CHECK: %[[C2IDX:.*]] = arith.constant 2 : index
+  // CHECK: %[[C32:.*]] = arith.constant 32 : i64
+  // CHECK: %[[C1:.*]] = arith.constant 1 : index
+  // CHECK: %[[C2:.*]] = arith.constant 2 : i64
+  // CHECK: %[[C0:.*]] = arith.constant 0 : index
+  // CHECK: %[[A:.*]] = memref.alloc() : memref<2x256x3xf32, #hivm.address_space<ub>>
+  // CHECK: %[[A0:.*]] = memref.alloc() : memref<3xi64, #hivm.address_space<ub>>
+  // CHECK: memref.store %[[C2]], %[[A0]][%[[C0]]] : memref<3xi64, #hivm.address_space<ub>>
+  // CHECK: memref.store %[[C32]], %[[A0]][%[[C1]]] : memref<3xi64, #hivm.address_space<ub>>
+  // CHECK: memref.store %[[C24]], %[[A0]][%[[C2IDX]]] : memref<3xi64, #hivm.address_space<ub>>
+  // CHECK: %[[R:.*]] = memref.reshape %[[A]](%[[A0]]) : (memref<2x256x3xf32, #hivm.address_space<ub>>, memref<3xi64, #hivm.address_space<ub>>) -> memref<2x32x24xf32, #hivm.address_space<ub>>
+  // CHECK: %[[A1:.*]] = memref.alloc() : memref<2x24x32xf32, #hivm.address_space<ub>>
+  // CHECK: hivm.hir.vtranspose ins(%[[R]] : memref<2x32x24xf32, #hivm.address_space<ub>>) outs(%[[A1]] : memref<2x24x32xf32, #hivm.address_space<ub>>) permutation = [0, 2, 1]
+  // CHECK: %[[A2:.*]] = memref.alloc() : memref<3xi64, #hivm.address_space<ub>>
+  // CHECK: memref.store %[[C2]], %[[A2]][%[[C0]]] : memref<3xi64, #hivm.address_space<ub>>
+  // CHECK: memref.store %[[C8]], %[[A2]][%[[C1]]] : memref<3xi64, #hivm.address_space<ub>>
+  // CHECK: memref.store %[[C96]], %[[A2]][%[[C2IDX]]] : memref<3xi64, #hivm.address_space<ub>>
+  // CHECK: %[[R3:.*]] = memref.reshape %[[A1]](%[[A2]]) : (memref<2x24x32xf32, #hivm.address_space<ub>>, memref<3xi64, #hivm.address_space<ub>>) -> memref<2x8x96xf32, #hivm.address_space<ub>>
+  // CHECK: %[[A4:.*]] = memref.alloc() : memref<2x96x8xf32, #hivm.address_space<ub>>
+  // CHECK: hivm.hir.vtranspose ins(%[[R3]] : memref<2x8x96xf32, #hivm.address_space<ub>>) outs(%[[A4]] : memref<2x96x8xf32, #hivm.address_space<ub>>) permutation = [0, 2, 1]
+  // CHECK: %[[A5:.*]] = memref.alloc() : memref<3xi64, #hivm.address_space<ub>>
+  // CHECK: memref.store %[[C2]], %[[A5]][%[[C0]]] : memref<3xi64, #hivm.address_space<ub>>
+  // CHECK: memref.store %[[C3]], %[[A5]][%[[C1]]] : memref<3xi64, #hivm.address_space<ub>>
+  // CHECK: memref.store %[[C256]], %[[A5]][%[[C2IDX]]] : memref<3xi64, #hivm.address_space<ub>>
+  // CHECK: %[[R6:.*]] = memref.reshape %[[A4]](%[[A5]]) : (memref<2x96x8xf32, #hivm.address_space<ub>>, memref<3xi64, #hivm.address_space<ub>>) -> memref<2x3x256xf32, #hivm.address_space<ub>>
+  // CHECK: return %[[R6]] : memref<2x3x256xf32, #hivm.address_space<ub>>
+  %src = memref.alloc() : memref<2x256x3xf32, #hivm.address_space<ub>>
+  %dst = memref.alloc() : memref<2x3x256xf32, #hivm.address_space<ub>>
+
+  hivm.hir.vtranspose ins(%src : memref<2x256x3xf32, #hivm.address_space<ub>>) outs(%dst : memref<2x3x256xf32, #hivm.address_space<ub>>) permutation = [0, 2, 1] disable_align = true
+  return %dst : memref<2x3x256xf32, #hivm.address_space<ub>>
+}
+
+
+//===----------------------------------------------------------------------===//
 // Test VCastOp args: transpose broadcast
 //===----------------------------------------------------------------------===//
 
