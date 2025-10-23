@@ -26,20 +26,28 @@
 
 using namespace mlir;
 
+static hivm::ReduceOperation
+getReduceWithIndexOpAttr(hfusion::ReduceWithIndexOp reduceOp) {
+  auto reduceKind = reduceOp.getReduceKindAttr().getReduceWithIndexKind();
+  auto tieBreakLeft = reduceOp.getTieBreakLeftAttr().getValue();
+  if (reduceKind == hfusion::ReduceWithIndexKind::MAX) {
+    return tieBreakLeft ? hivm::ReduceOperation::max_with_index_left
+                        : hivm::ReduceOperation::max_with_index_right;
+  }
+  if (reduceKind == hfusion::ReduceWithIndexKind::MIN) {
+    return tieBreakLeft ? hivm::ReduceOperation::min_with_index_left
+                        : hivm::ReduceOperation::min_with_index_right;
+  }
+  reduceOp.emitOpError("unsupported reduce with index operation: ");
+  llvm_unreachable("Not implemented");
+}
+
 static hivm::ReduceOpAttr getReduceOpAttr(Operation *op) {
   hivm::ReduceOperation kind;
-  auto ctx = op->getContext();
+  auto *ctx = op->getContext();
 
   if (auto reduceOp = dyn_cast<hfusion::ReduceWithIndexOp>(op)) {
-    auto reduceKind = reduceOp.getReduceKindAttr().getReduceWithIndexKind();
-    if (reduceKind == hfusion::ReduceWithIndexKind::MAX) {
-      kind = hivm::ReduceOperation::max_with_index;
-    } else if (reduceKind == hfusion::ReduceWithIndexKind::MIN) {
-      kind = hivm::ReduceOperation::min_with_index;
-    } else {
-      reduceOp.emitOpError("unsupported reduce with index operation: ");
-      llvm_unreachable("Not implemented");
-    }
+    kind = getReduceWithIndexOpAttr(reduceOp);
   } else if (auto reduceOp = dyn_cast<linalg::ReduceOp>(op)) {
     Block &body = reduceOp.getCombiner().front();
     auto yieldOp = dyn_cast<linalg::YieldOp>(body.getTerminator());
