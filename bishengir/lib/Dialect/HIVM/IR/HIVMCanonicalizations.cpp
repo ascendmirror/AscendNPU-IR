@@ -18,6 +18,7 @@
 #include "bishengir/Config/bishengir-config.h"
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
 #include "bishengir/Dialect/Tensor/IR/TensorImpl.h"
+#include "bishengir/Dialect/HIVM/Utils/Utils.h"
 #include "bishengir/Dialect/Utils/Util.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -251,6 +252,7 @@ struct RedudantVReduceOp : public OpRewritePattern<VReduceOp> {
 
     return success();
   }
+}
 };
 
 struct RedudantVReduceInitOp : public OpRewritePattern<VReduceOp> {
