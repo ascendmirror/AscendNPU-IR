@@ -155,9 +155,7 @@ struct LinalgToHIVMReduceLikeOp : public OpRewritePattern<ReduceOpTy> {
       return elemType.isInteger();
     };
 
-    auto indices = isTieBreakRight(reduceOp) && isSrcInputInt(reduceOp)
-                       ? reduceOpInits[1]
-                       : nullptr;
+    auto indices = (reduceOpInputs.size() > 1) ? reduceOpInputs[1] : nullptr;
     // For reduce with index op that has index as input, note that the
     // index is not used in the hivm op because hivm op creates its
     // own index.

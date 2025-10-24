@@ -218,7 +218,7 @@ struct RedudantVReduceOp : public OpRewritePattern<VReduceOp> {
       if (reduceOp.hasPureTensorSemantics()) {
         assert(isa<TensorType>(srcType));
         auto arith = reduceOp.getArithAttr().getReduceOp();
-        if (util::isArgminOrArgmax(arith)) {
+        if (isArgminOrArgmax(arith)) {
           if (!reduceOp->getResult(1).getUsers().empty()) {
             return decomposeRedundantReduceWithIndex(reduceOp, rewriter,
                                                      isa<TensorType>(srcType));
@@ -233,7 +233,7 @@ struct RedudantVReduceOp : public OpRewritePattern<VReduceOp> {
           return failure();
         }
         auto arith = reduceOp.getArithAttr().getReduceOp();
-        if (util::isArgminOrArgmax(arith)) {
+        if (isArgminOrArgmax(arith)) {
           return decomposeRedundantReduceWithIndex(reduceOp, rewriter,
                                                    isa<TensorType>(srcType));
         }
@@ -251,6 +251,13 @@ struct RedudantVReduceOp : public OpRewritePattern<VReduceOp> {
 
     return success();
   }
+
+  bool isArgminOrArgmax(ReduceOperation op) const {
+  return op == ReduceOperation::min_with_index_left ||
+         op == ReduceOperation::max_with_index_left ||
+         op == ReduceOperation::min_with_index_right ||
+         op == ReduceOperation::max_with_index_right;
+}
 };
 
 struct RedudantVReduceInitOp : public OpRewritePattern<VReduceOp> {
