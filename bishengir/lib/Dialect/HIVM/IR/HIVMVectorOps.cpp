@@ -267,7 +267,15 @@ void VReduceOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                       TypeRange result, Value src, ValueRange dst,
                       hivm::ReduceOpAttr arith, DenseI64ArrayAttr reduce_dims) {
   build(odsBuilder, odsState, result, src, dst, /*temp_buffer=*/nullptr, arith,
-        reduce_dims);
+        reduce_dims, /*indices=*/nullptr);
+}
+
+void VReduceOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                      TypeRange result, Value src, ValueRange dst,
+                      hivm::ReduceOpAttr arith, DenseI64ArrayAttr reduce_dims,
+                      Value indices) {
+  build(odsBuilder, odsState, result, src, dst, /*temp_buffer=*/nullptr, arith,
+        reduce_dims, indices);
 }
 
 LogicalResult VReduceOp::verify() {
