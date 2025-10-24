@@ -22,6 +22,8 @@
 
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/TypeUtilities.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace mlir;
@@ -134,12 +136,33 @@ struct LinalgToHIVMReduceLikeOp : public OpRewritePattern<ReduceOpTy> {
       }
     }
 
-    // For reduce with index op that has index as input, note that the index is
-    // not used in the hivm op because hivm op creates its own index.
+    auto isTieBreakRight = [](Operation *op) -> bool {
+      auto reduceWithIndexOp = dyn_cast<hfusion::ReduceWithIndexOp>(op);
+      if (!reduceWithIndexOp) {
+        return false;
+      }
+      auto tieBreakLeft = reduceWithIndexOp.getTieBreakLeftAttr().getValue();
+      return tieBreakLeft == false;
+    };
+
+    auto isSrcInputInt = [](Operation *op) -> bool {
+      auto reduceWithIndexOp = dyn_cast<hfusion::ReduceWithIndexOp>(op);
+      if (!reduceWithIndexOp) {
+        return false;
+      }
+      Type elemType =
+          getElementTypeOrSelf(reduceWithIndexOp.getInputs()[0].getType());
+      return elemType.isInteger();
+    };
+
+    auto indices = (reduceOpInputs.size() > 1) ? reduceOpInputs[1] : nullptr;
+    // For reduce with index op that has index as input, note that the
+    // index is not used in the hivm op because hivm op creates its
+    // own index.
     auto hivmOp = rewriter.create<hivm::VReduceOp>(
         reduceOp.getLoc(), TypeRange(resTypeVec), reduceOpInputs[0],
         ValueRange(expandShapeOps), getReduceOpAttr(reduceOp),
-        reduceOp.getDimensionsAttr());
+        reduceOp.getDimensionsAttr(), indices);
 
     Value firstCollapseSrc =
         hasPureTensor ? hivmOp.getResult()[0] : hivmOp.getDstValue();
