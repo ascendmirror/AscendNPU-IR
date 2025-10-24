@@ -352,3 +352,33 @@ func.func @castInLoop(%arg0: tensor<1x1x12xbf16>, %arg1: tensor<1x1x12xbf16>) ->
   }
   return %7 : tensor<1x1x12xbf16>
 }
+
+// -----
+// CHECK-LABEL:   func.func @FuseMatmulAdd(
+// CHECK:                                  %[[ARG_0:.*]]: tensor<16x8xbf16>
+// CHECK:                                  %[[ARG_1:.*]]: tensor<8x16xbf16>
+// CHECK:                                  %[[ARG_2:.*]]: tensor<16x16xf32>) -> tensor<16x16xf32> {
+func.func @FuseMatmulAdd(%arg0: tensor<16x8xbf16>, %arg1: tensor<8x16xbf16>, %arg2: tensor<16x16xf32>) -> tensor<16x16xf32> {
+  %empty = tensor.empty() : tensor<16x16xf32>
+  // CHECK:              %[[VAL_0:.*]] = linalg.matmul {input_precision = "hf32"} ins(%arg0, %arg1 : tensor<16x8xbf16>, tensor<8x16xbf16>) outs(%arg2 : tensor<16x16xf32>) -> tensor<16x16xf32>
+  %1 = linalg.matmul {input_precision = "hf32"} ins(%arg0, %arg1 : tensor<16x8xbf16>, tensor<8x16xbf16>) outs(%empty : tensor<16x16xf32>) -> tensor<16x16xf32> 
+  // CHECK-NOT:          arith.addf
+  %2 = arith.addf %arg2, %1 : tensor<16x16xf32>  
+  // CHECK:              return %[[VAL_0]] : tensor<16x16xf32> 
+  return %2 : tensor<16x16xf32> 
+}
+
+// -----
+// CHECK-LABEL:   func.func @FuseBatchMatmulAdd(
+// CHECK:                                  %[[ARG_0:.*]]: tensor<3x16x8xbf16>
+// CHECK:                                  %[[ARG_1:.*]]: tensor<3x8x16xbf16>
+// CHECK:                                  %[[ARG_2:.*]]: tensor<3x16x16xf32>) -> tensor<3x16x16xf32> {
+func.func @FuseBatchMatmulAdd(%arg0: tensor<3x16x8xbf16>, %arg1: tensor<3x8x16xbf16>, %arg2: tensor<3x16x16xf32>) -> tensor<3x16x16xf32> {
+  %empty = tensor.empty() : tensor<3x16x16xf32>
+  // CHECK:              %[[VAL_0:.*]] = linalg.batch_matmul {input_precision = "hf32"} ins(%arg0, %arg1 : tensor<3x16x8xbf16>, tensor<3x8x16xbf16>) outs(%arg2 : tensor<3x16x16xf32>) -> tensor<3x16x16xf32>
+  %1 = linalg.batch_matmul {input_precision = "hf32"} ins(%arg0, %arg1 : tensor<3x16x8xbf16>, tensor<3x8x16xbf16>) outs(%empty : tensor<3x16x16xf32>) -> tensor<3x16x16xf32> 
+  // CHECK-NOT:          arith.addf
+  %2 = arith.addf %arg2, %1 : tensor<3x16x16xf32>  
+  // CHECK:              return %[[VAL_0]] : tensor<3x16x16xf32> 
+  return %2 : tensor<3x16x16xf32> 
+}
