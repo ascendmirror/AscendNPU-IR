@@ -1138,11 +1138,13 @@ def VReduceOp : HIVM_VectorOp<"vreduce",
                        Variadic<TensorOrMemref>:$dst,
                        Optional<AnyMemRef>:$temp_buffer,
                        HIVM_ReduceOpAttr:$arith,
-                       DenseI64ArrayAttr:$reduce_dims
+                       DenseI64ArrayAttr:$reduce_dims,
+                       Optional<TensorOrMemref>:$indices
   );
   let results = (outs Variadic<AnyRankedTensor>:$result);
   let assemblyFormat = [{
     attr-dict $arith `ins` `(` $src `:` type($src) `)`
+    (`indices` `(` $indices^ `:` type($indices) `)`)?
     `outs` `(` $dst `:` type($dst) `)`
     (`temp_buffer` `(` $temp_buffer^ `:` type($temp_buffer) `)`)?
     `reduce_dims` `=` $reduce_dims
@@ -1151,7 +1153,10 @@ def VReduceOp : HIVM_VectorOp<"vreduce",
   let builders = [
     OpBuilder<(ins "TypeRange":$result, "Value":$src,
                    "ValueRange":$dst, "hivm::ReduceOpAttr":$arith,
-                   "DenseI64ArrayAttr":$reduce_dims)>
+                   "DenseI64ArrayAttr":$reduce_dims)>,
+    OpBuilder<(ins "TypeRange":$result, "Value":$src,
+                   "ValueRange":$dst, "hivm::ReduceOpAttr":$arith,
+                   "DenseI64ArrayAttr":$reduce_dims, "Value":$indices)>
   ];
   let hasCanonicalizer = 1;
   let hasVerifier = 1;
