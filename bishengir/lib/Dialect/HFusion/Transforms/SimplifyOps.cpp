@@ -231,6 +231,41 @@ public:
   }
 };
 
+template <typename MMOP>
+struct FuseMatmulAddPattern : public OpRewritePattern<MMOP> {
+public:
+  using OpRewritePattern<MMOP>::OpRewritePattern;
+  LogicalResult matchAndRewrite(MMOP matmulOp,
+                                PatternRewriter &rewriter) const final {
+    if (isOpTriviallyDead(matmulOp)) {
+      rewriter.eraseOp(matmulOp);
+      return success();
+    }
+
+    auto matmulResult = matmulOp->getResult(0);
+    if (!matmulResult.hasOneUse()) {
+      return failure();
+    }
+    auto addOp = dyn_cast<arith::AddFOp>(*matmulResult.getUsers().begin());
+    if (!addOp) {
+      return failure();
+    }
+    Value lhs = matmulOp.getInputs()[0];
+    Value rhs = matmulOp.getInputs()[1];
+    Value bias = (matmulResult == addOp.getLhs()) ? addOp.getRhs() : addOp.getLhs();
+    Location loc = matmulOp.getLoc();
+    auto newMatmulOp = rewriter.create<MMOP>(
+        loc, ValueRange{lhs, rhs}, ValueRange{bias});
+    std::string inputPrecisionStr{"input_precision"};
+    if (auto inputPrecisionAttr = matmulOp->getAttr(inputPrecisionStr)) {
+      newMatmulOp->setAttr(inputPrecisionStr, inputPrecisionAttr);
+    }
+    rewriter.replaceOp(addOp, newMatmulOp->getResult(0));
+    rewriter.eraseOp(matmulOp);
+    return success();
+  }
+};
+
 bool isConstOne(Value v) {
   auto type = getElementTypeOrSelf(v);
   if (isa<FloatType>(type)) {
@@ -364,6 +399,10 @@ void populateSimplifyOpsPattern(RewritePatternSet &patterns) {
   patterns.add<LoopedCastOpPattern>(patterns.getContext());
   patterns.add<CastOpPattern>(patterns.getContext());
   patterns.add<TransposeOpPattern>(patterns.getContext());
+  patterns.add<FuseMatmulAddPattern<linalg::MatmulOp>>(
+      patterns.getContext());
+  patterns.add<FuseMatmulAddPattern<linalg::BatchMatmulOp>>(
+      patterns.getContext());
   patterns.add<ElemBinaryPattern<hfusion::ElemwiseBinaryOp>>(
       patterns.getContext());
   patterns.add<ElemBinaryPattern<linalg::ElemwiseBinaryOp>>(
