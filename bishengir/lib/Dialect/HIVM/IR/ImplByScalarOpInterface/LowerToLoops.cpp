@@ -554,6 +554,9 @@ Value calculateIndexIntegerArgMinArgMax(
           .getResult();
   Value resIndex = rewriter.create<arith::SelectOp>(op.getLoc(), resConditional,
                                                     indval, scalarIndx[0]);
+  // createSinglePointLoad(rewriter, op.getLoc(), op.getDpsInputs()[1], );
+  // auto loadOp = mlir::utils::createSinglePointLoad(
+  //     rewriter, op.getLoc(), op.getDpsInputs()[0], dstIndexes);
   return resIndex;
 }
 
@@ -609,6 +612,7 @@ std::pair<Value, Value> getIndexTensorForArgmaxArgmin(
     resIndex = calculateIndexIntegerArgMinArgMax(rewriter, op, scalarInputs,
                                                  scalarIndx, intPred,
                                                  scalarInputs[1], index);
+
     resTensor = getScalarResult<hivm::VMinOp, SCALAROP>(rewriter, op.getLoc(),
                                                         scalarInputs);
   } else {
@@ -618,6 +622,9 @@ std::pair<Value, Value> getIndexTensorForArgmaxArgmin(
     resTensor = calculateResFloatArgMinArgMax(rewriter, op, scalarInputs,
                                               floatPred, scalarInputs[1]);
   }
+  // if (scalarInputs.size() > 1) {
+  // createSinglePointLoad(rewriter, op.getLoc(), scalarInputs[1], resIndex);
+  // }
   return {resIndex, resTensor};
 }
 
@@ -744,6 +751,7 @@ void decomposeVReduceOpToScalarOpImpl(RewriterBase &rewriter, VReduceOp op) {
     // Since the reduce operation src is different from the dst shape,
     // additional indexes are required to obtain the dst value.
     llvm::SmallVector<Value> dstIndexes(indexes);
+    llvm::SmallVector<Value> newIndexes(indexes);
     auto reduceDims = op.getReduceDims();
     auto constZero = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
     // update dstIndexes: change index of reduce axis to 0
@@ -777,13 +785,22 @@ void decomposeVReduceOpToScalarOpImpl(RewriterBase &rewriter, VReduceOp op) {
     llvm::SmallVector<Value> resTensors = createScalarReduceComputeOp(
         rewriter, op, scalarInputs, scalarIndx, indexes[indexVal]);
 
-    for (size_t i = 0; i < resTensors.size(); ++i) {
-      createSinglePointStore(rewriter, op.getLoc(), resTensors[i],
-                             op.getDpsInits()[i], dstIndexes);
-    }
+    newIndexes[reduceDims[0]] = resTensors[1];
+    auto newLoad = createSinglePointLoad(rewriter, op.getLoc(),
+                                         op.getDpsInputs()[1], newIndexes);
+
+    createSinglePointStore(rewriter, op.getLoc(), resTensors[0],
+                           op.getDpsInits()[0], dstIndexes);
+    createSinglePointStore(rewriter, op.getLoc(), newLoad, op.getDpsInits()[1],
+                           dstIndexes);
+    // for (size_t i = 0; i < resTensors.size(); ++i) {
+    //   createSinglePointStore(rewriter, op.getLoc(), resTensors[i],
+    //                          op.getDpsInits()[i], dstIndexes);
+    // }
   };
 
   Value dst = op->getOperand(0);
+  Value indices = op->getOperand(1);
   MemRefType dstType = dyn_cast<MemRefType>(dst.getType());
   std::set<int> loopDims;
   for (int i = 0; i < dstType.getRank(); i++) {
