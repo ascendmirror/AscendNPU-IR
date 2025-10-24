@@ -143,11 +143,13 @@ bool VMulExtOp::shouldLowerToScalarLoops() {
 namespace mlir::hivm {
 
 static bool processIndexLeft(VReduceOp op, Type elemType) {
+  // lower reduce_with_index op with integer-type src
   if (elemType.isInteger(64) || elemType.isInteger(32) ||
       elemType.isInteger(16)) {
     return true;
   }
-
+  
+  // lower reduce_with_index op with 3 or more dims
   if (elemType.isF16() || elemType.isF32() || elemType.isBF16()) {
     auto hivmFlattenInterfaceOp =
         cast<hivm::FlattenInterface>(op.getOperation());
@@ -171,6 +173,8 @@ static bool processIndexRight(VReduceOp op, Type elemType) {
   bool lastAxis = reduceDims[0] == rank - 1;
   bool isROrAR = rank == 1 || lastAxis;
 
+  // lower reduce_with_index op with integer-type src
+  // lower rightmost type reduce_with_index op in R and AR condition
   if (elemType.isInteger(64) || elemType.isInteger(32) ||
       elemType.isInteger(16) ||
       (isROrAR &&
@@ -179,6 +183,7 @@ static bool processIndexRight(VReduceOp op, Type elemType) {
     return true;
   }
 
+  // lower reduce_with_index op with 3 or more dims
   if (elemType.isF16() || elemType.isF32() || elemType.isBF16()) {
     auto hivmFlattenInterfaceOp =
         cast<hivm::FlattenInterface>(op.getOperation());

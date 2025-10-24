@@ -75,6 +75,8 @@ def ReduceWithIndexOp : HFusionStructuredBase_Op<"reduce_with_index",
     index (AnyShaped), produce resulting input and index;
     (2) take input, produce resulting input and index.
     Currently only one reduction dimension is supported.
+    `tie_break_left` shows whether find the leftmost index or
+    the rightmost index. 
   }];
 
   let arguments = (ins Variadic<AnyShaped>:$inputs,
@@ -82,7 +84,7 @@ def ReduceWithIndexOp : HFusionStructuredBase_Op<"reduce_with_index",
                        HFusion_ReduceWithIndexOpAttr:$reduce_kind,
                        BoolAttr:$tie_break_left,
                        ConfinedAttr<DenseI64ArrayAttr,
-                         [DenseArrayStrictlySorted<DenseI64ArrayAttr>]>:$dimensions
+                       [DenseArrayStrictlySorted<DenseI64ArrayAttr>]>:$dimensions
   );
   let results = (outs Variadic<AnyTensor>:$result);
   let regions = (region AnyRegion:$region);

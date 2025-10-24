@@ -22,6 +22,8 @@
 
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/TypeUtilities.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace mlir;
@@ -134,12 +136,13 @@ struct LinalgToHIVMReduceLikeOp : public OpRewritePattern<ReduceOpTy> {
       }
     }
 
-    // For reduce with index op that has index as input, note that the index is
-    // not used in the hivm op because hivm op creates its own index.
+    // If there are no indices input from HFusion/Linalg reduce op, then the hivm
+    // reduce op will create it's own indeices input.
+    auto indices = (reduceOpInputs.size() > 1) ? reduceOpInputs[1] : nullptr;
     auto hivmOp = rewriter.create<hivm::VReduceOp>(
         reduceOp.getLoc(), TypeRange(resTypeVec), reduceOpInputs[0],
         ValueRange(expandShapeOps), getReduceOpAttr(reduceOp),
-        reduceOp.getDimensionsAttr());
+        reduceOp.getDimensionsAttr(), indices);
 
     Value firstCollapseSrc =
         hasPureTensor ? hivmOp.getResult()[0] : hivmOp.getDstValue();
