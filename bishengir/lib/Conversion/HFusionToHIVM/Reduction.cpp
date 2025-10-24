@@ -139,7 +139,7 @@ struct LinalgToHIVMReduceLikeOp : public OpRewritePattern<ReduceOpTy> {
     auto hivmOp = rewriter.create<hivm::VReduceOp>(
         reduceOp.getLoc(), TypeRange(resTypeVec), reduceOpInputs[0],
         ValueRange(expandShapeOps), getReduceOpAttr(reduceOp),
-        reduceOp.getDimensionsAttr());
+        reduceOp.getDimensionsAttr(), reduceOpInputs[1]);
 
     Value firstCollapseSrc =
         hasPureTensor ? hivmOp.getResult()[0] : hivmOp.getDstValue();
