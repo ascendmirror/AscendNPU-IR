@@ -18,6 +18,7 @@
 #include "bishengir/Conversion/LinalgToHFusion/LinalgToHFusion.h"
 #include "bishengir/Dialect/HFusion/IR/HFusion.h"
 #include "bishengir/Dialect/Tensor/IR/TensorImpl.h"
+#include "bishengir/Dialect/Utils/Util.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -409,10 +410,18 @@ struct LinalgToHFusionReduceWithIndex : OpRewritePattern<linalg::ReduceOp> {
     auto reduceKindAttr =
         ReduceWithIndexKindAttr::get(rewriter.getContext(), reduceKind);
     auto tieBreakLeftAttr = BoolAttr::get(rewriter.getContext(), tieBreakLeft);
-    rewriter.replaceOpWithNewOp<hfusion::ReduceWithIndexOp>(
+    std::optional<Operation *> isIndexInputUnused = utils::getAnnotateOpWithAttr(inits[1], "unused_index");
+    if (!isIndexInputUnused.has_value()) {
+      rewriter.replaceOpWithNewOp<hfusion::ReduceWithIndexOp>(
         op, TypeRange{inits[0].getType(), inits[1].getType()},
         /*input*/ op.getInputs(), /*outputValue&Index*/ inits, reduceKindAttr,
         tieBreakLeftAttr, op.getDimensionsAttr());
+    } else {
+      rewriter.replaceOpWithNewOp<hfusion::ReduceWithIndexOp>(
+          op, TypeRange{inits[0].getType(), inits[1].getType()},
+          /*input*/ ValueRange{op.getInputs()[0]}, /*outputValue&Index*/ inits, reduceKindAttr,
+          tieBreakLeftAttr, op.getDimensionsAttr());
+    }
     return success();
   }
 };

@@ -602,13 +602,13 @@ std::pair<Value, Value> getIndexTensorForArgmaxArgmin(
     llvm::SmallVector<Value, 4> scalarInputs,
     llvm::SmallVector<Value, 4> scalarIndx, Value index,
     arith::CmpIPredicate intPred, arith::CmpFPredicate floatPred) {
-
   Value resTensor;
   Value resIndex;
   if (elemType.isInteger()) {
     resIndex = calculateIndexIntegerArgMinArgMax(rewriter, op, scalarInputs,
                                                  scalarIndx, intPred,
                                                  scalarInputs[1], index);
+
     resTensor = getScalarResult<hivm::VMinOp, SCALAROP>(rewriter, op.getLoc(),
                                                         scalarInputs);
   } else {
@@ -753,6 +753,10 @@ void decomposeVReduceOpToScalarOpImpl(RewriterBase &rewriter, VReduceOp op) {
     insertReduceInitialization(rewriter, op, indexes);
 
     // push reduce init as another scalar input operand
+    if (op.getIndices()) {
+      scalarInputs.pop_back();
+    }
+
     if (isa<MemRefType>(op.getDstValue().getType())) {
       auto loadOp = createSinglePointLoad(rewriter, op.getLoc(),
                                           op.getDpsInits()[0], dstIndexes);
@@ -777,9 +781,9 @@ void decomposeVReduceOpToScalarOpImpl(RewriterBase &rewriter, VReduceOp op) {
     llvm::SmallVector<Value> resTensors = createScalarReduceComputeOp(
         rewriter, op, scalarInputs, scalarIndx, indexes[indexVal]);
 
-    for (size_t i = 0; i < resTensors.size(); ++i) {
-      createSinglePointStore(rewriter, op.getLoc(), resTensors[i],
-                             op.getDpsInits()[i], dstIndexes);
+    for (size_t i = 0; i < resTensors.size(); ++i) {	
+      createSinglePointStore(rewriter, op.getLoc(), resTensors[i],	
+                             op.getDpsInits()[i], dstIndexes);	
     }
   };
 
@@ -789,7 +793,45 @@ void decomposeVReduceOpToScalarOpImpl(RewriterBase &rewriter, VReduceOp op) {
   for (int i = 0; i < dstType.getRank(); i++) {
     loopDims.insert(i);
   }
-  createNestedLoops(rewriter, op.getLoc(), dst, loopDims, buildLoopBody);
+  auto forOps = createNestedLoops(rewriter, op.getLoc(), dst, loopDims, buildLoopBody);
+  if (op.getIndices()) {
+    if (forOps.size() > 0) {
+      rewriter.setInsertionPointAfter(forOps[0]);
+    }
+    auto loadAndStoreIndexFunc = [&rewriter, &op](llvm::SmallVector<Value> dstIndexes,
+                                                  int64_t reduceDim) -> void {
+      auto loadedIndex = createSinglePointLoad(rewriter, op.getLoc(),
+                                                op.getDpsInits()[1], dstIndexes).getResult();
+      auto idxIndex = rewriter.create<arith::IndexCastOp>(op.getLoc(), 
+                                                        TypeRange{rewriter.getIndexType()}, 
+                                                        ValueRange{loadedIndex}).getResult();
+      llvm::SmallVector<Value> idxIndexes(dstIndexes);
+      idxIndexes[reduceDim] = idxIndex;
+      auto resIndex = createSinglePointLoad(rewriter, op.getLoc(),
+                                            op.getIndices(), idxIndexes).getResult();
+      createSinglePointStore(rewriter, op.getLoc(), resIndex, op.getDpsInits()[1], dstIndexes);
+    };
+    
+    if (loopDims.size() == 1) {
+      auto constZero = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
+      llvm::SmallVector<Value> dstIndexes = {constZero};
+      int64_t reduceDim = op.getReduceDims()[0];
+      loadAndStoreIndexFunc(dstIndexes, reduceDim);
+    } else {
+      auto buildGatherLoopBody = [&rewriter, &op,
+                                  &loadAndStoreIndexFunc](llvm::SmallVector<Value> indexes) -> void {
+        llvm::SmallVector<Value> dstIndexes(indexes);
+        int64_t reduceDim = op.getReduceDims()[0];
+        auto constZero = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
+        auto *it = dstIndexes.begin() + reduceDim;
+        // update dstIndexes: insert 0 to index of reduce axis
+        dstIndexes.insert(it, constZero);
+        loadAndStoreIndexFunc(dstIndexes, reduceDim);
+      };
+      loopDims.erase(op.getReduceDims()[0]);
+      createNestedLoops(rewriter, op.getLoc(), dst, loopDims, buildGatherLoopBody);
+    }
+  }
 }
 
 } // namespace mlir::hivm
