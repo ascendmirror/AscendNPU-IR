@@ -209,3 +209,28 @@ std::string bishengir::getBiShengInstallPath() {
                              " please verify its validity");
   return path.str().str();
 }
+
+mlir::LogicalResult bishengir::handleDiagnostic(const mlir::Diagnostic &diag) {
+  auto &os = (diag.getServerity() == mlir::DiagnosticSeverity::Error)
+            ? llvm::errs()
+            : llvm::outs();
+  auto loc = diag.getLocation();
+  if(!llvm::isa<mlir::UnKownLoc>(loc)) {
+    os << loc << ": ";
+  }
+
+  // Handle warning.
+  if(diag.getServerity() == mlir::DiagnosticSeverity::Warning) {
+    os << "warning: " << diag.str() << "\n";
+    return mlir::success();
+  }
+
+  // Handle error.
+  if(diag.ge tServerity() == mlir::DiagnosticSeverity::Error) {
+    os << "error: " << diag.str() << "\n";
+    return mlir::failure();
+  }
+
+  // Any other severity - treat as failure.
+  return mlir::failure();
+}
