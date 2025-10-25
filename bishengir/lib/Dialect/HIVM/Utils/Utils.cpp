@@ -76,12 +76,60 @@ FailureOr<memref::AllocOp> getMemRefForBlockArgument(BlockArgument bbArg) {
   auto *bbParentOp = bbOwner->getParentOp();
   if (!bbParentOp)
     return failure();
-  auto forOp = dyn_cast<scf::ForOp>(bbParentOp);
-  if (!forOp) {
-    return bbParentOp->emitError("Unsupported block op type");
+  if (auto forOp = dyn_cast<scf::ForOp>(bbParentOp)) {
+    auto *operand = forOp.getTiedLoopInit(bbArg);
+    return getMemRefAlloc(operand->get());
+  } 
+  if (auto whileOp = dyn_cast<scf::WhileOp>(bbParentOp)) {
+    auto *operand = whileOp.getTiedLoopInit(bbArg);
+    return getMemRefAlloc(operand->get());
   }
-  auto *operand = forOp.getTiedLoopInit(bbArg);
-  return getMemRefAlloc(operand->get());
+  return bbParentOp->emitError("Unsupported block op type");
+}
+
+/// Find the root PointerCastOp for the input block argument.
+FailureOr<hivm::PointerCastOp>
+getPointerCastOpForBlockArgument(BlockArgument bbArg) {
+  auto *bbOwner = bbArg.getOwner();
+  if (!bbOwner) {
+    llvm_unreachable("parentOp doesn't exist");
+    return failure();
+  }
+  auto *bbParentOp = bbOwner->getParentOp();
+  if (!bbParentOp)
+    return failure();
+  if (auto forOp = dyn_cast<scf::ForOp>(bbParentOp)) {
+    auto *operand = forOp.getTiedLoopInit(bbArg);
+    return getPointerCastOp(operand->get());
+  }
+  if (auto whileOp = dyn_cast<scf::WhileOp>(bbParentOp)) {
+    auto *operand = whileOp.getTiedLoopInit(bbArg);
+    return getPointerCastOp(operand->get());
+  }
+  return bbParentOp->emitError("Unsupported block op type");
+}
+
+/// Find the root PointerCastOp for the OpResult.
+FailureOr<hivm::PointerCastOp> getPointerCastOpResult(OpResult result) {
+  return TypeSwitch<Operation *, FailureOr<hivm::PointerCastOp>>(
+             result.getDefiningOp())
+      .Case<hivm::PointerCastOp>([&](hivm::PointerCastOp op) { return op; })
+      // We could pursue view_source of current traced op with
+      // viewLikeOpInterface trait.
+      .Case<mlir::ViewLikeOpInterface>([&](ViewLikeOpInterface viewLikeOp) {
+        return getPointerCastOp(viewLikeOp.getViewSource());
+      })
+      .Case<scf::ForOp>([&](scf::ForOp op) {
+        Value initSource = op.getInits()[result.getResultNumber()];
+        return getPointerCastOp(initSource);
+      })
+      .Case<scf::WhileOp>([&](scf::WhileOp op) {
+        Value initSource = op.getInits()[result.getResultNumber()];
+        return getPointerCastOp(initSource);
+      })
+      .Default([&](Operation *op) {
+        return failure();
+      });
 }
 
 /// Find the root memerf alloc for the OpResult.
@@ -95,6 +143,10 @@ FailureOr<memref::AllocOp> getMemRefForOpResult(OpResult result) {
         return getMemRefAlloc(viewLikeOp.getViewSource());
       })
       .Case<scf::ForOp>([&](scf::ForOp op) {
+        Value initSource = op.getInits()[result.getResultNumber()];
+        return getMemRefAlloc(initSource);
+      })
+      .Case<scf::WhileOp>([&](scf::WhileOp op) {
         Value initSource = op.getInits()[result.getResultNumber()];
         return getMemRefAlloc(initSource);
       })
@@ -230,6 +282,15 @@ FailureOr<memref::AllocOp> getMemRefAlloc(Value operand) {
   auto result = dyn_cast<OpResult>(operand);
   assert(result != nullptr);
   return getMemRefForOpResult(result);
+}
+
+FailureOr<hivm::PointerCastOp> getPointerCastOp(Value operand) {
+  if (auto bbArg = dyn_cast<BlockArgument>(operand)) {
+    return getPointerCastOpForBlockArgument(bbArg);
+  }
+  auto result = dyn_cast<OpResult>(operand);
+  assert(result != nullptr);
+  return getPointerCastOpResult(result);
 }
 
 // New helper function to get the updated BaseMemRefType
