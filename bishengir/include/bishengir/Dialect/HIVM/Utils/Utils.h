@@ -97,6 +97,11 @@ BaseMemRefType getBaseMemRefTypeWithNewScope(BaseMemRefType type,
 /// AllocOp.
 FailureOr<memref::AllocOp> getMemRefAlloc(Value operand);
 
+/// Get the root PointerCastOp for the input operand, return failure if there is
+/// unsupported Ops on the search path or if the defining op is not a
+/// PointerCastOp.
+FailureOr<hivm::PointerCastOp> getPointerCastOp(Value operand);
+
 SmallVector<Value>
 getValueListFromMixedTypeLists(SmallVector<Value> dynamicValues,
                                ArrayRef<int64_t> staticValues, Location loc,
