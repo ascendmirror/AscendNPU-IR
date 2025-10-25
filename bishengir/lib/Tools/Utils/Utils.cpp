@@ -215,11 +215,12 @@ mlir::LogicalResult bishengir::handleDiagnostic(const mlir::Diagnostic &diag) {
             ? llvm::errs()
             : llvm::outs();
   auto loc = diag.getLocation();
-  if(!llvm::isa<mlir::UnKnownLoc>(loc)) {
+  if(!llvm::isa<mlir::UnknownLoc>(loc)) {
     os << loc << ": ";
   }
 
   // Handle warning.
+
   if(diag.getSeverity() == mlir::DiagnosticSeverity::Warning) {
     os << "warning: " << diag.str() << "\n";
     return mlir::success();
