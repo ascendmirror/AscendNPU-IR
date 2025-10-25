@@ -18,8 +18,8 @@
 // This header file defines prototypes of all HIVM pipelines.
 //
 //===----------------------------------------------------------------------===//
-#ifndef BISHENGIR_DIALECT_HIVM_PIPELINES_PASSES_H
-#define BISHENGIR_DIALECT_HIVM_PIPELINES_PASSES_H
+#ifndef BISHENGIR_DIALECT_HIVM_PIPELINES_CONVERT_TO_HIVM_PIPELINE_H
+#define BISHENGIR_DIALECT_HIVM_PIPELINES_CONVERT_TO_HIVM_PIPELINE_H
 
 #include "bishengir/Dialect/HIVM/Transforms/Passes.h"
 #include "mlir/Pass/PassOptions.h"
@@ -48,4 +48,4 @@ void registerConvertToHIVMPipelines();
 } // namespace hivm
 } // namespace mlir
 
-#endif // BISHENGIR_DIALECT_HIVM_PIPELINES_PASSES_H
+#endif // BISHENGIR_DIALECT_HIVM_PIPELINES_CONVERT_TO_HIVM_PIPELINE_H
