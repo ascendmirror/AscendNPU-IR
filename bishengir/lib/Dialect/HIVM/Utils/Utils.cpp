@@ -76,12 +76,11 @@ FailureOr<memref::AllocOp> getMemRefForBlockArgument(BlockArgument bbArg) {
   auto *bbParentOp = bbOwner->getParentOp();
   if (!bbParentOp)
     return failure();
-  auto forOp = dyn_cast<scf::ForOp>(bbParentOp);
-  if (!forOp) {
-    return bbParentOp->emitError("Unsupported block op type");
+  if (auto loopOp = dyn_cast<LoopLikeOpInterface>(bbParentOp)) {
+    auto *operand = loopOp.getTiedLoopInit(bbArg);
+    return getMemRefAlloc(operand->get());
   }
-  auto *operand = forOp.getTiedLoopInit(bbArg);
-  return getMemRefAlloc(operand->get());
+  return bbParentOp->emitError("Unsupported block op type");
 }
 
 /// Find the root memerf alloc for the OpResult.
@@ -94,8 +93,8 @@ FailureOr<memref::AllocOp> getMemRefForOpResult(OpResult result) {
       .Case<mlir::ViewLikeOpInterface>([&](ViewLikeOpInterface viewLikeOp) {
         return getMemRefAlloc(viewLikeOp.getViewSource());
       })
-      .Case<scf::ForOp>([&](scf::ForOp op) {
-        Value initSource = op.getInits()[result.getResultNumber()];
+      .Case<mlir::LoopLikeOpInterface>([&](LoopLikeOpInterface loopOp) {
+        Value initSource = loopOp.getInits()[result.getResultNumber()];
         return getMemRefAlloc(initSource);
       })
       .Case<bufferization::ToTensorOp>([&](bufferization::ToTensorOp op) {
