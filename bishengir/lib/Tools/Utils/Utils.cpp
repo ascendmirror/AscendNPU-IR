@@ -220,6 +220,7 @@ mlir::LogicalResult bishengir::handleDiagnostic(const mlir::Diagnostic &diag) {
   }
 
   // Handle warning.
+
   if(diag.getSeverity() == mlir::DiagnosticSeverity::Warning) {
     os << "warning: " << diag.str() << "\n";
     return mlir::success();
