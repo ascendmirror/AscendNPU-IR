@@ -225,12 +225,6 @@ mlir::LogicalResult bishengir::handleDiagnostic(const mlir::Diagnostic &diag) {
     return mlir::success();
   }
 
-  // Handle error.
-  if(diag.getSeverity() == mlir::DiagnosticSeverity::Error) {
-    os << "error: " << diag.str() << "\n";
-    return mlir::failure();
-  }
-
   // Any other severity - treat as success.
   return mlir::success();
 }
