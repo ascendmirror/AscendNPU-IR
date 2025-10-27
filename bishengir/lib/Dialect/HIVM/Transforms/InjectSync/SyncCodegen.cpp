@@ -233,20 +233,20 @@ void SyncCodegen::SyncInsert(IRRewriter &rewriter, Operation *op,
     CreateBarrierOp(rewriter, op, sync, beforeInsert);
   } else if (sync->GetType() == SyncOperation::TYPE::SET_EVENT ||
              sync->GetType() == SyncOperation::TYPE::WAIT_EVENT) {
+    checkCondition(!sync->eventIds.empty(),
+                   "eventIds expected to not be empty");
     if (sync->eventIds.size() == 1) {
       CreateSetWaitOpForSingleBuffer(rewriter, op, sync, beforeInsert);
     } else {
-      checkCondition(sync->eventIds.size() > 1,
-                     "eventIds expected to have more than 1 element");
       CreateSetWaitOpForMultiBuffer(rewriter, op, sync, beforeInsert);
     }
   } else if (sync->GetType() == SyncOperation::TYPE::SYNC_BLOCK_SET ||
              sync->GetType() == SyncOperation::TYPE::SYNC_BLOCK_WAIT) {
+    checkCondition(!sync->eventIds.empty(),
+                   "eventIds expected to not be empty");
     if (sync->eventIds.size() == 1) {
       CreateSetWaitBlockOpForSingleBuffer(rewriter, op, sync, beforeInsert);
     } else {
-      checkCondition(sync->eventIds.size() > 1,
-                     "eventIds expected to have more than 1 element");
       CreateSetWaitBlockOpForMultiBuffer(rewriter, op, sync, beforeInsert);
     }
   } else if (sync->GetType() == SyncOperation::TYPE::SYNC_BLOCK_ALL) {
