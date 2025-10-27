@@ -267,8 +267,16 @@ void SyncAnalyzer::UpdateSyncRecord(const SyncOperation *sync,
                                     SyncRecord &syncRecord,
                                     hivm::PIPE nowPipeValue) {
   auto &[recordAlready, recordFinder] = syncRecord;
-  const hivm::PIPE waitPipeValue = sync->GetDstPipe();
   const hivm::PIPE setPipeValue = sync->GetSrcPipe();
+  hivm::PIPE waitPipeValue = sync->GetDstPipe();
+  if (syncAnalysisMode == SyncAnalysisMode::BLOCKSYNC) {
+    // Unlike normal-sync mode, in block-sync mode, there is no wait-pipe (or
+    // dst-pipe), all further instructions after the syncBlockWait instruction
+    // will be blocked, as if it is blocking the pipe-s pipeline.
+    nowPipeValue = hivm::PIPE::PIPE_S;
+    waitPipeValue = hivm::PIPE::PIPE_S;
+  }
+
   bool barrierFinder = (nowPipeValue == waitPipeValue) &&
                        (sync->GetType() == SyncOperation::TYPE::PIPE_BARRIER);
   if (barrierFinder) {
@@ -625,7 +633,7 @@ void SyncAnalyzer::InsertBlockSyncOperation(
     std::unique_ptr<SyncOperation, std::default_delete<SyncOperation>>
         syncBlockSetOp = std::make_unique<SyncOperation>(SyncOperation{
             SyncOperation::TYPE::SYNC_BLOCK_SET, frontCompound->kPipeValue,
-            nowCompound->kPipeValue, syncIndex, insertSetId, forEndIndex});
+            hivm::PIPE::PIPE_S, syncIndex, insertSetId, forEndIndex});
     auto syncBlockWaitOp = syncBlockSetOp->GetMatchSync(insertWaitId);
 
     auto parentLoops =
