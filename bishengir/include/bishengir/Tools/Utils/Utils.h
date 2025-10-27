@@ -69,6 +69,9 @@ llvm::LogicalResult execute(llvm::StringRef binName,
 /// Get the path set by environment variable `BISHENG_INSTALL_PATH`.
 std::string getBiShengInstallPath();
 
+/// Prints a diagnostic to llvm::outs() and return a LogicalResult.
+mlir::LogicalResult handleDiagnostic(const mlir::Diagnostic &diag);
+
 } // namespace bishengir
 
 #endif // BISHENGIR_TOOLS_UTILS_UTILS_H
