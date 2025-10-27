@@ -24,7 +24,7 @@
 using namespace mlir;
 using namespace mlir::hivm;
 
-void SyncEventIdAllocation::Allocate() {
+void SyncEventIdAllocation::Allocate(uint32_t runNum) {
   //  allocate event id
   for (auto &element : syncIR) {
     AllocateEventId(element.get());
@@ -42,9 +42,58 @@ void SyncEventIdAllocation::Allocate() {
     for (auto &e : syncIR) {
       WidenEventId(e->pipeAfter);
     }
-    reallocatedPipePair.clear();
   }
-  ChangeNoEventIdSyncToPipeAll();
+  // Change no event id sync to pipe all if possible.
+  auto status = ChangeNoEventIdSyncToPipeAll();
+  if (status.failed() && runNum < kMaxWidenTryNum) {
+    if (tryWidenOnFirstFound()) {
+      // clear and reallocate event ids.
+      reallocatedPipePair.clear();
+      eventCyclePool.clear();
+      clearAllocatedEventId();
+      Allocate(runNum + 1);
+    }
+  }
+}
+
+bool SyncEventIdAllocation::tryWidenOnFirstFound() {
+  for (auto pipePair : reallocatedPipePair) {
+    for (auto &e : syncIR) {
+      for (auto &sync : e->pipeAfter) {
+        if (sync->isSyncSetType() && !sync->uselessSync &&
+            (ScopePair(sync) == pipePair)) {
+          if (TryWidenByOtherSync(sync)) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+
+void SyncEventIdAllocation::reserveBlockAllEventIds() {
+  bool blockSyncAllExists = false;
+  for (auto &element : syncIR) {
+    for (auto &syncOp : element->pipeBefore) {
+      if (syncOp->GetType() == SyncOperation::TYPE::SYNC_BLOCK_ALL) {
+        blockSyncAllExists = true;
+        break;
+      }
+    }
+    for (auto &syncOp : element->pipeAfter) {
+      if (syncOp->GetType() == SyncOperation::TYPE::SYNC_BLOCK_ALL) {
+        blockSyncAllExists = true;
+        break;
+      }
+    }
+    if (blockSyncAllExists) {
+      break;
+    }
+  }
+  if (blockSyncAllExists) {
+    reservedBlockSyncEventIdNum = 2;
+  }
 }
 
 void SyncEventIdAllocation::SetBlockSyncAllEventID(SyncOperation *sync) {
@@ -93,7 +142,7 @@ size_t SyncEventIdAllocation::GetCompilerAvailableEventIdNum(
   if (sync->GetType() == SyncOperation::TYPE::SYNC_BLOCK_SET ||
       sync->GetType() == SyncOperation::TYPE::SYNC_BLOCK_WAIT) {
     // inter-block synchronization.
-    return kBlockSyncSetWaitEventIdNum;
+    return kBlockSyncSetWaitEventIdNum - reservedBlockSyncEventIdNum;
   }
   auto it = reservedEventIdNum.find({sync->GetSrcPipe(), sync->GetDstPipe()});
   if (it != reservedEventIdNum.end()) {
@@ -345,14 +394,11 @@ void SyncEventIdAllocation::SetEventPool(const SyncOperation *sync,
 void SyncEventIdAllocation::UpdateBackwardMatchSync(
     const SyncOperation *setFlag, const SyncOperation *waitFlag,
     unsigned eventId) {
-  std::unique_ptr<SyncOperation, std::default_delete<SyncOperation>> syncFront =
-      std::make_unique<SyncOperation>(SyncOperation{
-          setFlag->GetType(), setFlag->GetSrcPipe(), setFlag->GetDstPipe(),
-          static_cast<unsigned>(syncOperations.size()),
-          setFlag->GetSyncIRIndex(), setFlag->GetForEndIndex()});
-  assert(syncFront != nullptr);
+  auto syncFront = std::make_unique<SyncOperation>(
+      setFlag->GetType(), setFlag->GetSrcPipe(), setFlag->GetDstPipe(),
+      static_cast<unsigned>(syncOperations.size()), setFlag->GetSyncIRIndex(),
+      setFlag->GetForEndIndex());
   auto syncEnd = syncFront->GetMatchSync(waitFlag->GetSyncIRIndex());
-
   syncFront->syncCoreType = setFlag->syncCoreType;
   syncEnd->syncCoreType = waitFlag->syncCoreType;
   syncFront->eventIds.push_back(eventId);
@@ -374,6 +420,8 @@ void SyncEventIdAllocation::UpdateBackwardMatchSync(
     syncIR[0]->pipeBefore.push_back(syncFront.get());
     syncIR[syncIR.size() - 1]->pipeAfter.push_back(syncEnd.get());
   }
+  insertedBackwardSync.insert(syncFront.get());
+  insertedBackwardSync.insert(syncEnd.get());
   SmallVector<std::unique_ptr<SyncOperation>> newSync;
   newSync.emplace_back(std::move(syncFront));
   newSync.emplace_back(std::move(syncEnd));
@@ -484,10 +532,43 @@ void SyncEventIdAllocation::WidenEventId(SyncOps syncVector) {
   for (auto &sync : syncVector) {
     if (sync->isSyncSetType() && sync->eventIds.empty() && !sync->uselessSync) {
       // Replace sync of the same type and perform widen processing.
-      bool canWiden = CanWidenByOtherSync(sync);
+      bool canWiden = TryWidenByOtherSync(sync);
       if (!canWiden) {
         int scopePair = ScopePair(sync);
         reallocatedPipePair.insert(scopePair);
+      }
+    }
+  }
+}
+
+void SyncEventIdAllocation::clearAllocatedEventId() {
+  for (auto &e : syncIR) {
+    SyncOps newPipeBefore;
+    for (auto *sync : e->pipeBefore) {
+      if (!insertedBackwardSync.contains(sync)) {
+        newPipeBefore.push_back(sync);
+      }
+    }
+    e->pipeBefore = newPipeBefore;
+
+    SyncOps newPipeAfter;
+    for (auto *sync : e->pipeAfter) {
+      if (!insertedBackwardSync.contains(sync)) {
+        newPipeAfter.push_back(sync);
+      }
+    }
+    e->pipeAfter = newPipeAfter;
+  }
+
+  for (auto &e : syncIR) {
+    for (auto &sync : e->pipeBefore) {
+      if (!sync->isBarrierType()) {
+        ClearEventId(sync);
+      }
+    }
+    for (auto &sync : e->pipeAfter) {
+      if (!sync->isBarrierType()) {
+        ClearEventId(sync);
       }
     }
   }
@@ -549,7 +630,7 @@ void SyncEventIdAllocation::ClearReallocatedBackwardMatchSync() {
   syncIR[syncIR.size() - 1]->pipeAfter = newPipeAfter;
 }
 
-void SyncEventIdAllocation::ChangeNoEventIdSyncToPipeAll() {
+llvm::LogicalResult SyncEventIdAllocation::ChangeNoEventIdSyncToPipeAll() {
   for (auto &e : syncIR) {
     for (auto &sync : e->pipeAfter) {
       if (sync->GetType() == SyncOperation::TYPE::WAIT_EVENT &&
@@ -566,10 +647,11 @@ void SyncEventIdAllocation::ChangeNoEventIdSyncToPipeAll() {
       }
       if (sync->GetType() == SyncOperation::TYPE::SYNC_BLOCK_SET &&
           sync->eventIds.empty() && !sync->uselessSync) {
-        llvm_unreachable("Inter block synchronization must own an event id!");
+        return failure();
       }
     }
   }
+  return success();
 }
 
 void SyncEventIdAllocation::MoveOutBackwardMatchSync(
@@ -629,12 +711,11 @@ void SyncEventIdAllocation::IgnoreBackHeadAndTailSync() {
   }
 }
 
-bool SyncEventIdAllocation::CanWidenByOtherSync(const SyncOperation *sync) {
+bool SyncEventIdAllocation::TryWidenByOtherSync(const SyncOperation *sync) {
   assert(!sync->isBarrierType());
   assert(sync->GetSyncIndex() < syncOperations.size());
   auto &syncPair = syncOperations[sync->GetSyncIndex()];
   assert(syncPair.size() > 1);
-  assert(sync->eventIds.empty());
   SyncOperation *setSync = syncPair[0].get();
   SyncOperation *waitSync = syncPair[1].get();
 
