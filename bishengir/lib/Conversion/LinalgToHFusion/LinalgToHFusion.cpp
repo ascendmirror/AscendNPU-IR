@@ -18,6 +18,7 @@
 #include "bishengir/Conversion/LinalgToHFusion/LinalgToHFusion.h"
 #include "bishengir/Dialect/HFusion/IR/HFusion.h"
 #include "bishengir/Dialect/Tensor/IR/TensorImpl.h"
+#include "bishengir/Dialect/Utils/Util.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -27,6 +28,7 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/TypeRange.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -389,13 +391,38 @@ struct LinalgToHFusionReduceWithIndex : OpRewritePattern<linalg::ReduceOp> {
       return failure();
     }
 
+    StringAttr linalgTieBreakAttr =
+        op->getAttrOfType<StringAttr>(StringRef("tie_break_left"));
+    if (!linalgTieBreakAttr) {
+      return failure();
+    }
+
+    bool tieBreakLeft;
+    if (linalgTieBreakAttr == "false") {
+      tieBreakLeft = false;
+    } else if (linalgTieBreakAttr == "true") {
+      tieBreakLeft = true;
+    } else {
+      return failure();
+    }
+
     ValueRange inits = op.getInits();
+    ValueRange inputs = op.getInputs();
     auto reduceKindAttr =
         ReduceWithIndexKindAttr::get(rewriter.getContext(), reduceKind);
-    rewriter.replaceOpWithNewOp<hfusion::ReduceWithIndexOp>(
+    auto tieBreakLeftAttr = BoolAttr::get(rewriter.getContext(), tieBreakLeft);
+    std::optional<Operation *> isIndexInputUnused = utils::getAnnotateOpWithAttr(inputs[1], "UseIndexInput");
+    if (isIndexInputUnused.has_value()) {
+      rewriter.replaceOpWithNewOp<hfusion::ReduceWithIndexOp>(
         op, TypeRange{inits[0].getType(), inits[1].getType()},
         /*input*/ op.getInputs(), /*outputValue&Index*/ inits, reduceKindAttr,
-        op.getDimensionsAttr());
+        tieBreakLeftAttr, op.getDimensionsAttr());
+    } else {
+      rewriter.replaceOpWithNewOp<hfusion::ReduceWithIndexOp>(
+          op, TypeRange{inits[0].getType(), inits[1].getType()},
+          /*input*/ ValueRange{op.getInputs()[0]}, /*outputValue&Index*/ inits, reduceKindAttr,
+          tieBreakLeftAttr, op.getDimensionsAttr());
+    }
     return success();
   }
 };

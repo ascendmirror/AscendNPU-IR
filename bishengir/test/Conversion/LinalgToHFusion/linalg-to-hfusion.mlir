@@ -232,8 +232,38 @@ func.func @test_reduce_with_index(%arg0 : tensor<256x64xf32>, %arg1 : tensor<256
   %true = arith.constant true
   %0 = tensor.empty() : tensor<256xf32>
   %1 = tensor.empty() : tensor<256xi32>
-  //CHECK:  %[[REDUCED:.*]]:2 = hfusion.reduce_with_index <max> ins(%[[INPUT0:.*]], %[[INPUT1:.*]] : tensor<256x64xf32>, tensor<256x64xi32>) outs(%[[INIT0:.*]], %[[INIT1:.*]] : tensor<256xf32>, tensor<256xi32>) dimensions = [1] -> tensor<256xf32>, tensor<256xi32>
-  %reduced:2 = linalg.reduce ins(%arg0, %arg1 : tensor<256x64xf32>, tensor<256x64xi32>) outs(%0, %1 : tensor<256xf32>, tensor<256xi32>) dimensions = [1]  {reduce_mode = "max_with_index"}
+  //CHECK:  %[[REDUCED:.*]]:2 = hfusion.reduce_with_index {tie_break_left = true} <max> ins(%[[INPUT0:.*]] : tensor<256x64xf32>) outs(%[[INIT0:.*]], %[[INIT1:.*]] : tensor<256xf32>, tensor<256xi32>) dimensions = [1] -> tensor<256xf32>, tensor<256xi32>
+  %reduced:2 = linalg.reduce ins(%arg0, %arg1 : tensor<256x64xf32>, tensor<256x64xi32>) outs(%0, %1 : tensor<256xf32>, tensor<256xi32>) dimensions = [1]  {reduce_mode = "max_with_index", tie_break_left = "true"}
+    (%in: f32, %in_1: i32, %init: f32, %init_1: i32) {
+      %7 = arith.cmpf ogt, %in, %init : f32
+      %8 = arith.cmpf oeq, %in, %init : f32
+      %9 = arith.cmpf une, %in, %in : f32
+      %10 = arith.cmpf une, %init, %init : f32
+      %11 = arith.xori %10, %true : i1
+      %12 = arith.andi %9, %11 : i1
+      %13 = arith.ori %7, %12 : i1
+      %14 = arith.andi %9, %10 : i1
+      %15 = arith.ori %8, %14 : i1
+      %16 = arith.cmpi slt, %in_1, %init_1 : i32
+      %17 = arith.andi %15, %16 : i1
+      %18 = arith.ori %13, %17 : i1
+      %19 = arith.select %18, %in, %init : f32
+      %20 = arith.select %18, %in_1, %init_1 : i32
+      linalg.yield %19, %20 : f32, i32
+    }
+  return %0 : tensor<256xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @test_reduce_with_index_with_index_input
+func.func @test_reduce_with_index_with_index_input(%arg0 : tensor<256x64xf32>, %arg1 : tensor<256x64xi32>) -> tensor<256xf32> {
+  %true = arith.constant true
+  %0 = tensor.empty() : tensor<256xf32>
+  %1 = tensor.empty() : tensor<256xi32>
+  annotation.mark %arg1 {UseIndexInput} : tensor<256x64xi32>
+  //CHECK:  %[[REDUCED:.*]]:2 = hfusion.reduce_with_index {tie_break_left = true} <max> ins(%[[INPUT0:.*]], %[[INPUT1:.*]] : tensor<256x64xf32>, tensor<256x64xi32>) outs(%[[INIT0:.*]], %[[INIT1:.*]] : tensor<256xf32>, tensor<256xi32>) dimensions = [1] -> tensor<256xf32>, tensor<256xi32>
+  %reduced:2 = linalg.reduce ins(%arg0, %arg1 : tensor<256x64xf32>, tensor<256x64xi32>) outs(%0, %1 : tensor<256xf32>, tensor<256xi32>) dimensions = [1]  {reduce_mode = "max_with_index", tie_break_left = "true"}
     (%in: f32, %in_1: i32, %init: f32, %init_1: i32) {
       %7 = arith.cmpf ogt, %in, %init : f32
       %8 = arith.cmpf oeq, %in, %init : f32

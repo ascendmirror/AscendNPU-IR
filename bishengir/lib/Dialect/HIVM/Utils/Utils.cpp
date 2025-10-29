@@ -1211,6 +1211,13 @@ bool isGMPointerCastOp(Operation *op) {
   return memSpaceAttr.getAddressSpace() == hivm::AddressSpace::GM;
 }
 
+bool isArgminOrArgmax(ReduceOperation op) {
+  return op == ReduceOperation::min_with_index_left ||
+         op == ReduceOperation::max_with_index_left ||
+         op == ReduceOperation::min_with_index_right ||
+         op == ReduceOperation::max_with_index_right;
+}
+
 } // namespace util
 } // namespace hivm
 } // namespace mlir

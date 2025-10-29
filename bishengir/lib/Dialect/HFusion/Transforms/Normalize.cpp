@@ -3645,7 +3645,8 @@ public:
         normalizeSrcToTargetType<bool, Float16Type>(rewriter, inits);
     Operation *newOp = rewriter.create<hfusion::ReduceWithIndexOp>(
         op.getLoc(), TypeRange{newInits[0].getType(), newInits[1].getType()},
-        newInputs, newInits, op.getReduceKindAttr(), op.getDimensionsAttr());
+        newInputs, newInits, op.getReduceKindAttr(), op.getTieBreakLeftAttr(),
+        op.getDimensionsAttr());
     replaceI1ResultsWithTargetType(op->getResults(), newOp->getResults(),
                                    rewriter);
 
@@ -3677,7 +3678,8 @@ public:
         normalizeSrcToTargetType<int8_t, Float16Type>(rewriter, inits);
     Operation *newOp = rewriter.create<hfusion::ReduceWithIndexOp>(
         op.getLoc(), TypeRange{newInits[0].getType(), newInits[1].getType()},
-        newInputs, newInits, op.getReduceKindAttr(), op.getDimensionsAttr());
+        newInputs, newInits, op.getReduceKindAttr(), op.getTieBreakLeftAttr(),
+        op.getDimensionsAttr());
     replaceI8ResultsWithTargetType(op->getResults(), newOp->getResults(),
                                    rewriter);
     return success();
@@ -3698,21 +3700,24 @@ public:
 
     SmallVector<Value> inputs = op.getInputs();
     SmallVector<Value> inits = op.getInits();
-    if (!isI64ElemType(inputs[1].getType()) &&
+    if (((inputs.size() < 2) || !isI64ElemType(inputs[1].getType())) &&
         !isI64ElemType(inits[1].getType())) {
       return failure();
     }
     SmallVector<Value> newInputs;
     SmallVector<Value> newInits;
     newInputs.push_back(inputs[0]);
-    Value castIndexInput = castTo(rewriter, inputs[1], rewriter.getI32Type());
-    newInputs.push_back(castIndexInput);
+    if (inputs.size() > 1) {
+      Value castIndexInput = castTo(rewriter, inputs[1], rewriter.getI32Type());
+      newInputs.push_back(castIndexInput);
+    }
     newInits.push_back(inits[0]);
     Value castIndexInit = castTo(rewriter, inits[1], rewriter.getI32Type());
     newInits.push_back(castIndexInit);
     Operation *newOp = rewriter.create<hfusion::ReduceWithIndexOp>(
         op.getLoc(), TypeRange{newInits[0].getType(), newInits[1].getType()},
-        newInputs, newInits, op.getReduceKindAttr(), op.getDimensionsAttr());
+        newInputs, newInits, op.getReduceKindAttr(), op.getTieBreakLeftAttr(),
+        op.getDimensionsAttr());
     Value oldValResult = op->getResult(0);
     Value newValResult = newOp->getResult(0);
     rewriter.replaceAllUsesWith(oldValResult, newValResult);

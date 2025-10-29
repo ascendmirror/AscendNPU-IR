@@ -18,6 +18,7 @@
 #include "bishengir/Config/bishengir-config.h"
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
 #include "bishengir/Dialect/Tensor/IR/TensorImpl.h"
+#include "bishengir/Dialect/HIVM/Utils/Utils.h"
 #include "bishengir/Dialect/Utils/Util.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -218,8 +219,7 @@ struct RedudantVReduceOp : public OpRewritePattern<VReduceOp> {
       if (reduceOp.hasPureTensorSemantics()) {
         assert(isa<TensorType>(srcType));
         auto arith = reduceOp.getArithAttr().getReduceOp();
-        if (arith == hivm::ReduceOperation::max_with_index ||
-            arith == hivm::ReduceOperation::min_with_index) {
+        if (util::isArgminOrArgmax(arith)) {
           if (!reduceOp->getResult(1).getUsers().empty()) {
             return decomposeRedundantReduceWithIndex(reduceOp, rewriter,
                                                      isa<TensorType>(srcType));
@@ -234,8 +234,7 @@ struct RedudantVReduceOp : public OpRewritePattern<VReduceOp> {
           return failure();
         }
         auto arith = reduceOp.getArithAttr().getReduceOp();
-        if (arith == hivm::ReduceOperation::max_with_index ||
-            arith == hivm::ReduceOperation::min_with_index) {
+        if (util::isArgminOrArgmax(arith)) {
           return decomposeRedundantReduceWithIndex(reduceOp, rewriter,
                                                    isa<TensorType>(srcType));
         }
