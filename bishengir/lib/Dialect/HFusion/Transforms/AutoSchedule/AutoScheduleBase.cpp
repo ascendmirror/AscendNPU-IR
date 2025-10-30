@@ -39,6 +39,7 @@
 #include "bishengir/Dialect/Tensor/Transforms/Passes.h"
 #include "bishengir/Dialect/Utils/Util.h"
 
+#include "bishengir/Transforms/Passes.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -1120,7 +1121,7 @@ LogicalResult SchedulerBase::applyCSEAndCanonicalizePass(
   CanonicalizerOptions options;
   options.enableExtendedPattern = true;
   options.disabledPatterns = disabledPatterns;
-  pm.addPass(createCanonicalizerPass(options));
+  pm.addPass(bishengir::createExternalCanonicalizerPass(options));
   pm.addPass(createCSEPass());
   if (failed(pm.run(target))) {
     return target->emitError("Apply Canonicalizer && CSE error");

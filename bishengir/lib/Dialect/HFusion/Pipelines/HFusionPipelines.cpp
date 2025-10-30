@@ -25,6 +25,7 @@
 #include "bishengir/Dialect/HFusion/Transforms/Passes.h"
 #include "bishengir/Dialect/Symbol/Transforms/Passes.h"
 #include "bishengir/Dialect/Tensor/Transforms/Passes.h"
+#include "bishengir/Transforms/Passes.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -72,7 +73,7 @@ canonicalizationPipeline(OpPassManager &pm,
   CanonicalizerOptions options;
   options.enableExtendedPattern = true;
   options.disabledPatterns = phaseToDisabledMap[phase];
-  pm.addPass(createCanonicalizerPass(options));
+  pm.addPass(bishengir::createExternalCanonicalizerPass(options));
   pm.nest<func::FuncOp>().addPass(tensor::createNormalizeTensorOpsPass());
 }
 
