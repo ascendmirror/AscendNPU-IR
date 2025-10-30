@@ -12,5 +12,6 @@ add_bishengir_library(BiShengIRTransform
   BiShengIRTransformsPassIncGen
 
   LINK_LIBS PUBLIC
+  BiShengIRLinalgCanonicalizations
   BiShengIRMemRefDialect
 )
