@@ -398,6 +398,16 @@ FailureOr<std::string> stringfyConstantIntOpValue(Value value) {
   return failure();
 }
 
+bool judgeWhetherUserScfYield(Operation *op) {
+  if (!isa<scf::ForOp>(op->getParentOp()))
+    return false;
+  for (auto user : op->getUsers()) {
+    if (isa<scf::YieldOp>(user))
+      return true;
+  }
+  return false;
+}
+
 } // namespace util
 
 } // namespace hivm
