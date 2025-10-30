@@ -18,6 +18,7 @@
 #include "bishengir/Dialect/Annotation/Transforms/Passes.h"
 #include "bishengir/Dialect/Tensor/Transforms/Passes.h"
 #include "bishengir/ExecutionEngine/Passes.h"
+#include "bishengir/Transforms/Passes.h"
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Bufferization/Pipelines/Passes.h"
@@ -64,7 +65,7 @@ void execution_engine::buildCPURunnerPipeline(
   pm.addPass(annotation::createAnnotationLoweringPass());
   pm.addPass(memref::createExpandStridedMetadataPass());
   pm.addPass(createConvertLinalgToLoopsPass());
-  pm.addPass(createCanonicalizerPass());
+  pm.addPass(bishengir::createExternalCanonicalizerPass());
   pm.addPass(createConvertSCFToCFPass());
   pm.addPass(createLowerAffinePass());
   pm.addPass(arith::createArithExpandOpsPass());
