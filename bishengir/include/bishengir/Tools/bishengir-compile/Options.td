@@ -363,11 +363,13 @@ def EnableHIVMUnitFlagSync : HIVMOptimizationControlOptions<
   "false"
 >;
 
+#ifndef BISHENGIR_PUBLISH
 def EnableHIVMAssumeAliveLoops : HIVMOptimizationControlOptions<
   "Assume that all loops (forOp whileOp) will execute at least once.",
   "bool",
   "false"
 >;
+#endif
 
 def EnableHIVMInjectBlockAllSync : HIVMOptimizationControlOptions<
   "Enable inject all block sync for HIVM inject block sync.",
@@ -473,6 +475,7 @@ def HivmCompileArgs : BiShengIRCompileListOpt<
   "std::string"
 >;
 
+#ifndef BISHENGIR_PUBLISH
 /// Note that we don't own `mlir-print-ir-after-all` and
 /// `mlir-print-ir-before-all` as they are upstream options.
 /// We add it here because we can capture their values and forward
@@ -496,5 +499,6 @@ def MlirPrintIrBeforeAll : BiShengIRCompileOpt<
   let externalStorage = 0;
   bit isSharedWithDownstreamToolchain = 1;
 }
+#endif
 
 #endif // BISHENGIR_TOOLS_BISHENGIR_COMPILE_OPTIONS_TD
