@@ -1,6 +1,7 @@
 add_bishengir_library(BiShengIRTransform
   CanonicalizeModule.cpp
   DeadFunctionElimination.cpp
+  ExternalCanonicalizer.cpp
   LowerToCPUBackend.cpp
   Transforms.cpp
 
