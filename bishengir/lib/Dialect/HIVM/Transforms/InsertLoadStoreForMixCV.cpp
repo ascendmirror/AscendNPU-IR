@@ -572,7 +572,6 @@ void populateInsertLoadStorePattern(RewritePatternSet &patterns) {
 #define GET_OP_LIST
 #include "bishengir/Dialect/HIVM/IR/HIVMVectorOps.cpp.inc"
       >(patterns);
-  registerOne<tensor::InsertSliceOp>(patterns);
   patterns.add<InsertLoadOpBetweenStoreLikeAndVectorOrCube<hivm::MmadL1Op>>(
       patterns.getContext());
   patterns.add<InsertLoadOpBetweenStoreLikeAndVectorOrCube<hivm::StoreOp>>(

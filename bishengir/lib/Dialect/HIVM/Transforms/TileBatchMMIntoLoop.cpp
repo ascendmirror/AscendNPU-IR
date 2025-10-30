@@ -235,6 +235,7 @@ Value rewriteMmadThrowOutBatch(hivm::BatchMmadL1Op batchmmOp,
       batchmmOp.getRealK(), batchmmOp.getRealN(), /*C=*/newOutput,
       batchmmOp.getPerChannelBias(), batchmmOp.getATransposeAttr(),
       batchmmOp.getBTransposeAttr(), batchmmOp.getEnable_HF32Attr());
+  tiledMmad->setAttr(fixpipeAlreadyInserted, rewriter.getBoolAttr(true));
   Value matrixToStore = rewriteMatrixCShapeChange(
       /* ignore first fixpipe */ ArrayRef<Operation *>(useChain).drop_front(),
       tiledMmad.getResultTensors()[0], rewriter);

@@ -187,6 +187,9 @@ bool isTransposeAdjacentAxes(SmallVector<int64_t> transposeAxes);
 
 /// Return the ConstantOp IntValue.
 FailureOr<std::string> stringfyConstantIntOpValue(Value value);
+
+/// To judge whether op user is yield of scf op
+bool judgeWhetherUserScfYield(Operation *op);
 } // namespace util
 } // namespace hivm
 } // namespace mlir
