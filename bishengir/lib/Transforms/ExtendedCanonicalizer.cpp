@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "bishengir/Dialect/Linalg/IR/LinalgCanonicalizations.h"
 #include "bishengir/Dialect/MemRef/IR/MemRefImpl.h"
 #include "bishengir/Transforms/Passes.h"
 #include "mlir/Rewrite/FrozenRewritePatternSet.h"
@@ -63,6 +64,7 @@ struct ExtendedCanonicalizer
       op.getCanonicalizationPatterns(patterns, context);
 
     mlir::memref::getExtendedCanonicalizationPatterns(patterns);
+    linalg::getExtendedCanonicalizationPatterns(patterns);
 
     this->patterns = FrozenRewritePatternSet(std::move(patterns),
                                              disabledPatterns, enabledPatterns);
