@@ -76,9 +76,9 @@ FailureOr<memref::AllocOp> getMemRefForBlockArgument(BlockArgument bbArg) {
   auto *bbParentOp = bbOwner->getParentOp();
   if (!bbParentOp)
     return failure();
-  if (auto loopOp = dyn_cast<LoopLikeOpInterface>(bbParentOp)) {
-    auto *operand = loopOp.getTiedLoopInit(bbArg);
-    return getMemRefAlloc(operand->get());
+  auto forOp = dyn_cast<scf::ForOp>(bbParentOp);
+  if (!forOp) {
+    return failure();
   }
   return bbParentOp->emitError("Unsupported block op type");
 }
@@ -101,7 +101,6 @@ FailureOr<memref::AllocOp> getMemRefForOpResult(OpResult result) {
         return getMemRefAlloc(op.getMemref());
       })
       .Default([&](Operation *op) {
-        op->emitOpError("Unsupported op for finding the root alloc.");
         return failure();
       });
 }
