@@ -1,5 +1,5 @@
 # BiShengIR Project.
-cmake_minimum_required(VERSION 3.28.0)
+cmake_minimum_required(VERSION 3.22.0)
 project(bishengir)
 
 # bishengir-target-spec-tblgen related target has ninja version requirement
