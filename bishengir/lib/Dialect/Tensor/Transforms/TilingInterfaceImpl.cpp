@@ -25,6 +25,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Interfaces/TilingInterface.h"
 #include "llvm/Support/Debug.h"
 
@@ -83,6 +84,19 @@ SmallVector<Segment> getConcatSegments(tensor::ConcatOp concatOp,
     start = end;
   }
   return segments;
+}
+
+SmallVector<Range> getDefaultIterationDomain(Operation *op, OpBuilder &b) {
+  ReifiedRankedShapedTypeDims reifiedShapes;
+  (void)reifyResultShapes(b, op, reifiedShapes);
+  OpFoldResult zero = b.getIndexAttr(0);
+  OpFoldResult one = b.getIndexAttr(1);
+  // Initialize all the ranges to {zero, one, one}. All the `ub`s are
+  // overwritten.
+  SmallVector<Range> loopRanges(reifiedShapes[0].size(), {zero, one, one});
+  for (const auto &ub : enumerate(reifiedShapes[0]))
+    loopRanges[ub.index()].size = ub.value();
+  return loopRanges;
 }
 
 FailureOr<TilingResult> bubbleUpConcatSlice(OpBuilder &b,
@@ -276,16 +290,7 @@ struct ConcatOpTiling
   }
 
   SmallVector<Range> getIterationDomain(Operation *op, OpBuilder &b) const {
-    ReifiedRankedShapedTypeDims reifiedShapes;
-    (void)reifyResultShapes(b, op, reifiedShapes);
-    OpFoldResult zero = b.getIndexAttr(0);
-    OpFoldResult one = b.getIndexAttr(1);
-    // Initialize all the ranges to {zero, one, one}. All the `ub`s are
-    // overwritten.
-    SmallVector<Range> loopRanges(reifiedShapes[0].size(), {zero, one, one});
-    for (const auto &ub : enumerate(reifiedShapes[0]))
-      loopRanges[ub.index()].size = ub.value();
-    return loopRanges;
+    return getDefaultIterationDomain(op, b);
   }
 
   FailureOr<TilingResult>
@@ -294,6 +299,165 @@ struct ConcatOpTiling
                          ArrayRef<OpFoldResult> sizes) const {
     FailureOr<TilingResult> result =
         bubbleUpConcatSlice(b, cast<ConcatOp>(op), offsets, sizes);
+    if (failed(result))
+      return failure();
+    return result.value();
+  }
+
+  LogicalResult
+  getResultTilePosition(Operation *op, OpBuilder &b, unsigned resultNumber,
+                        ArrayRef<OpFoldResult> offsets,
+                        ArrayRef<OpFoldResult> sizes,
+                        SmallVector<OpFoldResult> &resultOffsets,
+                        SmallVector<OpFoldResult> &resultSizes) const {
+    resultOffsets.assign(offsets.begin(), offsets.end());
+    resultSizes.assign(sizes.begin(), sizes.end());
+    return success();
+  }
+
+  LogicalResult getIterationDomainTileFromResultTile(
+      Operation *op, OpBuilder &b, unsigned resultNumber,
+      ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
+      SmallVectorImpl<OpFoldResult> &iterDomainOffsets,
+      SmallVectorImpl<OpFoldResult> &iterDomainSizes) const {
+    iterDomainOffsets.assign(offsets.begin(), offsets.end());
+    iterDomainSizes.assign(sizes.begin(), sizes.end());
+    return success();
+  }
+
+  FailureOr<TilingResult> generateResultTileValue(
+      Operation *op, OpBuilder &b, unsigned /*resultNumber*/,
+      ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes) const {
+    return getTiledImplementation(op, b, offsets, sizes);
+  }
+};
+
+bool isFullInsertSliceDim(tensor::InsertSliceOp insertSliceOp, int64_t dim) {
+  SmallVector<OpFoldResult> offsets = insertSliceOp.getMixedOffsets();
+  if (!isConstantIntValue(offsets[dim], 0)) {
+    return false;
+  }
+
+  ArrayRef<int64_t> insertSizes = insertSliceOp.getStaticSizes();
+  ArrayRef<int64_t> resultShape = insertSliceOp.getResultType().getShape();
+  return insertSizes[dim] == resultShape[dim];
+}
+
+FailureOr<TilingResult> mergeConsecutiveInsertAndExtractSlice(
+    OpBuilder &b, tensor::InsertSliceOp insertSliceOp,
+    ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes) {
+  ArrayRef<int64_t> oldStrides = insertSliceOp.getStaticStrides();
+  if (llvm::any_of(oldStrides, [](int64_t s) { return s != 1; })) {
+    insertSliceOp->emitError("insert slice must be continuous to tile");
+    return failure();
+  }
+
+  Location loc = insertSliceOp->getLoc();
+  AffineExpr dim0;
+  AffineExpr dim1;
+  bindDims(b.getContext(), dim0, dim1);
+  auto subMap = AffineMap::get(2, 0, {dim0 - dim1});
+  auto sub = [&b, &loc, &subMap](OpFoldResult v1, OpFoldResult v2) {
+    return affine::makeComposedFoldedAffineApply(b, loc, subMap, {v1, v2});
+  };
+  auto addMap = AffineMap::get(2, 0, {dim0 + dim1});
+  auto add = [&b, &loc, &addMap](OpFoldResult v1, OpFoldResult v2) {
+    return affine::makeComposedFoldedAffineApply(b, loc, addMap, {v1, v2});
+  };
+  auto idMap = AffineMap::getMultiDimIdentityMap(2, b.getContext());
+  auto min = [&b, &loc, &idMap](OpFoldResult v1, OpFoldResult v2) {
+    return affine::makeComposedFoldedAffineMin(b, loc, idMap, {v1, v2});
+  };
+  auto max = [&b, &loc, &idMap](OpFoldResult v1, OpFoldResult v2) {
+    return affine::makeComposedFoldedAffineMax(b, loc, idMap, {v1, v2});
+  };
+  // Zero index-typed integer.
+  OpFoldResult zero = b.getIndexAttr(0);
+
+  // on each dimension:
+  //               | <slice.offset> | <slice.size> |
+  // insert_slice: |     dummy      |---- src -----|    dummy   |
+  //               |-------------------- dst -----------------|
+  // tile:             |       tile        |
+  // tile:             ^tile.offset        ^tile.offset+tile.size
+  //
+  // newSrc.offset = min(max(tile.offset - slice.offset, 0), slice.size)
+  // newSrc.size   = max(0, min(tile.offset + tile.size,
+  //                            slice.offset + slice.size)
+  //                         - (slice.offset + newSrc.offset))
+  // newSrc.stride = tile.stride, should all be one, i.e. continuous
+  //
+  // newDst.offset = tile.offset
+  // newDst.size   = tile.size
+  // newDst.stride = tile.stride, should all be one, i.e. continuous
+  // insert_slice newSrc into newDst
+  RankedTensorType dstType = insertSliceOp.getResultType();
+  int64_t rank = dstType.getRank();
+
+  SmallVector<OpFoldResult> sliceOffsets = insertSliceOp.getMixedOffsets();
+  SmallVector<OpFoldResult> sliceSizes = insertSliceOp.getMixedSizes();
+  SmallVector<OpFoldResult> newSrcOffsets;
+  SmallVector<OpFoldResult> newSrcSizes;
+  SmallVector<OpFoldResult> newDstOffsets;
+  SmallVector<OpFoldResult> newDstSizes;
+  SmallVector<OpFoldResult> strides(rank, b.getIndexAttr(1));
+
+  for (int64_t dim = 0; dim < rank; ++dim) {
+    auto tileOffset = offsets[dim];
+    auto tileSize = sizes[dim];
+    // dst offsets/sizes same as tile offsets/sizes
+    newDstOffsets.push_back(tileOffset);
+    newDstSizes.push_back(tileSize);
+    // full insert slice dims has same sizes and offsets as tiles
+    if (isFullInsertSliceDim(insertSliceOp, dim)) {
+      newSrcOffsets.push_back(tileOffset);
+      newSrcSizes.push_back(tileSize);
+      continue;
+    }
+    auto sliceOffset = sliceOffsets[dim];
+    auto sliceSize = sliceSizes[dim];
+
+    auto srcOffset = min(max(sub(tileOffset, sliceOffset), zero), sliceSize);
+    auto srcSize = max(
+        zero, sub(min(add(tileOffset, tileSize), add(sliceOffset, sliceSize)),
+                  add(sliceOffset, srcOffset)));
+    newSrcOffsets.push_back(srcOffset);
+    newSrcSizes.push_back(srcSize);
+  }
+
+  Value src = insertSliceOp.getSource();
+  Value dst = insertSliceOp.getDest();
+  Value sliceFromSrc = b.create<tensor::ExtractSliceOp>(loc, src, newSrcOffsets,
+                                                        newSrcSizes, strides);
+  Value sliceFromDst = b.create<tensor::ExtractSliceOp>(loc, dst, newDstOffsets,
+                                                        newDstSizes, strides);
+  auto newInsertSliceOp = b.create<tensor::InsertSliceOp>(
+      loc, sliceFromSrc, sliceFromDst, newDstOffsets, newSrcSizes, strides);
+
+  return TilingResult{{newInsertSliceOp}, {newInsertSliceOp.getResult()}};
+}
+
+struct InsertSliceOpTiling
+    : public TilingInterface::ExternalModel<InsertSliceOpTiling,
+                                            InsertSliceOp> {
+  SmallVector<utils::IteratorType> getLoopIteratorTypes(Operation *op) const {
+    auto insertSliceOp = cast<InsertSliceOp>(op);
+    SmallVector<utils::IteratorType> iteratorTypes(
+        insertSliceOp.getResultType().getRank(), utils::IteratorType::parallel);
+    return iteratorTypes;
+  }
+
+  SmallVector<Range> getIterationDomain(Operation *op, OpBuilder &b) const {
+    return getDefaultIterationDomain(op, b);
+  }
+
+  FailureOr<TilingResult>
+  getTiledImplementation(Operation *op, OpBuilder &b,
+                         ArrayRef<OpFoldResult> offsets,
+                         ArrayRef<OpFoldResult> sizes) const {
+    auto insertSliceOp = cast<tensor::InsertSliceOp>(op);
+    FailureOr<TilingResult> result =
+        mergeConsecutiveInsertAndExtractSlice(b, insertSliceOp, offsets, sizes);
     if (failed(result))
       return failure();
     return result.value();
@@ -1007,5 +1171,6 @@ void bishengir::tensor::registerTilingInterfaceExternalModels(
     mlir::tensor::ConcatOp::attachInterface<ConcatOpTiling>(*ctx);
     mlir::tensor::ExpandShapeOp::attachInterface<ExpandShapeOpTiling>(*ctx);
     mlir::tensor::CollapseShapeOp::attachInterface<CollapseShapeOpTiling>(*ctx);
+    mlir::tensor::InsertSliceOp::attachInterface<InsertSliceOpTiling>(*ctx);
   });
 }
