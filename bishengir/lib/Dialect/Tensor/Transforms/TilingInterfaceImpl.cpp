@@ -85,6 +85,19 @@ SmallVector<Segment> getConcatSegments(tensor::ConcatOp concatOp,
   return segments;
 }
 
+SmallVector<Range> getDefaultIterationDomain(Operation *op, OpBuilder &b) {
+  ReifiedRankedShapedTypeDims reifiedShapes;
+  (void)reifyResultShapes(b, op, reifiedShapes);
+  OpFoldResult zero = b.getIndexAttr(0);
+  OpFoldResult one = b.getIndexAttr(1);
+  // Initialize all the ranges to {zero, one, one}. All the `ub`s are
+  // overwritten.
+  SmallVector<Range> loopRanges(reifiedShapes[0].size(), {zero, one, one});
+  for (const auto &ub : enumerate(reifiedShapes[0]))
+    loopRanges[ub.index()].size = ub.value();
+  return loopRanges;
+}
+
 FailureOr<TilingResult> bubbleUpConcatSlice(OpBuilder &b,
                                             tensor::ConcatOp concatOp,
                                             ArrayRef<OpFoldResult> offsets,
@@ -276,16 +289,7 @@ struct ConcatOpTiling
   }
 
   SmallVector<Range> getIterationDomain(Operation *op, OpBuilder &b) const {
-    ReifiedRankedShapedTypeDims reifiedShapes;
-    (void)reifyResultShapes(b, op, reifiedShapes);
-    OpFoldResult zero = b.getIndexAttr(0);
-    OpFoldResult one = b.getIndexAttr(1);
-    // Initialize all the ranges to {zero, one, one}. All the `ub`s are
-    // overwritten.
-    SmallVector<Range> loopRanges(reifiedShapes[0].size(), {zero, one, one});
-    for (const auto &ub : enumerate(reifiedShapes[0]))
-      loopRanges[ub.index()].size = ub.value();
-    return loopRanges;
+    return getDefaultIterationDomain(op, b);
   }
 
   FailureOr<TilingResult>
@@ -294,6 +298,66 @@ struct ConcatOpTiling
                          ArrayRef<OpFoldResult> sizes) const {
     FailureOr<TilingResult> result =
         bubbleUpConcatSlice(b, cast<ConcatOp>(op), offsets, sizes);
+    if (failed(result))
+      return failure();
+    return result.value();
+  }
+
+  LogicalResult
+  getResultTilePosition(Operation *op, OpBuilder &b, unsigned resultNumber,
+                        ArrayRef<OpFoldResult> offsets,
+                        ArrayRef<OpFoldResult> sizes,
+                        SmallVector<OpFoldResult> &resultOffsets,
+                        SmallVector<OpFoldResult> &resultSizes) const {
+    resultOffsets.assign(offsets.begin(), offsets.end());
+    resultSizes.assign(sizes.begin(), sizes.end());
+    return success();
+  }
+
+  LogicalResult getIterationDomainTileFromResultTile(
+      Operation *op, OpBuilder &b, unsigned resultNumber,
+      ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
+      SmallVectorImpl<OpFoldResult> &iterDomainOffsets,
+      SmallVectorImpl<OpFoldResult> &iterDomainSizes) const {
+    iterDomainOffsets.assign(offsets.begin(), offsets.end());
+    iterDomainSizes.assign(sizes.begin(), sizes.end());
+    return success();
+  }
+
+  FailureOr<TilingResult> generateResultTileValue(
+      Operation *op, OpBuilder &b, unsigned /*resultNumber*/,
+      ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes) const {
+    return getTiledImplementation(op, b, offsets, sizes);
+  }
+};
+
+FailureOr<TilingResult> mergeConsecutiveInsertAndExtractSlice(
+    OpBuilder &b, tensor::InsertSliceOp insertSliceOp,
+    ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes) {
+  // TODO
+  return failure();
+}
+
+struct InsertSliceOpTiling
+    : public TilingInterface::ExternalModel<InsertSliceOpTiling,
+                                            InsertSliceOp> {
+  SmallVector<utils::IteratorType> getLoopIteratorTypes(Operation *op) const {
+    auto insertSliceOp = cast<InsertSliceOp>(op);
+    SmallVector<utils::IteratorType> iteratorTypes(
+        insertSliceOp.getResultType().getRank(), utils::IteratorType::parallel);
+    return iteratorTypes;
+  }
+
+  SmallVector<Range> getIterationDomain(Operation *op, OpBuilder &b) const {
+    return getDefaultIterationDomain(op, b);
+  }
+
+  FailureOr<TilingResult>
+  getTiledImplementation(Operation *op, OpBuilder &b,
+                         ArrayRef<OpFoldResult> offsets,
+                         ArrayRef<OpFoldResult> sizes) const {
+    FailureOr<TilingResult> result = mergeConsecutiveInsertAndExtractSlice(
+        b, cast<tensor::InsertSliceOp>(op), offsets, sizes);
     if (failed(result))
       return failure();
     return result.value();
@@ -1007,5 +1071,6 @@ void bishengir::tensor::registerTilingInterfaceExternalModels(
     mlir::tensor::ConcatOp::attachInterface<ConcatOpTiling>(*ctx);
     mlir::tensor::ExpandShapeOp::attachInterface<ExpandShapeOpTiling>(*ctx);
     mlir::tensor::CollapseShapeOp::attachInterface<CollapseShapeOpTiling>(*ctx);
+    mlir::tensor::InsertSliceOp::attachInterface<InsertSliceOpTiling>(*ctx);
   });
 }
