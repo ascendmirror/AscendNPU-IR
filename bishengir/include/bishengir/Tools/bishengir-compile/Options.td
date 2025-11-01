@@ -61,6 +61,15 @@ def EnableTritonKernelCompile : FeatureControlOptions<
   let passGroup = ["HFUSION", "HIVM", "HFUSION_TO_HIVM"];
 }
 
+def EnableUbufSaving : FeatureControlOptions<
+  "Enable ub buffer saving mode.",
+  "bool",
+  "false"
+>{
+  let passGroup = ["HFUSION", "HFUSION_TO_HIVM"];
+  bit isSharedWithDownstreamToolchain = 1;
+}
+
 #ifdef BISHENGIR_ENABLE_TORCH_CONVERSIONS
 def EnableTorchCompile : FeatureControlOptions<
   "Enable Torch-MLIR compilation.",
