@@ -5553,14 +5553,14 @@ private:
     Value src0 = op.getInputs()[0];
     Value src1 = op.getInputs()[1];
  
-    // new_src0 = hfusion.select(hfusion.isnan(src0), -+inf, src0)
+    // step 1: new_src0 = hfusion.select(hfusion.isnan(src0), -+inf, src0)
     auto newSrc0 = createNewSrcForMinMaxNumFOp(rewriter, op->getLoc(), src0,
                                                paddingInfValue);
-    // new_src0 = hfusion.select(hfusion.isnan(src0), -+inf, src1)
+    // step 2: new_src0 = hfusion.select(hfusion.isnan(src0), -+inf, src1)
     auto newSrc1 = createNewSrcForMinMaxNumFOp(rewriter, op->getLoc(), src1,
                                                paddingInfValue);
  
-    // dst = hfusion.elemwise_binary {maxf | minf} (new_src0, new_src1)
+    // step 3: dst = hfusion.elemwise_binary {maxf | minf} (new_src0, new_src1)
     auto minMaxFOpOut = utils::createEmptyOp(rewriter, op->getLoc(), src0);
     auto minMaxFOp = createBinaryOp<ElemwiseBinaryOp, BinaryFn, BinaryFnAttr>(
         rewriter, op->getLoc(), hfusionFn, ValueRange({newSrc0, newSrc1}),
