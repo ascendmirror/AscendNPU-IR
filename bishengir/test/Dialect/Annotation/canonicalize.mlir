@@ -26,3 +26,18 @@ func.func @fold_buffer_size_mark_to_source_alloc(%offset : index, %size : index,
   "some_use"(%subview) : (memref<?xf32, strided<[?], offset: ?>>) -> ()
   return
 }
+
+// -----
+
+func.func @fold_mark_op_wot_other_user() {
+  %alloc = memref.alloc() : memref<8x1x16xf32>
+  // CHECK: annotation.mark
+  annotation.mark %alloc {MayImplicitTransposeWithLastAxis} : memref<8x1x16xf32>
+  // CHECK: memref.collapse_shape
+  %collapse_shape0 = memref.collapse_shape %alloc[[0], [1, 2]] : memref<8x1x16xf32> into memref<8x16xf32>
+  %collapse_shape = memref.collapse_shape %alloc[[0], [1, 2]] : memref<8x1x16xf32> into memref<8x16xf32>
+  // CHECK-NOT: annotation.mark
+  annotation.mark %collapse_shape {MayImplicitTransposeWithLastAxis} : memref<8x16xf32>
+  "some_use"(%collapse_shape0) : (memref<8x16xf32>) -> ()
+  return
+}
