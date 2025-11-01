@@ -1057,6 +1057,10 @@ public:
       RewritePatternSet hivmOpPatterns(ctx);
       populateHIVMOpRewritingRule(hivmOpPatterns);
       (void)applyPatternsGreedily(funcOp, std::move(hivmOpPatterns));
+      if (this->isEnableUbufSaving) {
+        funcOp->setAttr(hivm::EnableSavingUbAttr::name,
+                        UnitAttr::get(&getContext()));
+      }
     });
   }
 };
