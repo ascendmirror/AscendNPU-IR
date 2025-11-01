@@ -68,6 +68,7 @@ void buildBiShengHIRPipeline(OpPassManager &pm,
     hivm::ConvertToHIVMPipelineOptions convertToHIVMOptions;
     convertToHIVMOptions.enableTritonKernelCompile =
         config.getEnableTritonKernelCompile();
+    convertToHIVMOptions.enableUbufSaving = config.getEnableUbufSaving();
     hivm::buildConvertToHIVMPipeline(pm, convertToHIVMOptions);
   }
 }
@@ -149,6 +150,7 @@ public:
         &enableTritonKernelCompile,
         &enableHIVMUnitFlagSync,
         &enableHIVMAssumeAliveLoops,
+        &enableUbufSaving,
     };
 
     SmallVector<Pass::Option<unsigned> *> sharedWithHIVMCompileUnsigned = {
