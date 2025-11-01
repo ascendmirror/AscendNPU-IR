@@ -106,9 +106,31 @@ struct FoldUselessBufferSizeMarkOp : OpRewritePattern<annotation::MarkOp> {
   }
 };
 
+struct FoldMarkOpWotOtherUser : OpRewritePattern<annotation::MarkOp> {
+  using OpRewritePattern<annotation::MarkOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(annotation::MarkOp markOp,
+                                PatternRewriter &rewriter) const override {
+    if (!llvm::hasSingleElement(markOp->getAttrs()))
+      return failure();
+
+    auto srcVal = markOp.getSrc();
+    if (!isa<MemRefType>(srcVal.getType()))
+        return failure();
+
+    auto users = srcVal.getUses();
+    if (!llvm::hasSingleElement(users))
+      return failure();
+
+    rewriter.eraseOp(markOp);
+    return success();
+  }
+};
+
 void MarkOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                          MLIRContext *context) {
   results.add<FoldUselessBufferSizeMarkOp>(context);
+  results.add<FoldMarkOpWotOtherUser>(context);
 }
 
 bool MarkOp::isAnnotatedBy(StringRef key) {
