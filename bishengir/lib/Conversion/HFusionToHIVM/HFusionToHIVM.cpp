@@ -1048,7 +1048,7 @@ public:
 
     Operation *moduleOp = getOperation();
     auto *ctx = &getContext();
-    moduleOp->walk([&](func::FuncOp funcOp) {
+    moduleOp->walk([&,this](func::FuncOp funcOp) {
       if (hacc::utils::isHost(funcOp))
         // avoid convert host op to hivm op
         return;
@@ -1057,6 +1057,10 @@ public:
       RewritePatternSet hivmOpPatterns(ctx);
       populateHIVMOpRewritingRule(hivmOpPatterns);
       (void)applyPatternsGreedily(funcOp, std::move(hivmOpPatterns));
+      if (this->isEnableUbufSaving) {
+        funcOp->setAttr(hivm::EnableSavingUbAttr::name,
+                        UnitAttr::get(&getContext()));
+      }
     });
   }
 };
