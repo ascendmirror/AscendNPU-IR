@@ -46,6 +46,87 @@ namespace mlir {
 
 namespace {
 
+SmallVector<Value> tracebackValuesImpl(Value memrefVal) {
+  // case 1: v is the iter_arg of a scf.for
+  SmallVector<Value> result;
+  if (auto arg = dyn_cast<BlockArgument>(memrefVal)) {
+    if (arg.getParentRegion() == nullptr) {
+      return result;
+    }
+    if (auto forOp =
+            dyn_cast<scf::ForOp>(arg.getParentRegion()->getParentOp())) {
+      if (arg.getArgNumber() > 0 &&
+          forOp.getInitArgs().size() > arg.getArgNumber() - 1) {
+        result.emplace_back(forOp.getInitArgs()[arg.getArgNumber() - 1]);
+        result.emplace_back(forOp.getYieldedValues()[arg.getArgNumber() - 1]);
+      }
+    }
+    if (auto whileOp =
+            dyn_cast<scf::WhileOp>(arg.getParentRegion()->getParentOp())) {
+      result.emplace_back(whileOp.getTiedLoopInit(arg)->get());
+    }
+  }
+
+  Operation *def = memrefVal.getDefiningOp();
+  if (!def) {
+    // failed to trace back
+    return result;
+  }
+
+  // case 2: v is the result of cast-like ops
+  //  - memref.cast
+  //  - memref.collapse_shape
+  //  - memref.expand_shape
+  //  - memref.memory_space_cast
+  //  - memref.reinterpret_cast
+  //  - memref.reshape
+  //  - memref.transpose
+  if (auto op = dyn_cast<memref::CastOp>(def)) {
+    result.emplace_back(op.getSource());
+  } else if (auto op = dyn_cast<memref::CollapseShapeOp>(def)) {
+    result.emplace_back(op.getSrc());
+  } else if (auto op = dyn_cast<memref::ExpandShapeOp>(def)) {
+    result.emplace_back(op.getSrc());
+  } else if (auto op = dyn_cast<memref::MemorySpaceCastOp>(def)) {
+    result.emplace_back(op.getSource());
+  } else if (auto op = dyn_cast<memref::ReinterpretCastOp>(def)) {
+    result.emplace_back(op.getSource());
+  } else if (auto op = dyn_cast<memref::ReshapeOp>(def)) {
+    result.emplace_back(op.getSource());
+  } else if (auto op = dyn_cast<memref::TransposeOp>(def)) {
+    result.emplace_back(op.getIn());
+  } else if (auto op = dyn_cast<UnrealizedConversionCastOp>(def)) {
+    result.emplace_back(
+        op.getOperand(cast<OpResult>(memrefVal).getResultNumber()));
+  } else if (auto op = dyn_cast<scf::ForOp>(def)) {
+    // trace back memref.alloc support scf.for
+    result.emplace_back(
+        op.getInitArgs()[cast<OpResult>(memrefVal).getResultNumber()]);
+    result.emplace_back(
+        op.getYieldedValues()[cast<OpResult>(memrefVal).getResultNumber()]);
+  } else if (auto op = dyn_cast<scf::IfOp>(def)) {
+    result.emplace_back(
+        op.thenYield->getOperand(cast<OpResult>(memrefVal).getResultNumber()));
+    result.emplace_back(
+        op.elseYield->getOperand(cast<OpResult>(memrefVal).getResultNumber()));
+  }
+
+  if (result) {
+    return result;
+  }
+
+  // case 3: v is the result of the view-like ops
+  //  - memref::view
+  //  - memref::subview
+  if (auto op = dyn_cast<memref::ViewOp>(def)) {
+    result.emplace_back(op.getViewSource());
+  } else if (auto op = dyn_cast<memref::SubViewOp>(def)) {
+    esult.emplace_back(op.getViewSource());
+  }
+
+  return result;
+}
+
 Value tracebackImpl(Value memrefVal) {
   // case 1: v is the iter_arg of a scf.for
   Value result;
@@ -858,6 +939,38 @@ bool utils::areShapesAligned(ArrayRef<int64_t> staticShapes,
       return false;
   }
   return true;
+}
+
+SmallVector<Value> tracebackMemRefVec(Value memrefVal) {
+  SmallVector<Value> memrefValues;
+  memrefValues.push_back(memrefVal);
+  int loopBound = 256;
+  while (!memrefValues.empty() &&
+         std::any_of(memrefValues.begin(), memrefValues.end(),
+                     [](Value &val) { return !utils::isAllocLikeOp(val) })) {
+    Value allocVal;
+    for (auto val : memrefValues) {
+      if (!utils::isAllocLikeOp(val)) {
+        allocVal = val;
+        break;
+      }
+    }
+    auto upward = tracebackValuesImpl(allocVal);
+    if (upward.empty()) {
+      break;
+    }
+    auto it = std::find(memrefValues.begin(), memrefValues.end(), allocVal);
+    memrefValues.erase(it);
+    memrefValues.append(upward.begin(), upward.end());
+
+    // avoid infinite loop
+    if (loopBound-- < 0) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "tracebackMemRef exceeds loopBound(" << loopBound << ")!");
+      break;
+    }
+  }
+  return memrefValues;
 }
 
 Value utils::tracebackMemRef(Value memrefVal) {
