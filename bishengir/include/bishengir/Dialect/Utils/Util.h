@@ -346,11 +346,18 @@ int checkDefsAllWithCondition(Value v,
 int checkDefsAnyWithCondition(Value v,
                               const std::function<int(Operation *op)> &condFn);
 
+/// Try to trace back the current mermef-typed value to the source values.
+SmallVector<Value> tracebackMemRefVec(Value memrefVal);
+
+/// Try to trace back the current mermef-typed value to the target source
+/// values.
+SmallVector<Value>
+tracebackMemRefToTargetVec(Value memrefVal,
+                           std::function<bool(Value)> targetFn);
+
 /// Try to trace back the current mermef-typed value to the source value.
 /// This function always return a value.
 Value tracebackMemRef(Value memrefVal);
-
-Value tracebackMemRef(Value memrefVal, std::function<bool(Value)> targetFn);
 
 /// Try to trace back the current mermef-typed value to the source
 /// `mermef.alloc`.

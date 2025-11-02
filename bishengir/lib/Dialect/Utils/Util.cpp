@@ -15,13 +15,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "bishengir/Dialect/Utils/Util.h"
 #include "bishengir/Config/bishengir-config.h"
 #include "bishengir/Dialect/Annotation/IR/Annotation.h"
 #include "bishengir/Dialect/HIVM/Utils/Utils.h"
 #include "bishengir/Dialect/MemRef/IR/MemRefImpl.h"
 #include "bishengir/Dialect/Tensor/IR/TensorImpl.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "bishengir/Dialect/Utils/Util.h"
 #if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
 #include "mlir/Dialect/Linalg/IR/LinalgExtensions.h"
 #endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
@@ -45,6 +45,87 @@ using namespace mlir::utils::debugger;
 namespace mlir {
 
 namespace {
+
+SmallVector<Value> tracebackValuesImpl(Value memrefVal) {
+  // case 1: v is the iter_arg of a scf.for
+  SmallVector<Value> result;
+  if (auto arg = dyn_cast<BlockArgument>(memrefVal)) {
+    if (arg.getParentRegion() == nullptr) {
+      return result;
+    }
+    if (auto forOp =
+            dyn_cast<scf::ForOp>(arg.getParentRegion()->getParentOp())) {
+      if (arg.getArgNumber() > 0 &&
+          forOp.getInitArgs().size() > arg.getArgNumber() - 1) {
+        result.emplace_back(forOp.getInitArgs()[arg.getArgNumber() - 1]);
+        result.emplace_back(forOp.getYieldedValues()[arg.getArgNumber() - 1]);
+      }
+    }
+    if (auto whileOp =
+            dyn_cast<scf::WhileOp>(arg.getParentRegion()->getParentOp())) {
+      result.emplace_back(whileOp.getTiedLoopInit(arg)->get());
+    }
+  }
+
+  Operation *def = memrefVal.getDefiningOp();
+  if (!def) {
+    // failed to trace back
+    return result;
+  }
+
+  // case 2: v is the result of cast-like ops
+  //  - memref.cast
+  //  - memref.collapse_shape
+  //  - memref.expand_shape
+  //  - memref.memory_space_cast
+  //  - memref.reinterpret_cast
+  //  - memref.reshape
+  //  - memref.transpose
+  if (auto op = dyn_cast<memref::CastOp>(def)) {
+    result.emplace_back(op.getSource());
+  } else if (auto op = dyn_cast<memref::CollapseShapeOp>(def)) {
+    result.emplace_back(op.getSrc());
+  } else if (auto op = dyn_cast<memref::ExpandShapeOp>(def)) {
+    result.emplace_back(op.getSrc());
+  } else if (auto op = dyn_cast<memref::MemorySpaceCastOp>(def)) {
+    result.emplace_back(op.getSource());
+  } else if (auto op = dyn_cast<memref::ReinterpretCastOp>(def)) {
+    result.emplace_back(op.getSource());
+  } else if (auto op = dyn_cast<memref::ReshapeOp>(def)) {
+    result.emplace_back(op.getSource());
+  } else if (auto op = dyn_cast<memref::TransposeOp>(def)) {
+    result.emplace_back(op.getIn());
+  } else if (auto op = dyn_cast<UnrealizedConversionCastOp>(def)) {
+    result.emplace_back(
+        op.getOperand(cast<OpResult>(memrefVal).getResultNumber()));
+  } else if (auto op = dyn_cast<scf::ForOp>(def)) {
+    // trace back memref.alloc support scf.for
+    result.emplace_back(
+        op.getInitArgs()[cast<OpResult>(memrefVal).getResultNumber()]);
+    result.emplace_back(
+        op.getYieldedValues()[cast<OpResult>(memrefVal).getResultNumber()]);
+  } else if (auto op = dyn_cast<scf::IfOp>(def)) {
+    result.emplace_back(op.thenYield()->getOperand(
+        cast<OpResult>(memrefVal).getResultNumber()));
+    result.emplace_back(op.elseYield()->getOperand(
+        cast<OpResult>(memrefVal).getResultNumber()));
+  }
+
+  if (!result.empty()) {
+    return result;
+  }
+
+  // case 3: v is the result of the view-like ops
+  //  - memref::view
+  //  - memref::subview
+  if (auto op = dyn_cast<memref::ViewOp>(def)) {
+    result.emplace_back(op.getViewSource());
+  } else if (auto op = dyn_cast<memref::SubViewOp>(def)) {
+    result.emplace_back(op.getViewSource());
+  }
+
+  return result;
+}
 
 Value tracebackImpl(Value memrefVal) {
   // case 1: v is the iter_arg of a scf.for
@@ -179,8 +260,8 @@ Value createEmptyOpWithTargetElemType(
                                                          targetElemType);
 #endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
   }
-  return memref::createMemRefAllocOpWithTargetElemType(builder, loc, source,
-                                                       targetElemType, std::move(layout));
+  return memref::createMemRefAllocOpWithTargetElemType(
+      builder, loc, source, targetElemType, std::move(layout));
 }
 
 Value createEmptyOp(OpBuilder &builder, Location loc, Value source) {
@@ -860,15 +941,27 @@ bool utils::areShapesAligned(ArrayRef<int64_t> staticShapes,
   return true;
 }
 
-Value utils::tracebackMemRef(Value memrefVal) {
+SmallVector<Value> utils::tracebackMemRefVec(Value memrefVal) {
+  SmallVector<Value> memrefValues;
+  memrefValues.push_back(memrefVal);
   int loopBound = 256;
-  while (memrefVal && !utils::isAllocLikeOp(memrefVal)) {
-    auto upward = tracebackImpl(memrefVal);
-    if (!upward) {
+  while (!memrefValues.empty() &&
+         std::any_of(memrefValues.begin(), memrefValues.end(),
+                     [](Value &val) { return !utils::isAllocLikeOp(val); })) {
+    Value allocVal;
+    for (auto val : memrefValues) {
+      if (!utils::isAllocLikeOp(val)) {
+        allocVal = val;
+        break;
+      }
+    }
+    auto upward = tracebackValuesImpl(allocVal);
+    if (upward.empty()) {
       break;
     }
-
-    memrefVal = upward;
+    auto it = std::find(memrefValues.begin(), memrefValues.end(), allocVal);
+    memrefValues.erase(it);
+    memrefValues.append(upward.begin(), upward.end());
 
     // avoid infinite loop
     if (loopBound-- < 0) {
@@ -877,20 +970,45 @@ Value utils::tracebackMemRef(Value memrefVal) {
       break;
     }
   }
-
-  return memrefVal;
+  return memrefValues;
 }
 
-Value utils::tracebackMemRef(Value memrefVal,
-                             std::function<bool(Value)> targetFn) {
+Value utils::tracebackMemRef(Value memrefVal) {
+  SmallVector<Value> memrefValues = utils::tracebackMemRefVec(memrefVal);
+  if (memrefValues.empty()) {
+    return memrefVal;
+  }
+  if (memrefValues.size() > 1) {
+    assert(memrefVal.getDefiningOp());
+    memrefVal.getDefiningOp()->emitError(
+        "tracebackMemRef found multiple sources!");
+  }
+  return memrefValues[0];
+}
+
+SmallVector<Value>
+utils::tracebackMemRefToTargetVec(Value memrefVal,
+                                  std::function<bool(Value)> targetFn) {
+  SmallVector<Value> memrefValues;
+  memrefValues.push_back(memrefVal);
   int loopBound = 256;
-  while (memrefVal && !targetFn(memrefVal)) {
-    auto upward = tracebackImpl(memrefVal);
-    if (!upward) {
+  while (!memrefValues.empty() &&
+         std::any_of(memrefValues.begin(), memrefValues.end(),
+                     [&targetFn](Value &val) { return !targetFn(val); })) {
+    Value allocVal;
+    for (auto val : memrefValues) {
+      if (!targetFn(val)) {
+        allocVal = val;
+        break;
+      }
+    }
+    auto upward = tracebackValuesImpl(allocVal);
+    if (upward.empty()) {
       break;
     }
-
-    memrefVal = upward;
+    auto it = std::find(memrefValues.begin(), memrefValues.end(), allocVal);
+    memrefValues.erase(it);
+    memrefValues.append(upward.begin(), upward.end());
 
     // avoid infinite loop
     if (loopBound-- < 0) {
@@ -899,8 +1017,7 @@ Value utils::tracebackMemRef(Value memrefVal,
       break;
     }
   }
-
-  return memrefVal;
+  return memrefValues;
 }
 
 std::optional<memref::AllocOp> utils::tracebackMemRefToAlloc(Value memrefVal) {
