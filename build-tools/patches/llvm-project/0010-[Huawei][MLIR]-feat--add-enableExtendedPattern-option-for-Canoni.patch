@@ -26,26 +26,6 @@ index d6479143a0a5..505d4479631e 100644
    LogicalResult matchAndRewrite(OpType op,
                                  PatternRewriter &rewriter) const override {
      SmallVector<OpFoldResult> mixedOffsets(op.getMixedOffsets());
-diff --git a/mlir/lib/Dialect/MemRef/IR/MemRefOps.cpp b/mlir/lib/Dialect/MemRef/IR/MemRefOps.cpp
-index 535b0852ce92..f8d5d8b86f93 100644
---- a/mlir/lib/Dialect/MemRef/IR/MemRefOps.cpp
-+++ b/mlir/lib/Dialect/MemRef/IR/MemRefOps.cpp
-@@ -2126,11 +2126,10 @@ void ReinterpretCastOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                     MLIRContext *context) {
-   results.add<ReinterpretCastOpExtractStridedMetadataFolder>(context);
- #if BSPUB_DAVINCI_BISHENGIR
--  results.add<ReinterpretCastOpExtractStridedMetadataFolder,
--              OpWithOffsetSizesAndStridesConstantArgumentFolder<
--                  ReinterpretCastOp, ReinterpretCastReturnTypeCanonicalizer,
--                  ReinterpretCastCanonicalizer>>(context);
--
-+  results.add<OpWithOffsetSizesAndStridesConstantArgumentFolder<
-+      ReinterpretCastOp, ReinterpretCastReturnTypeCanonicalizer,
-+      ReinterpretCastCanonicalizer>>(context,
-+                                     "ReinterpretCastConstantArgumentFolder");
- #endif
- }
- 
 diff --git a/mlir/test/Pass/run-reproducer.mlir b/mlir/test/Pass/run-reproducer.mlir
 index bf3ab2dae2ff..275513b7636a 100644
 --- a/mlir/test/Pass/run-reproducer.mlir
