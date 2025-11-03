@@ -56,14 +56,16 @@ namespace reg {
 
 void bishengir::createTorchBackendToNamedOpBackendPipeline(
     OpPassManager &pm, const TorchToNamedOpPipelineOptions &options) {
-  CanonicalizerOptions options;
-  options.disabledPatterns = {"ReinterpretCastConstantArgumentFolder"};
+  CanonicalizerOptions canonicalizerOpts;
+  SmallVector<std::string> disabledPatterns(
+      1, "ReinterpretCastConstantArgumentFolder");
+  canonicalizerOpts.disabledPatterns = disabledPatterns;
   pm.addNestedPass<func::FuncOp>(Torch::createFuseQuantizedOpsPass());
   pm.addNestedPass<func::FuncOp>(Torch::createScalarizeShapesPass());
 
   pm.addNestedPass<func::FuncOp>(createConvertTorchToTMTensorPass());
   pm.addNestedPass<func::FuncOp>(
-      bishengir::createExtendedCanonicalizerPass(options));
+      bishengir::createExtendedCanonicalizerPass(canonicalizerOpts));
 
   pm.addNestedPass<func::FuncOp>(createLiteralDataTypeCastPass());
   ConvertTorchToHFusionOptions torchToHFusionOption;
@@ -82,7 +84,7 @@ void bishengir::createTorchBackendToNamedOpBackendPipeline(
       tensor::createCanonicalizeTensorReshapePass());
 
   pm.addNestedPass<func::FuncOp>(
-      bishengir::createExtendedCanonicalizerPass(options));
+      bishengir::createExtendedCanonicalizerPass(canonicalizerOpts));
 
   pm.addNestedPass<func::FuncOp>(createConvertTorchToSCFPass());
   pm.addNestedPass<func::FuncOp>(createConvertTorchToArithPass());
@@ -90,14 +92,14 @@ void bishengir::createTorchBackendToNamedOpBackendPipeline(
   pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
 
   pm.addNestedPass<func::FuncOp>(
-      bishengir::createExtendedCanonicalizerPass(options));
+      bishengir::createExtendedCanonicalizerPass(canonicalizerOpts));
   pm.addNestedPass<func::FuncOp>(
       memref::createResolveShapedTypeResultDimsPass());
   pm.addNestedPass<func::FuncOp>(createCSEPass());
 
   pm.addPass(TorchConversion::createFuncBackendTypeConversionPass());
   pm.addNestedPass<func::FuncOp>(
-      bishengir::createExtendedCanonicalizerPass(options));
+      bishengir::createExtendedCanonicalizerPass(canonicalizerOpts));
   pm.addNestedPass<func::FuncOp>(
       TorchConversion::createFinalizingBackendTypeConversionPass());
 }

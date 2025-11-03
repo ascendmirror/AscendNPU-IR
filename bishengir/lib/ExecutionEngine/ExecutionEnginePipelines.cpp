@@ -66,8 +66,9 @@ void execution_engine::buildCPURunnerPipeline(
   pm.addPass(memref::createExpandStridedMetadataPass());
   pm.addPass(createConvertLinalgToLoopsPass());
   CanonicalizerOptions canonicalizerOpts;
-  canonicalizerOpts.disabledPatterns = {
-      "ReinterpretCastConstantArgumentFolder"};
+  SmallVector<std::string> disabledPatterns(
+      1, "ReinterpretCastConstantArgumentFolder");
+  canonicalizerOpts.disabledPatterns = disabledPatterns;
   pm.addPass(bishengir::createExtendedCanonicalizerPass(canonicalizerOpts));
   pm.addPass(createConvertSCFToCFPass());
   pm.addPass(createLowerAffinePass());
