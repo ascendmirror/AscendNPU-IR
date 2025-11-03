@@ -80,7 +80,7 @@ FailureOr<memref::AllocOp> getMemRefForBlockArgument(BlockArgument bbArg) {
     auto *operand = loopOp.getTiedLoopInit(bbArg);
     return getMemRefAlloc(operand->get());
   }
-  return bbParentOp->emitError("Unsupported block op type");
+  return failure();
 }
 
 /// Find the root memerf alloc for the OpResult.
@@ -101,7 +101,6 @@ FailureOr<memref::AllocOp> getMemRefForOpResult(OpResult result) {
         return getMemRefAlloc(op.getMemref());
       })
       .Default([&](Operation *op) {
-        op->emitOpError("Unsupported op for finding the root alloc.");
         return failure();
       });
 }
