@@ -275,6 +275,14 @@ def HIVM_TCoreTypeAttr : HIVM_Attr<"TCoreType", "tcore_type"> {
   }];
 }
 
+def HIVM_TCoreTypeMarkerAttr : HIVM_Attr<"TCoreTypeMarker", "tcore_type_marker"> {
+  let parameters = (ins EnumParameter<HIVM_TCoreTypeEnum>:$tcoretype);
+  let assemblyFormat = "`<` params `>`";
+  let description = [{
+    HIVM op core type marker attribute.
+  }];
+}
+
 def HIVM_TPartOfMixAttr : HIVM_Attr<"TPartOfMix", "part_of_mix"> {
   let description = [{
       HIVM function is a part of mix kernel.
