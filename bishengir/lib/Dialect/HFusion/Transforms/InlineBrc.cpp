@@ -36,6 +36,14 @@ namespace mlir {
 using namespace mlir;
 using namespace mlir::hfusion;
 
+static bool isInlinableCompareOp(hfusion::CompareOp op) {
+  if (auto tType = dyn_cast<TensorType>(op->getOperandTypes()[0])) {
+    auto eType = tType.getElementType();
+    return (eType.isF32() || eType.isF16() || eType.isInteger(8));
+  }
+  return false;
+}
+
 // Currently enumerate all possible Ops
 // TODO: generalize inlinable Op.
 // An Op is consider inlinable if its operand shape can be easily
@@ -44,7 +52,9 @@ static bool isInlinableOp(Operation *op) {
   return isa<linalg::ElemwiseBinaryOp>(op) ||
          isa<linalg::ElemwiseUnaryOp>(op) ||
          isa<hfusion::ElemwiseBinaryOp>(op) ||
-         isa<hfusion::ElemwiseUnaryOp>(op);
+         isa<hfusion::ElemwiseUnaryOp>(op) || isa<hfusion::SelectOp>(op) ||
+         (isa<hfusion::CompareOp>(op) &&
+          isInlinableCompareOp(cast<hfusion::CompareOp>(op)));
 }
 
 // TODO : add platform information
