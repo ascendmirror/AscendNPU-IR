@@ -36,23 +36,32 @@ namespace mlir {
 using namespace mlir;
 using namespace mlir::hfusion;
 
+static bool isInlinableCompareOp(hfusion::CompareOp op) {
+  auto tType = op->getOperandTypes()[0];
+  auto eType = getElementTypeOrSelf(tType);
+  return (eType.isF32() || eType.isF16() || eType.isInteger(8));
+}
+
 // Currently enumerate all possible Ops
 // TODO: generalize inlinable Op.
 // An Op is consider inlinable if its operand shape can be easily
 // inferred by init
-static bool isInlinableOp(Operation *op) {
+static bool isInlinableOp(Operation *op, OpOperand *oper) {
   return isa<linalg::ElemwiseBinaryOp>(op) ||
          isa<linalg::ElemwiseUnaryOp>(op) ||
          isa<hfusion::ElemwiseBinaryOp>(op) ||
-         isa<hfusion::ElemwiseUnaryOp>(op);
+         isa<hfusion::ElemwiseUnaryOp>(op) ||
+         (isa<hfusion::SelectOp>(op) && oper->getOperandNumber() != 0) ||
+         (isa<hfusion::CompareOp>(op) &&
+          isInlinableCompareOp(cast<hfusion::CompareOp>(op)));
 }
 
 // TODO : add platform information
 // check whether brc op can be inlined to current brc user op
 static bool canInlineBrc(Operation *useOp, OpOperand *oper,
                          bool isScalar = false) {
-  // only support inline brc to elemwise binary op currently
-  if (!isInlinableOp(useOp)) {
+  // only support inline brc to elemwise binary op and select and compare
+  if (!isInlinableOp(useOp, oper)) {
     return false;
   }
 

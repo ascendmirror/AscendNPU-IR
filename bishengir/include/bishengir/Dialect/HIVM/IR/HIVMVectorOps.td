@@ -923,7 +923,7 @@ def VShROp : HIVM_ElementwiseBinaryOp<"vshr",
 def VCmpOp : HIVM_ElementwiseBinaryOp<"vcmp",
     [OperElemTypeConstraints<[0, 1], [F16, F32, I16, I32, I64]>,
      OperElemTypeConstraints<[/*dstIdx=*/2], [I1, I8]>,
-     VectorOnlyTrait<0>,
+     VectorOnlyTrait<0>, CommutativeOpTrait,
      DeclareOpInterfaceMethods<ImplByScalarOpInterface>
     ]> {
   let summary = "Elementwise Binary Vector Comparison Op";
