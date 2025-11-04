@@ -317,7 +317,8 @@ void convertInvalidScalarOperandByBrc(
   Value dstVal = op->getOperand(op->getNumOperands() - 1);
   for (size_t invalidIdx : invalidscalarOperands) {
     auto operand = op->getOperand(invalidIdx);
-    Value empty = utils::createEmptyOp(b, op->getLoc(), dstVal);
+    Value empty = utils::createEmptyOpWithTargetElemType(
+        b, op->getLoc(), dstVal, getElementTypeOrSelf(operand.getType()));
     Value newOperand = brcOperand(b, op->getLoc(), operand, empty);
     op->setOperand(invalidIdx, newOperand);
   }
