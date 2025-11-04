@@ -187,6 +187,7 @@ bool isTransposeAdjacentAxes(SmallVector<int64_t> transposeAxes);
 
 /// Return the ConstantOp IntValue.
 FailureOr<std::string> stringfyConstantIntOpValue(Value value);
+bool isArgminOrArgmax(ReduceOperation op);
 } // namespace util
 } // namespace hivm
 } // namespace mlir
