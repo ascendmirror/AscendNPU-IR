@@ -55,3 +55,15 @@ std::optional<Value> MmadL1Op::getUnitFlagModeCondition() {
 std::optional<UnitFlagAttr> MmadL1Op::getUnitFlagModeValue() {
   return getUnitFlagMode();
 }
+
+//===----------------------------------------------------------------------===//
+// MmadL0Op
+//===----------------------------------------------------------------------===//
+
+std::optional<Value> MmadL0Op::getUnitFlagModeCondition() {
+  return getUnitFlagCond();
+}
+
+std::optional<UnitFlagAttr> MmadL0Op::getUnitFlagModeValue() {
+  return getUnitFlagMode();
+}
