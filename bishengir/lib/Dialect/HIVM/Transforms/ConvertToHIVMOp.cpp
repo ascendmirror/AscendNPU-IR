@@ -151,8 +151,8 @@ LogicalResult replaceMemCopyByHIVMLoadOp(memref::CopyOp copyOp,
     }
   }
   // TODO: change TA to create hivm.load/store op directly
-  auto implicitTransposeAttr =
-      utils::getAnnotateOpWithAttr(copyOp.getTarget(), "MayImplicitTransposeWithLastAxis");
+  auto implicitTransposeAttr = utils::getAnnotateOpWithAttr(
+      copyOp.getTarget(), "MayImplicitTransposeWithLastAxis");
   if (implicitTransposeAttr.has_value()) {
     loadOp.setMayImplicitTransposeWithLastAxis(true);
   }
@@ -165,9 +165,15 @@ bool isAllocLikeOrGMPointerCastOp(Value v) {
 }
 
 bool isFromGMSpace(Value v) {
-  auto defOp =
-      utils::tracebackMemRef(v, isAllocLikeOrGMPointerCastOp).getDefiningOp();
-  return defOp == nullptr || isa<hivm::PointerCastOp>(defOp);
+  SmallVector<Value> targetOPVec =
+      utils::tracebackMemRefVecByTargetFn(v, isAllocLikeOrGMPointerCastOp);
+  for (auto targetOP : targetOPVec) {
+    auto defOp = targetOP.getDefiningOp();
+    if (defOp == nullptr || isa<hivm::PointerCastOp>(defOp)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 struct MemrefCopyOpLowering : public OpRewritePattern<memref::CopyOp> {
@@ -187,8 +193,8 @@ struct MemrefCopyOpLowering : public OpRewritePattern<memref::CopyOp> {
       auto storeOp = rewriter.replaceOpWithNewOp<hivm::StoreOp>(
           copyOp, TypeRange(), src, dst);
       // TODO: change TA to create hivm.load/store op directly
-      auto implicitTransposeAttr =
-          utils::getAnnotateOpWithAttr(copyOp.getTarget(), "MayImplicitTransposeWithLastAxis");
+      auto implicitTransposeAttr = utils::getAnnotateOpWithAttr(
+          copyOp.getTarget(), "MayImplicitTransposeWithLastAxis");
       if (implicitTransposeAttr.has_value()) {
         storeOp.setMayImplicitTransposeWithLastAxis(true);
       }
