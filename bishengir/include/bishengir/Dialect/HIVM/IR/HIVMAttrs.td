@@ -842,4 +842,10 @@ def HIVM_InsertSliceSourceIndexAttr
   }];
 }
 
+def HIVM_ParallelLoopAttr : HIVM_Attr<"ParallelLoop", "hivm.parallel_loop"> {
+  let description = [{
+    Specifies that marked loop can run in parallel.
+  }];
+}
+
 #endif // BISHENGIR_DIALECT_HIVM_IR_HIVMATTRS_TD
