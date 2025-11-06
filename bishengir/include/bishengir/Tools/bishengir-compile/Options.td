@@ -150,6 +150,14 @@ def EnableLIRCompile : FeatureControlOptions<
 }
 #endif
 
+def EnableHIVMGraphSyncSolver : FeatureControlOptions<
+  "Use hivm graph-sync-solver instead of inject-sync.",
+  "bool",
+  "false"
+> {
+  bit isSharedWithDownstreamToolchain = 1;
+}
+
 def DisableHIVMAutoInjectSync : FeatureControlOptions<
   "Disable auto inject sync intra core.",
   "bool",
