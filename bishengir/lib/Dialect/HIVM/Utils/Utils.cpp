@@ -930,6 +930,9 @@ AlignKind isBrcOpAligned(VBrcOp vbrcOp, int dim, int rank) {
       (util::INTR_BYTES_PER_BLOCK * utils::INTR_BITS_PER_BYTE) / resWidth;
   if (!isScalarLike(srcType))
     memrefTypeList.push_back(cast<MemRefType>(srcType));
+  else
+    // for scalar broadcast, alignment kind is considered as unknow.
+    return AlignKind::UNKNOWN;
   memrefTypeList.push_back(dstType);
   // Collect the list of align kind
   std::vector<AlignKind> alignKindList = {};
