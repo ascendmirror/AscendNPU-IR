@@ -925,8 +925,12 @@ AlignKind isBrcOpAligned(VBrcOp vbrcOp, int dim, int rank) {
   // Collect the list of align kind
   std::vector<AlignKind> alignKindList = {};
   dim = axisKind == AxisKind::LAST ? dstType.getRank() - 2 : dim;
+
   for (auto memrefType : memrefTypeList) {
     auto layout = dyn_cast<StridedLayoutAttr>(memrefType.getLayout());
+    if (dim < 0 && dstType.getRank() == 1 && layout && layout.getStrides()[0] == 1){
+      return AlignKind::ALIGN;
+    }
     // Return unknown if [dim ... end] has any dynamic shape
     for (auto i = dim + 1; i < rank; i++)
       if (memrefType.isDynamicDim(i))
