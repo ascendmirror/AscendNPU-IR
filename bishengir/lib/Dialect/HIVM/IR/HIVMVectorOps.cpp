@@ -671,9 +671,10 @@ LogicalResult VTransposeOp::verify() {
 
 void VTransposeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                          TypeRange result, Value src, Value dst,
-                         DenseI64ArrayAttr permutation) {
+                         DenseI64ArrayAttr permutation,
+                         bool disable_align) {
   build(odsBuilder, odsState, result, src, dst, /*temp_buffer=*/nullptr,
-        permutation);
+        permutation, disable_align);
 }
 
 //===----------------------------------------------------------------------===//
