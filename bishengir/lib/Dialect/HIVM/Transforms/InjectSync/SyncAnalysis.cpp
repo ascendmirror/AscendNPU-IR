@@ -120,8 +120,22 @@ void SyncAnalyzer::InsertLastPipeAll() {
   assert(syncOperations.size() == syncIndex);
 }
 
-bool SyncAnalyzer::isParallelLoop(scf::ForOp forOp) {
+bool SyncAnalyzer::isParallelLoop(scf::ForOp forOp) const {
   return forOp->hasAttrOfType<UnitAttr>(hivm::ParallelLoopAttr::name);
+}
+
+bool SyncAnalyzer::checkUnderParallelLoop(
+    const CompoundInstanceElement *nowCompound,
+    const CompoundInstanceElement *frontCompound) const {
+  auto loopOp1 = nowCompound->elementOp->getParentOfType<LoopLikeOpInterface>();
+  auto loopOp2 =
+      frontCompound->elementOp->getParentOfType<LoopLikeOpInterface>();
+  auto forOp1 = llvm::dyn_cast_if_present<scf::ForOp>(loopOp1.getOperation());
+  auto forOp2 = llvm::dyn_cast_if_present<scf::ForOp>(loopOp2.getOperation());
+  if (!forOp1 || !forOp2 || forOp1 != forOp2) {
+    return false;
+  }
+  return isParallelLoop(forOp1);
 }
 
 void SyncAnalyzer::DealWithLoopSync(LoopInstanceElement *nowElement) {
@@ -133,12 +147,6 @@ void SyncAnalyzer::DealWithLoopSync(LoopInstanceElement *nowElement) {
   //  *  A [j + 1]   copy cmd
   //  *  B [j + 1]   copy cmd
   // Then call InsertSeqSync func to insert backward sync as sequential sync.
-  if (auto forOp =
-          llvm::dyn_cast_if_present<scf::ForOp>(nowElement->elementOp)) {
-    if (isParallelLoop(forOp)) {
-      return;
-    }
-  }
   if (nowElement->getLoopKind() == KindOfLoop::LOOP_END) {
     SyncIRs backSyncIr;
     assert(syncIR.size() >= nowElement->endId);
@@ -408,6 +416,11 @@ bool SyncAnalyzer::IsNoNeedToInsertSync(
     // Two same compounds assigned by MacroOp do not require insertion
     // of forward synchronization, only need to be judged in reverse.
     return true;
+  }
+  if (isBackwardDep) {
+    if (checkUnderParallelLoop(nowCompound, frontCompound)) {
+      return true;
+    }
   }
   if (syncAnalysisMode == SyncAnalysisMode::BLOCKSYNC) {
     // TODO: support vector-vector
