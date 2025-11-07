@@ -273,7 +273,11 @@ private:
       CompoundInstanceElement *frontCompound,
       const std::optional<unsigned> &forEndIndex);
 
-  bool isParallelLoop(scf::ForOp forOp);
+  bool isParallelLoop(scf::ForOp forOp) const;
+
+  bool
+  checkUnderParallelLoop(const CompoundInstanceElement *nowCompound,
+                         const CompoundInstanceElement *frontCompound) const;
 };
 
 } // namespace hivm
