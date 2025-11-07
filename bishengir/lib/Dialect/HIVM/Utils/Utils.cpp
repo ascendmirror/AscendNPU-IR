@@ -1062,11 +1062,6 @@ Value createNestedIndexForOp(OpBuilder &builder, Operation *operation) {
 }
 
 namespace util {
-/// trace value and judge if it is function argument
-bool isFromFunctionArg(mlir::Value v) {
-  return utils::tracebackMemRef(v).getDefiningOp() == nullptr;
-}
-
 //===----------------------------------------------------------------------===//
 // This file contains code from the LLVM Project.
 // Original License: Apache License v2.0 with LLVM Exceptions
