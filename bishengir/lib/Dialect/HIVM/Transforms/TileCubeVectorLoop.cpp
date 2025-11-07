@@ -21,17 +21,19 @@
 #include "bishengir/Dialect/HIVM/IR/HIVMImpl.h"
 #include "bishengir/Dialect/HIVM/Transforms/Passes.h"
 #include "bishengir/Dialect/HIVM/Utils/Utils.h"
+#include "bishengir/Dialect/Tensor/Transforms/Passes.h"
 #include "bishengir/Dialect/Utils/Util.h"
-
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/TransformOps/SCFTransformOps.h"
 #include "mlir/Dialect/Tensor/TransformOps/TensorTransformOps.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Transform/IR/Utils.h"
 #include "mlir/Dialect/Transform/Transforms/TransformInterpreterUtils.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/Parser/Parser.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
 
 #include "llvm/Support/Debug.h"
@@ -57,6 +59,7 @@ const static llvm::StringLiteral kCubeProducerToFuse =
 const static llvm::StringLiteral kVectorProducerToFuse =
     "vector_producer_to_fuse_{0}";
 const static llvm::StringLiteral kDummyStore = "dummy_store";
+const static llvm::StringLiteral kLiftedLoad = "lifted_load";
 
 //===----------------------------------------------------------------------===//
 // Utils for constructing transform sequence.
@@ -214,6 +217,20 @@ inline bool hasHIVMUser(Operation *op) {
   });
 }
 
+SmallVector<bufferization::ToTensorOp> getToTensorUsers(Value value,
+                                                        Operation *except) {
+  SmallVector<bufferization::ToTensorOp> users;
+  for (Operation *user : value.getUsers()) {
+    if (user == except)
+      continue;
+    auto userDefOp = dyn_cast_if_present<bufferization::ToTensorOp>(user);
+    if (!userDefOp)
+      continue;
+    users.push_back(userDefOp);
+  }
+  return users;
+}
+
 /// Pattern to lift memref loads to tensor loads.
 ///
 /// Convert:
@@ -234,7 +251,7 @@ inline bool hasHIVMUser(Operation *op) {
 /// Restriction:
 ///   - the memref load's dst operand must have one user that is a
 ///   `bufferization.to_tensor` op
-class LiftToTensor : public OpRewritePattern<hivm::LoadOp> {
+class LiftLoadMemrefToTensor : public OpRewritePattern<hivm::LoadOp> {
 public:
   using OpRewritePattern<hivm::LoadOp>::OpRewritePattern;
 
@@ -246,25 +263,18 @@ public:
       return rewriter.notifyMatchFailure(
           loadOp, "No need to lift load that has tensor outs");
 
-    bufferization::ToTensorOp toTensorUser = nullptr;
-    for (Operation *user : dst.getUsers()) {
-      if (user == loadOp)
-        continue;
-
-      auto userDefOp = dyn_cast_if_present<bufferization::ToTensorOp>(user);
-      if (!userDefOp)
-        continue;
-
-      if (toTensorUser != nullptr)
-        return rewriter.notifyMatchFailure(
-            loadOp,
-            "dst's must only have a single, bufferization.to_tensor user");
-
-      toTensorUser = userDefOp;
-    }
-    if (!toTensorUser)
+    SmallVector<bufferization::ToTensorOp> toTensorUsers =
+        getToTensorUsers(dst, /*except=*/loadOp);
+    if (toTensorUsers.empty()) {
       return rewriter.notifyMatchFailure(
           loadOp, "dst's must have a bufferization.to_tensor user");
+    }
+    if (toTensorUsers.size() >= 2) {
+      return rewriter.notifyMatchFailure(
+          loadOp,
+          "dst's must only have a single, bufferization.to_tensor user");
+    }
+    bufferization::ToTensorOp toTensorUser = toTensorUsers.front();
 
     Location loc = loadOp->getLoc();
     Value src = loadOp.getSource();
@@ -292,10 +302,279 @@ public:
   }
 };
 
+/// Pattern to lift subview loads to tensor loads.
+///
+/// Convert:
+/// ```mlir
+///  %a = memref.subview %reinterpret_cast
+///  %b = memref.subview %alloc
+///  hivm.hir.load ins(%a: memref<?xf16>) outs(%b: memref<?xf16>)
+///  %alloc_t = bufferization.to_tensor %alloc : memref<256xf16>
+///  some_user(%alloc_t) : tensor<256xf16>
+/// ```
+/// To:
+/// ```mlir
+///  %a_t = bufferization.to_tensor %reinterpret_cast: memref<?xf16>
+///  %b_t = bufferization.to_tensor %alloc: memref<256xf16>
+///  %a_slice = tensor.extract_slice %a_t : tensor<?xf16>
+///  %b_slice = tensor.extract_slice %b_t : tensor<?xf16>
+///  %res = hivm.hir.load {lifted_load}
+///                       ins(%a_slice: tensor<?xf16>)
+///                       outs(%b_slice: tensor<?xf16>) -> tensor<?xf16>
+///  %inserted = tensor.insert_slice %res, %b_t
+///  some_user(%inserted)
+/// ```
+class LiftLoadSubviewToTensor : public OpRewritePattern<hivm::LoadOp> {
+public:
+  using OpRewritePattern<hivm::LoadOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(hivm::LoadOp loadOp,
+                                PatternRewriter &rewriter) const override {
+    Value dst = loadOp.getTarget();
+    Value src = loadOp.getSource();
+    auto dstType = dyn_cast<MemRefType>(dst.getType());
+    if (!dstType) {
+      return rewriter.notifyMatchFailure(
+          loadOp, "No need to lift load that has tensor outs");
+    }
+
+    auto dstSubviewOp = dst.getDefiningOp<memref::SubViewOp>();
+    auto srcSubviewOp = src.getDefiningOp<memref::SubViewOp>();
+    if (!dstSubviewOp || !srcSubviewOp) {
+      return rewriter.notifyMatchFailure(
+          loadOp, "require load dst and src to be subview");
+    }
+
+    Value dstAlloc = dstSubviewOp.getViewSource();
+    auto dstAllocOp = dstAlloc.getDefiningOp<memref::AllocOp>();
+    if (!dstAllocOp) {
+      return rewriter.notifyMatchFailure(
+          loadOp, "require load dst to be subview from alloc");
+    }
+
+    SmallVector<bufferization::ToTensorOp> toTensorUsers =
+        getToTensorUsers(dstAllocOp, /*except=*/dstSubviewOp);
+    if (toTensorUsers.empty()) {
+      return rewriter.notifyMatchFailure(
+          loadOp, "dst's alloc must have a bufferization.to_tensor user");
+    }
+    if (toTensorUsers.size() >= 2) {
+      return rewriter.notifyMatchFailure(
+          loadOp,
+          "dst's must only have a single, bufferization.to_tensor user");
+    }
+    bufferization::ToTensorOp toTensorUser = toTensorUsers.front();
+    Location loc = toTensorUser.getLoc();
+
+    auto newDst = getExtractSliceFromSubview(dstSubviewOp, rewriter);
+    auto newSrc = getExtractSliceFromSubview(srcSubviewOp, rewriter);
+    rewriter.setInsertionPointAfter(toTensorUser);
+    auto tensorType =
+        RankedTensorType::get(dstType.getShape(), dstType.getElementType());
+
+    // Create a tensor load, using the tensorized src/dst values
+    auto tensorLoadOp = rewriter.create<hivm::LoadOp>(
+        loc, tensorType, newSrc, newDst, loadOp.getPadModeAttr(),
+        loadOp.getPadValue(), loadOp.getLeftPaddingNum(),
+        loadOp.getRightPaddingNum(), loadOp.getInitOutBuffer(),
+        loadOp.getInitCondition(),
+        loadOp.getMayImplicitTransposeWithLastAxis());
+    tensorLoadOp->setAttr(kLiftedLoad, UnitAttr::get(getContext()));
+
+    // Create a insert_slice from load to new dst extract_slice
+    auto insertSliceOp = rewriter.create<tensor::InsertSliceOp>(
+        loc, tensorLoadOp.getResultTensor(), newDst.getSource(),
+        dstSubviewOp.getMixedOffsets(), dstSubviewOp.getMixedSizes(),
+        dstSubviewOp.getMixedStrides());
+
+    // Replace the users of `bufferization.to_tensor` by the new insert_slice
+    rewriter.replaceAllUsesWith(toTensorUser.getResult(),
+                                insertSliceOp.getResult());
+
+    // Erase the memref load
+    rewriter.eraseOp(loadOp);
+    return success();
+  }
+
+  tensor::ExtractSliceOp
+  getExtractSliceFromSubview(memref::SubViewOp subview,
+                             PatternRewriter &rewriter) const {
+    Value src = subview.getViewSource();
+    Location loc = subview.getLoc();
+    Value newSrc = rewriter.create<bufferization::ToTensorOp>(
+        loc, src, /*restrict=*/true, /*writable=*/true);
+    auto oldType = cast<MemRefType>(subview.getResult().getType());
+    auto newType =
+        RankedTensorType::get(oldType.getShape(), oldType.getElementType());
+    auto sliceOp = rewriter.create<tensor::ExtractSliceOp>(
+        loc, newType, newSrc, subview.getMixedOffsets(),
+        subview.getMixedSizes(), subview.getMixedStrides());
+    return sliceOp;
+  }
+};
+
 LogicalResult liftMemRefLoadsInLoop(ModuleOp module) {
   MLIRContext *ctx = module.getContext();
   RewritePatternSet patterns(ctx);
-  patterns.add<LiftToTensor>(ctx);
+  patterns.add<LiftLoadMemrefToTensor>(ctx);
+  patterns.add<LiftLoadSubviewToTensor>(ctx);
+  return applyPatternsGreedily(module, std::move(patterns));
+}
+
+/// Pattern to unlift tensor loads to subview loads.
+///
+/// Convert:
+/// ```mlir
+///  %t0 = bufferization.to_tensor %gm : memref<256x192xbf16>
+///  %slice0 = extract_slice %t0 : tensor<?x192xbf16>
+///  %ub1 = memref.alloc() : memref<256x192xbf16>
+///  %t1 = bufferization.to_tensor %ub1 : tensor<256x192xbf16>
+///  %slice1 = extract_slice %t1 : tensor<?x192xbf16>
+///  %load = hivm.hir.load ins(%slice0) outs(%slice1) {lifted} : tensor
+///  %inserted = insert_slice %load, %ub2 : tensor<?x192xbf16>
+///                                      -> tensor<256x192xbf16>
+///  mmadL1 %ub3, %inserted : tensor<256x192xbf16>, tensor<256x192xbf16>
+///                        -> tensor<256x256xbf16>
+/// ```
+/// To:
+/// ```mlir
+///  %slice0 = subview %gm : memref<256x192xbf16>
+///                       -> memref<?x192xbf16>
+///  %ub1 = memref.alloc() : memref<256x192xbf16>
+///  %slice1 = subview %ub1 : memref<256x192xbf16>
+///                        -> memref<?x192xbf16>
+///  hivm.hir.load ins(%slice0) outs(%slice1) : memref
+///  %t1 = bufferization.to_tensor %ub1 : tensor<256x192xbf16>
+///  mmadL1 %ub3, %t1 : tensor<256x192xbf16>, tensor<256x192xbf16>
+///                        -> tensor<256x256xbf16>
+/// ```
+class UnLiftLoadSubviewToTensor : public OpRewritePattern<hivm::LoadOp> {
+public:
+  using OpRewritePattern<hivm::LoadOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(hivm::LoadOp loadOp,
+                                PatternRewriter &rewriter) const override {
+    //////////
+    auto parent = loadOp->getParentOfType<func::FuncOp>();
+    llvm::dbgs() << "parent func: " << *parent << "\n";
+    //////////
+
+    if (!loadOp->hasAttr(kLiftedLoad)) {
+      return rewriter.notifyMatchFailure(loadOp, "no lift load attr found");
+    }
+    Value loadDst = loadOp.getTarget();
+    Value loadSrc = loadOp.getSource();
+    if (isa<MemRefType>(loadDst.getType())) {
+      return rewriter.notifyMatchFailure(
+          loadOp, "No need to unlift load that has memref outs");
+    }
+
+    auto loadDstSliceOp = loadDst.getDefiningOp<tensor::ExtractSliceOp>();
+    if (!loadDstSliceOp) {
+      return rewriter.notifyMatchFailure(loadOp,
+                                         "dst must come from ExtractSliceOp");
+    }
+
+    auto insertSliceMaybe = getSingleInsertSliceUser(loadOp->getResult(0));
+    if (!insertSliceMaybe.has_value()) {
+      return rewriter.notifyMatchFailure(
+          loadOp, "should have single insert_slice user");
+    }
+    auto insertSliceUser = insertSliceMaybe.value();
+
+    auto memLoadSrcMaybe = getMemRefFromToTensor(loadSrc, rewriter);
+    if (!memLoadSrcMaybe.has_value()) {
+      return rewriter.notifyMatchFailure(
+          loadOp, "src must come from ToTensor of memref type");
+    }
+    Value memLoadSrc = memLoadSrcMaybe.value();
+
+    auto memLoadDstMaybe = getMemRefFromToTensor(loadDst, rewriter);
+    if (!memLoadDstMaybe.has_value()) {
+      return rewriter.notifyMatchFailure(
+          loadOp, "dst must come from ToTensor of memref type");
+    }
+    Value memLoadDst = memLoadDstMaybe.value();
+
+    Location loc = loadOp.getLoc();
+    rewriter.create<hivm::LoadOp>(
+        loc, Type(), memLoadSrc, memLoadDst, loadOp.getPadModeAttr(),
+        loadOp.getPadValue(), loadOp.getLeftPaddingNum(),
+        loadOp.getRightPaddingNum(), loadOp.getInitOutBuffer(),
+        loadOp.getInitCondition(),
+        loadOp.getMayImplicitTransposeWithLastAxis());
+
+    // rewriter.replaceAllUsesWith(loadOp.getResult(0), memLoadDst);
+    rewriter.replaceOp(insertSliceUser, insertSliceUser.getDest());
+    rewriter.eraseOp(loadOp);
+    return success();
+  }
+
+  // 1. if value is from to_tensor result, return to_tensor source of memref
+  // type
+  // 2. if value is extract_slice from to_tensor, return subview from to_tensor
+  // source of memref type, with same offsets/sizes/strides
+  std::optional<Value> getMemRefFromToTensor(Value value,
+                                             PatternRewriter &rewriter) const {
+
+    auto toTensorMaybe = getToTensorSource(value);
+    if (toTensorMaybe.has_value()) {
+      return toTensorMaybe.value();
+    }
+
+    auto sliceOp = value.getDefiningOp<tensor::ExtractSliceOp>();
+    if (!sliceOp) {
+      return std::nullopt;
+    }
+
+    auto toTensorMaybeFromSlice = getToTensorSource(sliceOp.getSource());
+    if (!toTensorMaybeFromSlice.has_value()) {
+      return std::nullopt;
+    }
+    auto toTensorSource = toTensorMaybeFromSlice.value();
+
+    Location loc = sliceOp->getLoc();
+    auto subviewOp = rewriter.create<memref::SubViewOp>(
+        loc, toTensorSource, sliceOp.getMixedOffsets(), sliceOp.getMixedSizes(),
+        sliceOp.getMixedStrides());
+    return subviewOp.getResult();
+  }
+
+  std::optional<Value> getToTensorSource(Value value) const {
+    if (auto srcToTensor = value.getDefiningOp<bufferization::ToTensorOp>()) {
+      return srcToTensor.getOperand();
+    }
+    return std::nullopt;
+  }
+
+  std::optional<tensor::InsertSliceOp>
+  getSingleInsertSliceUser(Value value) const {
+    SmallVector<Operation *> users = llvm::to_vector(value.getUsers());
+    if (users.size() != 1) {
+      return std::nullopt;
+    }
+    if (auto insertOp = dyn_cast<tensor::InsertSliceOp>(users.front())) {
+      return insertOp;
+    }
+    return std::nullopt;
+  }
+};
+
+LogicalResult mergeConsecutiveInsertExtractSlice(ModuleOp module) {
+  auto result = module.walk([&](mlir::func::FuncOp funcOp) {
+    mlir::PassManager pm(funcOp->getContext());
+    pm.addPass(tensor::createMergeConsecutiveInsertExtractSlicePass());
+    if (failed(pm.run(funcOp)))
+      return WalkResult::interrupt();
+    return WalkResult::advance();
+  });
+  return failure(result.wasInterrupted());
+}
+
+LogicalResult unLiftMemRefLoadsInLoop(ModuleOp module) {
+  MLIRContext *ctx = module.getContext();
+  RewritePatternSet patterns(ctx);
+  patterns.add<UnLiftLoadSubviewToTensor>(ctx);
   return applyPatternsGreedily(module, std::move(patterns));
 }
 
@@ -957,8 +1236,6 @@ void TileCubeVectorLoopPass::collectLoopInfo(ModuleOp topLevelModule) {
   });
 }
 
-
-
 static bool
 areValuesAlignedAfterTiling(ValueRange valueRange,
                             mlir::hivm::detail::DimensionAnalyzer &analyzer,
@@ -1026,8 +1303,8 @@ TileCubeVectorLoopPass::collectVectorLoopInfo(scf::ForOp vectorLoop) {
           return WalkResult::advance();
         }
 
-	// TODO:: Use MarkStrideAlign to annotate the unaligned axis and
-	// rely on StrideAlign to make it aligned
+        // TODO:: Use MarkStrideAlign to annotate the unaligned axis and
+        // rely on StrideAlign to make it aligned
         if (!areValuesAlignedAfterTiling(op->getResults(), analyzer,
                                          info.getTripCount(), ubAlignSize) ||
             !areValuesAlignedAfterTiling(op->getOperands(), analyzer,
@@ -1212,6 +1489,12 @@ void TileCubeVectorLoopPass::runOnOperation() {
   }
   topLevelModule->removeAttr(
       transform::TransformDialect::kWithNamedSequenceAttrName);
+
+  if (failed(mergeConsecutiveInsertExtractSlice(topLevelModule)))
+    signalPassFailure();
+
+  if (failed(unLiftMemRefLoadsInLoop(topLevelModule)))
+    signalPassFailure();
 
   // Post processing step: try to shrink alloc's size.
   // This is needed because for copy that is lifted to tensor, it possible that

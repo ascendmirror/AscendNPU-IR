@@ -35,12 +35,31 @@ module attributes {dlti.target_system_spec = #dlti.target_system_spec<"NPU" : #h
       hivm.hir.fixpipe {enable_nz2nd} ins(%mmad_out : tensor<128x498xf32>) outs(%gm_c : memref<128x498xf32, strided<[498, 1], offset: ?>>)
       // Advacne B
       %advance_b = memref.reinterpret_cast %gm_b to offset: [%gm_offset], sizes: [498, 64], strides: [64, 1] : memref<?xf16> to memref<498x64xf16, strided<[64, 1], offset: ?>>
-      %advance_b_cast = memref.cast %advance_b : memref<498x64xf16, strided<[64, 1], offset: ?>> to memref<498x64xf16, strided<[?, ?], offset: ?>>      scf.yield %advance_b_cast : memref<498x64xf16, strided<[?, ?], offset: ?>>
+      %advance_b_cast = memref.cast %advance_b : memref<498x64xf16, strided<[64, 1], offset: ?>> to memref<498x64xf16, strided<[?, ?], offset: ?>>
+      scf.yield %advance_b_cast : memref<498x64xf16, strided<[?, ?], offset: ?>>
     } {hivm.loop_core_type = #hivm.tcore_type<CUBE>}
     return %res : memref<498x64xf16, strided<[?, ?], offset: ?>>
   }
 }
 
+func.func @test_cube(%lb: index, %ub: index, %gm_b: memref<?xf16>, %gm_offset: index, %gm_a: memref<?xf16>, %gm_c: memref<128x498xf32, strided<[498, 1], offset: ?>>) -> (memref<498x64xf16, strided<[?, ?], offset: ?>>) {
+
+scf.for %arg25 = %c0_14 to %83 step %c1_15 {
+    %reinterpret_cast_22 = memref.reinterpret_cast %arg4 to offset: [%108], sizes: [256, 192], strides: [192, 1] : memref<?xbf16> to memref<256x192xbf16, strided<[192, 1], offset: ?>>
+    %alloc_23 = memref.alloc() : memref<256x192xbf16>
+    %subview_24 = memref.subview %reinterpret_cast_22[0, 0] [%102, 192] [1, 1] : memref<256x192xbf16, strided<[192, 1], offset: ?>> to memref<?x192xbf16, strided<[192, 1], offset: ?>>
+    %subview_25 = memref.subview %alloc_23[0, 0] [%102, 192] [1, 1] : memref<256x192xbf16> to memref<?x192xbf16, strided<[192, 1]>>
+    hivm.hir.load ins(%subview_24 : memref<?x192xbf16, strided<[192, 1], offset: ?>>) outs(%subview_25 : memref<?x192xbf16, strided<[192, 1]>>) pad_mode = <PadValue> pad_value = %cst_0 : bf16 left_padding_num = %c0 : index init_out_buffer = true init_condition = %103 : i1 may_implicit_transpose_with_last_axis = false
+    %109 = bufferization.to_tensor %alloc_23 restrict writable : memref<256x192xbf16>
+    %110 = tensor.empty() : tensor<256x256xf32>
+    %111 = hivm.hir.mmadL1 {b_transpose, fixpipe_already_inserted = true} ins(%50, %109, %true, %48, %c192, %102 : tensor<256x192xbf16>, tensor<256x192xbf16>, i1, index, index, index) outs(%110 : tensor<256x256xf32>) -> tensor<256x256xf32>
+    %subview_26 = memref.subview %79[%arg25, 0, 0] [1, 256, 256] [1, 1, 1] : memref<2x256x256xf32> to memref<1x256x256xf32, strided<[65536, 256, 1], offset: ?>>
+    %collapse_shape = memref.collapse_shape %subview_26 [[0, 1], [2]] : memref<1x256x256xf32, strided<[65536, 256, 1], offset: ?>> into memref<256x256xf32, strided<[256, 1], offset: ?>>
+    hivm.hir.fixpipe {enable_nz2nd} ins(%111 : tensor<256x256xf32>) outs(%collapse_shape : memref<256x256xf32, strided<[256, 1], offset: ?>>)
+    scf.yield
+} {hivm.loop_core_type = #hivm.tcore_type<CUBE>, multibuffer_unroll_factor = 2 : i32}
+return
+}
 // -----
 
 module attributes {dlti.target_system_spec = #dlti.target_system_spec<"NPU" : #hacc.target_device_spec<#dlti.dl_entry<"L0C_SIZE", 1048576 : i32>, #dlti.dl_entry<"UB_ALIGN_SIZE", 256 : i32>>>} {
