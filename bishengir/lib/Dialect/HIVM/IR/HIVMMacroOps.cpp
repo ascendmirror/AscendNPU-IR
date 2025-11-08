@@ -615,3 +615,11 @@ LogicalResult MixGroupMatmulOp::verify() {
 
   return success();
 }
+
+bool Conv1DL1Op::isInitConstant(std::optional<bool> cst) {
+  return isInitConstantForLocalMmadOp<Conv1DL1Op>(this, cst);
+}
+
+void Conv1DL1Op::setInitCondition(Value init) {
+  getInitConditionMutable().assign(init);
+}
