@@ -908,6 +908,31 @@ struct HFusionToHIVMAtomicOp : public OpRewritePattern<HFUSIONOP> {
 };
 
 //===----------------------------------------------------------------------===//
+// HFusionToHIVMConv1DOp
+//===----------------------------------------------------------------------===//
+struct HFusionToHIVMConv1DOp : public OpRewritePattern<hfusion::Conv1DOp> {
+  using OpRewritePattern<hfusion::Conv1DOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(hfusion::Conv1DOp op,
+                                PatternRewriter &rewriter) const override {
+    mlir::IntegerType int1Type = rewriter.getIntegerType(1);
+    auto resType = op->getResults().front().getType();
+    auto init = op.getInit();
+    auto input = op.getInput();
+    auto weight = op.getWeight();
+    auto bias = op.getBias();
+    auto stride = op.getStride();
+    auto group = op.getGroups();
+    auto dilation = op.getDilation();
+    auto padding = op.getPadding();
+    rewriter.replaceOpWithNewOp<hivm::Conv1DL1Op>(
+        op, resType, input, weight, bias, init,
+        rewriter.create<arith::ConstantIntOp>(op->getLoc(), 0, int1Type),
+        stride, padding, dilation, group);
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // HFusionToHIVMSortOp
 //===----------------------------------------------------------------------===//
 struct HFusionToHIVMSortOp : public OpRewritePattern<hfusion::SortOp> {

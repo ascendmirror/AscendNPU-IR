@@ -2483,3 +2483,100 @@ FailureOr<SmallVector<Value>> HistogramOp::decomposeOperation(OpBuilder &b) {
   Value finalHist = forOp.getResult(0);
   return SmallVector<Value>{finalHist};
 }
+
+//===----------------------------------------------------------------------===//
+// Conv1DOp
+//===----------------------------------------------------------------------===//
+
+MutableOperandRange Conv1DOp::getDpsInitsMutable() { return getInitMutable(); }
+
+SmallVector<utils::IteratorType> Conv1DOp::getIteratorTypesArray() {
+  return SmallVector<utils::IteratorType>{
+      utils::IteratorType::parallel,  utils::IteratorType::reduction,
+      utils::IteratorType::reduction, utils::IteratorType::parallel,
+      utils::IteratorType::reduction, utils::IteratorType::parallel,
+  };
+}
+
+void Conv1DOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  getGenericEffectsImpl(effects, cast<linalg::LinalgOp>(getOperation()));
+}
+
+ArrayAttr Conv1DOp::getIndexingMaps() {
+  MLIRContext *ctx = getContext();
+  AffineMap scalarMap = AffineMap::get(getNumParallelLoops(), 0, ctx);
+  SmallVector<AffineMap> indexingMaps(getNumOperands(), scalarMap);
+  AffineMap iMap =
+      parseAffineMap("(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)", ctx);
+  indexingMaps[getInputMutable().getOperandNumber()] = iMap;
+
+  AffineMap wMap =
+      parseAffineMap("(d0, d1, d2, d3, d4, d5) -> (d3, d1, d4)", ctx);
+  indexingMaps[getWeightMutable().getOperandNumber()] = wMap;
+
+  AffineMap bMap = parseAffineMap("(d0, d1, d2, d3, d4, d5) -> (d3)", ctx);
+  indexingMaps[getBiasMutable().getOperandNumber()] = bMap;
+
+  AffineMap oMap =
+      parseAffineMap("(d0, d1, d2, d3, d4, d5) -> (d0, d3, d5)", ctx);
+  indexingMaps[getInitMutable().getOperandNumber()] = oMap;
+  return Builder(ctx).getAffineMapArrayAttr(indexingMaps);
+}
+
+void Conv1DOp::print(OpAsmPrinter &p) {
+  // attr-dict
+  p.printOptionalAttrDict((*this)->getAttrs(), ArrayRef<StringRef>{});
+  printCommonStructuredOpParts(p, {getInput(), getWeight(), getBias()},
+                               getInit());
+  p.printArrowTypeList(TypeRange{getResult().getType()});
+}
+
+ParseResult Conv1DOp::parse(OpAsmParser &p, OperationState &result) {
+  // Parse attr-dict
+  if (p.parseOptionalAttrDict(result.attributes))
+    return failure();
+
+  SmallVector<Type, 3> inputTypes;
+  SmallVector<Type, 1> outputTypes;
+  if (parseCommonStructuredOpParts(p, result, inputTypes, outputTypes,
+                                   /*OperandSegmentSizes*/ false))
+    return failure();
+
+  // Parse optional result type
+  if (p.parseOptionalArrowTypeList(result.types))
+    return failure();
+
+  // Build implicit region
+  OpBuilder opBuilder(p.getContext());
+  fillStructuredOpRegion(opBuilder, *(result.addRegion()), inputTypes,
+                         outputTypes, result.attributes.getAttrs(),
+                         getRegionBuilder());
+
+  return success();
+}
+
+std::function<void(ImplicitLocOpBuilder &, Block &, ArrayRef<NamedAttribute>)>
+Conv1DOp::getRegionBuilder() {
+  return [](ImplicitLocOpBuilder &builder, Block &block,
+            ArrayRef<NamedAttribute> attrs) {
+    assert(block.getNumArguments() == 4 &&
+           "Conv1DOp regionBuilder expects 4 (>=0) args");
+    RegionBuilderHelper helper(builder.getContext(), block);
+    SmallVector<Value> yields;
+    Value value1 =
+        helper.buildTypeFn(TypeFn::cast_signed, block.getArgument(3).getType(),
+                           block.getArgument(0));
+    Value value2 =
+        helper.buildTypeFn(TypeFn::cast_signed, block.getArgument(3).getType(),
+                           block.getArgument(1));
+    Value value3 = helper.buildBinaryFn(BinaryFn::powf, value1, value2);
+    Value value4 =
+        helper.buildBinaryFn(BinaryFn::powf, block.getArgument(3), value3);
+    Value value5 =
+        helper.buildBinaryFn(BinaryFn::powf, value4, block.getArgument(2));
+    yields.push_back(value5);
+    helper.yieldOutputs(yields);
+  };
+}
