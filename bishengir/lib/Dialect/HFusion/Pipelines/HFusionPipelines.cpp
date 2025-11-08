@@ -236,6 +236,7 @@ static void hfusionAutoSchedulePipeline(OpPassManager &pm,
   autoScheduleOptions.externalTilingFuncPath = options.externalTilingFuncPath;
   autoScheduleOptions.enableManageHostResources =
       options.enableManageHostResources;
+  autoScheduleOptions.enableSymbolAnalysis = options.enableSymbolAnalysis;
   pm.addPass(createHFusionAutoSchedulePass(autoScheduleOptions));
   // END AUTO SCHEDULE
   pm.nest<func::FuncOp>().addPass(createDecomposeMulti());
