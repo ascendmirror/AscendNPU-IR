@@ -15,8 +15,22 @@
 //
 //===----------------------------------------------------------------------===//
 #include "bishengir/Dialect/HIVM/Transforms/InjectBlockSync.h"
+#include "bishengir/Dialect/HACC/Utils/Utils.h"
+#include "bishengir/Dialect/HFusion/Utils/Utils.h"
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
+#include "bishengir/Dialect/HIVM/IR/HIVMImpl.h"
+#include "bishengir/Dialect/HIVM/Transforms/InjectSync/MoveSyncState.h"
+#include "bishengir/Dialect/HIVM/Transforms/InjectSync/RemoveRedundantSync.h"
+#include "bishengir/Dialect/HIVM/Transforms/InjectSync/SyncAnalysis.h"
+#include "bishengir/Dialect/HIVM/Transforms/InjectSync/SyncCodegen.h"
+#include "bishengir/Dialect/HIVM/Transforms/InjectSync/SyncDebug.h"
+#include "bishengir/Dialect/HIVM/Transforms/InjectSync/SyncEventIdAllocation.h"
+#include "bishengir/Dialect/HIVM/Transforms/Passes.h"
+#include "bishengir/Dialect/HIVM/Utils/Utils.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "llvm/Support/Debug.h"
+#include <type_traits>
 
 #define DEBUG_TYPE "hivm-inject-block-sync"
 
@@ -97,8 +111,8 @@ TCoreType InjectBlockSyncAnalysis::convertFuncCoreTypeToCoreType(
 
 std::optional<::mlir::hivm::TCoreType>
 InjectBlockSyncAnalysis::queryCoreType(Operation *op) {
-  auto tCoreTypeAttr = op->getAttrOfType<hivm::TCoreTypeAttr>(
-      hivm::TCoreTypeAttr::getMnemonic());
+  auto tCoreTypeAttr =
+      op->getAttrOfType<hivm::TCoreTypeAttr>(hivm::TCoreTypeAttr::name);
   if (tCoreTypeAttr) {
     return tCoreTypeAttr.getTcoretype();
   }
@@ -251,6 +265,14 @@ void SyncBlockIRTranslator::RecursionIR(Region *region) {
     } else if (auto dstStyleOp = dyn_cast<DestinationStyleOpInterface>(op)) {
       UpdateInitAndResAlias(dstStyleOp);
       UpdateDestinationStyleOpInform(op, dstStyleOp);
+    } else if (auto loadOp = dyn_cast<memref::LoadOp>(op)) {
+      updateStoreOrLoadOpInfoBlockSync(loadOp);
+    } else if (auto storeOp = dyn_cast<memref::StoreOp>(op)) {
+      updateStoreOrLoadOpInfoBlockSync(storeOp);
+    } else if (auto affineLoadOp = dyn_cast<affine::AffineLoadOp>(op)) {
+      updateStoreOrLoadOpInfoBlockSync(affineLoadOp);
+    } else if (auto affineStoreOp = dyn_cast<affine::AffineStoreOp>(op)) {
+      updateStoreOrLoadOpInfoBlockSync(affineStoreOp);
     }
     return WalkResult::advance();
   });
@@ -341,6 +363,45 @@ void SyncBlockIRTranslator::UpdateTensorExtractOpInform(
   index++;
 }
 
+template <typename OP>
+typename std::enable_if<std::is_same_v<OP, memref::LoadOp> ||
+                            std::is_same_v<OP, affine::AffineLoadOp> ||
+                            std::is_same_v<OP, affine::AffineStoreOp> ||
+                            std::is_same_v<OP, memref::StoreOp>,
+                        void>::type
+SyncBlockIRTranslator::updateStoreOrLoadOpInfoBlockSync(OP op) {
+  Value memRef = op.getMemRef();
+  llvm::SmallVector<const BaseMemInfo *> memInfoVec;
+  if (buffer2MemInfoMap.contains(memRef)) {
+    for (auto &memInfo : buffer2MemInfoMap[memRef]) {
+      memInfoVec.push_back(memInfo.get());
+    }
+  }
+  if (memInfoVec.empty()) {
+    return;
+  }
+  SmallVector<const BaseMemInfo *> defVec;
+  SmallVector<const BaseMemInfo *> useVec;
+  if constexpr (std::is_same_v<OP, memref::LoadOp> ||
+                std::is_same_v<OP, affine::AffineLoadOp>) {
+    useVec = memInfoVec;
+  } else {
+    static_assert(std::is_same_v<OP, memref::StoreOp> ||
+                  std::is_same_v<OP, affine::AffineStoreOp>);
+    defVec = memInfoVec;
+  }
+  auto pipe = hivm::PIPE::PIPE_S;
+  auto coreType = getCoreType(op);
+  assert(succeeded(coreType));
+  assert(coreType.value() != TCoreType::CUBE_OR_VECTOR);
+  auto copPrt = std::make_unique<CompoundInstanceElement>(index, defVec, useVec,
+                                                          pipe, op->getName());
+  copPrt->elementOp = op.getOperation();
+  copPrt->compoundCoreType = coreType.value();
+  syncIR.emplace_back(std::move(copPrt));
+  index++;
+}
+
 void InjectBlockSyncAnalysis::InjectAllBlockSync() {
   func_->walk<WalkOrder::PreOrder>([&](Operation *op) {
     OpBuilder opBuilder(func_);
@@ -376,24 +437,36 @@ void InjectBlockSyncAnalysis::InjectBlockMixSync(bool assumeAliveLoops) {
   SyncBlockIRTranslator trans(syncIR, memAnalyzer, buffer2MemInfoMap, func_,
                               SyncAnalysisMode::BLOCKSYNC);
   trans.SyncBlockBuild();
+  LLVM_DEBUG(llvm::dbgs() << "SyncBlockIRTranslator\n");
+  LLVM_DEBUG(SyncDebug(syncIR).PrintSyncIr());
 
   SyncAnalyzer syncAnalyzer(syncIR, memAnalyzer, syncOperations, func_,
                             SyncAnalysisMode::BLOCKSYNC, false,
                             assumeAliveLoops);
   syncAnalyzer.Plan(false /*insertBarAllAtLast*/);
+  LLVM_DEBUG(llvm::dbgs() << "SyncAnalyzer\n");
+  LLVM_DEBUG(SyncDebug(syncIR).PrintSyncIr());
 
   MoveSyncState syncMove(syncIR, syncOperations);
   syncMove.StateOptimize();
+  LLVM_DEBUG(llvm::dbgs() << "MoveSyncState\n");
+  LLVM_DEBUG(SyncDebug(syncIR).PrintSyncIr());
 
   RemoveRedundantSync removeRedundantSync(syncIR, syncOperations,
                                           SyncAnalysisMode::BLOCKSYNC);
   removeRedundantSync.Plan();
+  LLVM_DEBUG(llvm::dbgs() << "RemoveRedundantSync\n");
+  LLVM_DEBUG(SyncDebug(syncIR).PrintSyncIr());
 
   SyncEventIdAllocation eventIdAllocation(syncIR, syncOperations);
   eventIdAllocation.Allocate();
+  LLVM_DEBUG(llvm::dbgs() << "SyncEventIdAllocation\n");
+  LLVM_DEBUG(SyncDebug(syncIR).PrintSyncIr());
 
   SyncCodegen syncCodegen(syncIR, func_, SyncAnalysisMode::BLOCKSYNC);
   syncCodegen.Build();
+  LLVM_DEBUG(llvm::dbgs() << "SyncCodegen\n");
+  LLVM_DEBUG(SyncDebug(syncIR).PrintSyncIr());
 }
 
 void InjectBlockSyncAnalysis::InjectBlockShallowSync() {
