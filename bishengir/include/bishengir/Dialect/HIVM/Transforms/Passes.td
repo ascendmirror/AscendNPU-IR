@@ -339,6 +339,16 @@ def SplitMixKernel : Pass<"hivm-split-mix-kernel", "ModuleOp"> {
                            "hacc::HACCDialect"];
 }
 
+def MarkRealCoreType : Pass<"hivm-mark-real-core-type", "ModuleOp"> {
+  let summary = "Mark scalar operations with core-type attribute.";
+  let constructor = "mlir::hivm::createMarkRealCoreTypePass()";
+  let dependentDialects = ["func::FuncDialect"];
+  let options = [Option<"removeCoreTypeAttrs", "remove-core-type-attrs", "bool",
+                        /*default=*/"false",
+                        "Remove all core type attributes. If set to true, this "
+                        "pass becomes a cleanup pass.">];
+}
+
 def SetBufferSize : Pass<"hivm-set-buffer-size", "func::FuncOp"> {
   let constructor = "mlir::hivm::createSetBufferSizePass()";
   let dependentDialects = ["arith::ArithDialect", "memref::MemRefDialect"];
