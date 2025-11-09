@@ -17,20 +17,8 @@
 #ifndef BISHENG_DIALECT_HIVM_TRANSFORMS_INJECT_BLOCK_SYNC_H
 #define BISHENG_DIALECT_HIVM_TRANSFORMS_INJECT_BLOCK_SYNC_H
 
-#include "bishengir/Dialect/HFusion/Utils/Utils.h"
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
-#include "bishengir/Dialect/HIVM/IR/HIVMImpl.h"
 #include "bishengir/Dialect/HIVM/Transforms/InjectSync/IRTranslator.h"
-#include "bishengir/Dialect/HIVM/Transforms/InjectSync/MoveSyncState.h"
-#include "bishengir/Dialect/HIVM/Transforms/InjectSync/RemoveRedundantSync.h"
-#include "bishengir/Dialect/HIVM/Transforms/InjectSync/SyncAnalysis.h"
-#include "bishengir/Dialect/HIVM/Transforms/InjectSync/SyncCodegen.h"
-#include "bishengir/Dialect/HIVM/Transforms/InjectSync/SyncDebug.h"
-#include "bishengir/Dialect/HIVM/Transforms/InjectSync/SyncEventIdAllocation.h"
-#include "bishengir/Dialect/HIVM/Transforms/Passes.h"
-#include "bishengir/Dialect/HIVM/Utils/Utils.h"
-#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-
 namespace mlir {
 namespace hivm {
 
@@ -88,7 +76,7 @@ public:
                         Buffer2MemInfoMap &buffer2MemInfoMap, func::FuncOp func,
                         SyncAnalysisMode syncAnalysisMode)
       : IRTranslator(syncIR, memDepAnalyzer, buffer2MemInfoMap, func,
-                     syncAnalysisMode){};
+                     syncAnalysisMode) {};
 
   ~SyncBlockIRTranslator() = default;
 
@@ -113,7 +101,17 @@ private:
   void UpdateDestinationStyleOpInform(Operation *op,
                                       DestinationStyleOpInterface dstStyleOp);
 
+  /// Collect information on tensor.extract op.
   void UpdateTensorExtractOpInform(Operation *op, tensor::ExtractOp extractOp);
+
+  /// Collect information on load or store op.
+  template <typename OP>
+  typename std::enable_if<std::is_same_v<OP, memref::LoadOp> ||
+                              std::is_same_v<OP, affine::AffineLoadOp> ||
+                              std::is_same_v<OP, affine::AffineStoreOp> ||
+                              std::is_same_v<OP, memref::StoreOp>,
+                          void>::type
+  updateStoreOrLoadOpInfoBlockSync(OP op);
 };
 
 } // namespace hivm
