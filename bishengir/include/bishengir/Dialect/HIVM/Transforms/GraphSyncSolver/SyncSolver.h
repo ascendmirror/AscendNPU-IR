@@ -55,6 +55,7 @@ public:
   bool considerMergedBackwardSyncEventIds{true};
   bool disableMultiEventIdForBarrierAllPairs{true};
   bool reuseSyncPairToSaveEventIds{true};
+  bool enableUnitFlagFeature{false};
 
   func::FuncOp func;
   std::unique_ptr<OperationBase> funcIr;
@@ -104,6 +105,7 @@ public:
                  llvm::DenseSet<std::pair<Occurrence *, int32_t>>>
       insertedBarrierAllBefore;
   llvm::DenseMap<hivm::MmadL1Op, MmadL1SyncArgs> mmadl1SyncArgsMap;
+  llvm::DenseSet<RWOperation *> unitFlagFeaturedOps;
 
 public:
   Solver(func::FuncOp func) : func(func) {
@@ -296,8 +298,18 @@ private:
 
   void insertMultiBufferWaitFlagOp(IRRewriter &rewriter, OperationBase *opBase,
                                    WaitFlagOp *waitFlagOp, bool insertAfterOp);
-  
+
   void insertMmadL1SyncArgs(IRRewriter &rewriter);
+
+  hivm::UNIT_FLAG getUnitFlagMode(RWOperation *rwOp);
+
+  Value getIsNotDeadLoopValue(scf::ForOp forOp, Location loc,
+                              IRRewriter &rewriter);
+
+  std::optional<mlir::Value> getUnitFlagCond(IRRewriter &rewriter,
+                                             RWOperation *rwOp);
+
+  void handleUnitFlagEnabledOps(IRRewriter &rewriter);
 
   void insertBarrierAllBeforeReturn(IRRewriter &rewriter);
 
@@ -309,6 +321,21 @@ private:
   checkAndApplyMmadl0LoopOpt(ConflictPair *conflictPair, Occurrence *occ1,
                              Occurrence *occ2, Occurrence *parOcc1,
                              Occurrence *parOcc2);
+
+  std::optional<std::pair<UNIT_FLAG, UNIT_FLAG>>
+  checkUnitFlagPatterns(ConflictPair *conflictPair, Occurrence *occ1,
+                        Occurrence *occ2, Occurrence *parentLCALoopOcc);
+
+  std::optional<std::pair<UNIT_FLAG, UNIT_FLAG>>
+  checkMmadl1FixpipeUnitFlagPattern(RWOperation *rwOp1, RWOperation *rwOp2,
+                                    hivm::PIPE pipe1, hivm::PIPE pipe2);
+
+  std::optional<std::pair<hivm::UNIT_FLAG, hivm::UNIT_FLAG>>
+  checkMmadl1FixpipeSingleForLoopUnitFlagPattern(RWOperation *rwOp1,
+                                                 RWOperation *rwOp2,
+                                                 hivm::PIPE pipe1,
+                                                 hivm::PIPE pipe2,
+                                                 bool rw1IsFrontOcc);
 
   std::pair<bool, Occurrence *> checkMmadl0BackwardSyncOpt(Occurrence *loopOcc);
 

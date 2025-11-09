@@ -206,6 +206,8 @@ Solver::getDecomposedMmadl1(hivm::MmadL1Op mmadl1Op, OperationBase *parentOp) {
   auto mmadl0Op = std::make_unique<MmadL0Operation>(
       mmadl1Op, scopeOp.get(), hivm::PIPE::PIPE_M, hivm::PIPE::PIPE_M,
       TCoreType::CUBE, SmallVector<Value>(), getMemOps({mmadl1Op.getC()}));
+  mmadl0Op->hasUnitFlagFeat = true;
+  unitFlagFeaturedOps.insert(mmadl0Op.get());
   mmadl1LoopOp->mmadL0Op = mmadl0Op.get();
   scopeOp->body.push_back(std::move(mmadl0Op));
 
@@ -258,6 +260,10 @@ std::unique_ptr<Scope> Solver::funcIrBuilder(Region &region,
         auto rwOp = std::make_unique<RWOperation>(&op, scopeOp.get(), pipeRead,
                                                   pipeWrite, coreTypeVal,
                                                   readMemOps, writeMemOps);
+        if (isa<hivm::MmadL1Op, hivm::FixpipeOp>(op)) {
+          rwOp->hasUnitFlagFeat = true;
+          unitFlagFeaturedOps.insert(rwOp.get());
+        }
         scopeOp->body.push_back(std::move(rwOp));
       } else if (auto storeOp = dyn_cast<memref::StoreOp>(op)) {
         if (auto rwOp = getLoadStoreOp(&storeOp, scopeOp.get())) {

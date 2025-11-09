@@ -125,7 +125,27 @@ std::string RWOperation::str(int indent, bool recursive) const {
   } else {
     pipes = "[<" + stringifyPIPE(this->pipeRead).str() + ">]";
   }
-  ret += std::string(indent, ' ') + opStr + " " + pipes + "\n";
+  std::string unitFlag;
+  if (hasUnitFlagFeat) {
+    unitFlag = "unit-flag(";
+    Comma comma;
+    if (unitFlagModeAsSet == UNIT_FLAG::ENABLED_WITH_UPDATE) {
+      unitFlag += comma.get() + "as-set";
+    } else if (unitFlagModeAsSet == UNIT_FLAG::ENABLED_ONLY_LAST_ITER) {
+      unitFlag += comma.get() + "as-set-only-last-iter";
+    } else if (unitFlagModeAsSet == UNIT_FLAG::ENABLED_ONLY_FIRST_ITER) {
+      unitFlag += comma.get() + "as-set-only-first-iter";
+    }
+    if (unitFlagModeAsWait == UNIT_FLAG::ENABLED_WITH_UPDATE) {
+      unitFlag += comma.get() + "as-wait";
+    } else if (unitFlagModeAsWait == UNIT_FLAG::ENABLED_ONLY_LAST_ITER) {
+      unitFlag += comma.get() + "as-wait-only-last-iter";
+    } else if (unitFlagModeAsWait == UNIT_FLAG::ENABLED_ONLY_FIRST_ITER) {
+      unitFlag += comma.get() + "as-wait-only-first-iter";
+    }
+    unitFlag += ")";
+  }
+  ret += std::string(indent, ' ') + opStr + " " + pipes + " " + unitFlag + "\n";
   if (indent) {
     for (auto val : this->readMemVals) {
       ret += std::string(indent + 2, ' ') + "read: " + op2str(val) + "\n";

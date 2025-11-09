@@ -226,6 +226,11 @@ public:
   llvm::SmallVector<Value> writeMemVals;
   llvm::SmallVector<llvm::SmallVector<int>> testReadMemVals;
   llvm::SmallVector<llvm::SmallVector<int>> testWriteMemVals;
+  bool hasUnitFlagFeat{false};
+  UNIT_FLAG unitFlagModeAsSet{UNIT_FLAG::DISABLED};
+  UNIT_FLAG unitFlagModeAsWait{UNIT_FLAG::DISABLED};
+  RWOperation *linkedUnitFlagOpAsSet{nullptr};
+  RWOperation *linkedUnitFlagOpAsWait{nullptr};
 
 private:
 public:

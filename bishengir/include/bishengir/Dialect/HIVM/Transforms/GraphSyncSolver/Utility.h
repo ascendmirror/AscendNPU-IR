@@ -82,6 +82,7 @@ struct ConflictPair {
   LoopLikeOpInterface multibufferLoopPar{nullptr};
   bool setOnLastIterOnly{false};
   bool waitOnFirstIterOnly{false};
+  bool replacedWithUnitFlag{false};
 
   ConflictPair(OperationBase *op1, OperationBase *op2, OperationBase *opSet,
                OperationBase *opWait, hivm::PIPE setPipe, hivm::PIPE waitPipe,
@@ -98,6 +99,17 @@ struct ConflictPair {
   bool isBarrier() const { return setPipe == waitPipe; }
 
   std::string str() const;
+
+  void updateSetWaitOps(Occurrence *setOcc, Occurrence *waitOcc) {
+    if (setOcc != nullptr) {
+      opSet = setOcc->op;
+      startIndex = setOcc->endIndex;
+    }
+    if (waitOcc != nullptr) {
+      opWait = waitOcc->op;
+      endIndex = waitOcc->startIndex;
+    }
+  }
 
   std::unique_ptr<ConflictPair> clone() {
     auto clonedConflictPair = std::make_unique<ConflictPair>(
