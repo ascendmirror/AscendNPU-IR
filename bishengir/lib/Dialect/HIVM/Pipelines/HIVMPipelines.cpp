@@ -280,13 +280,17 @@ static void hivmPostBufferizationOptimizationPipeline(
   pm.nest<func::FuncOp>().addPass(createHIVMLowerToLoopsPass());
   // TODO: move DecomposeI32ScalarExtOp etc. to interface
   pm.nest<func::FuncOp>().addPass(createHIVMDecomposeOpPass());
-  InjectSyncOptions syncOptions;
-  syncOptions.enableUnitFlag = hivmPipelineOptions.enableHIVMUnitFlagSync;
-  syncOptions.assumeAliveLoops = hivmPipelineOptions.enableHIVMAssumeAliveLoops;
-  if (hivmPipelineOptions.enableHIVMInjectBarrierAllSync) {
-    syncOptions.syncMode = SyncMode::BARRIERALL;
-  }
-  if (!hivmPipelineOptions.disableHIVMAutoInjectSync) {
+  if (hivmPipelineOptions.enableHIVMGraphSyncSolver &&
+      !hivmPipelineOptions.enableHIVMInjectBarrierAllSync) {
+    pm.nest<func::FuncOp>().addPass(createGraphSyncSolverPass());
+  } else if (!hivmPipelineOptions.disableHIVMAutoInjectSync) {
+    InjectSyncOptions syncOptions;
+    syncOptions.enableUnitFlag = hivmPipelineOptions.enableHIVMUnitFlagSync;
+    syncOptions.assumeAliveLoops =
+        hivmPipelineOptions.enableHIVMAssumeAliveLoops;
+    if (hivmPipelineOptions.enableHIVMInjectBarrierAllSync) {
+      syncOptions.syncMode = SyncMode::BARRIERALL;
+    }
     pm.nest<func::FuncOp>().addPass(createInjectSyncPass(syncOptions));
   }
   pm.nest<func::FuncOp>().addPass(createAddFFTSToSyncBlockSetOpPass());
