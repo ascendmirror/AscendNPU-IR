@@ -210,7 +210,12 @@ std::optional<TFuncCoreType> queryFuncCoreType(Operation *funcOp) {
 }
 
 FailureOr<TCoreType> getCoreType(Operation *op) {
-  // annotation.mark has the highest priority for determining the core type
+  // coretype attribute has the highest priority.
+  if (auto coreTypeAttr =
+          op->getAttrOfType<hivm::TCoreTypeAttr>(hivm::TCoreTypeAttr::name)) {
+    return coreTypeAttr.getTcoretype();
+  }
+  // annotation.mark has the second highest priority.
   if (op->getNumResults() > 0) {
     auto res = getAnnotateOpWithAttr(op->getResult(0),
                                      mlir::hivm::TCoreTypeMarkerAttr::name);

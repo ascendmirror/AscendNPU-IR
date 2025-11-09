@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "bishengir/Dialect/HIVM/Transforms/InjectSync/IRTranslator.h"
+#include "bishengir/Dialect/HACC/Utils/Utils.h"
 #include "bishengir/Dialect/Utils/Util.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -419,7 +420,7 @@ void IRTranslator::UpdateTempOpDefVec(
   }
 }
 
-bool isTensorExtractLoadOp(Operation *op) {
+bool IRTranslator::isTensorExtractLoadOp(Operation *op) {
   for (auto result : op->getResults()) {
     auto duplicateTensorExtractForCubeOpt = utils::getAnnotateOpWithAttr(
         result, "DuplicateTensorExtractForCube::replacementLabel");
