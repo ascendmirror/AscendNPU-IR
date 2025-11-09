@@ -148,6 +148,8 @@ private:
   /// Update the src and dst information of MacroOp.
   void UpdateMacroOpInform(DestinationStyleOpInterface dstOp);
 
+  void insertPlaceHolderInst(InstanceElement *parentScope);
+
 private:
   /// The actual base address corresponding to the buffer.
   /// note: multiBuffer has multiple addresses.

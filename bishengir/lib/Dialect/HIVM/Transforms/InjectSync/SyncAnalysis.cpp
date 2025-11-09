@@ -704,11 +704,103 @@ void SyncAnalyzer::ChangeFrontPipeToVirtualMTE2(
   }
 }
 
+InstanceElement *
+SyncAnalyzer::getParentScope(InstanceElement *instanceElement) {
+  for (int i = instanceElement->GetIndex(); i >= 0; i--) {
+    if (auto *loopOp = dyn_cast<LoopInstanceElement>(syncIR[i].get())) {
+      auto loopKind = loopOp->getLoopKind();
+      if (loopKind == KindOfLoop::LOOP_BEGIN) {
+        return loopOp;
+      }
+      i = loopOp->beginId;
+    } else if (auto *branchOp =
+                   dyn_cast<BranchInstanceElement>(syncIR[i].get())) {
+      auto branchKind = branchOp->getBranchKind();
+      if (branchKind == KindOfBranch::IF_BEGIN ||
+          branchKind == KindOfBranch::ELSE_BEGIN) {
+        return branchOp;
+      }
+      i = branchOp->beginId;
+    }
+  }
+  return nullptr;
+}
+
+PlaceHolderInstanceElement *
+SyncAnalyzer::checkUnlikelyScope(CompoundInstanceElement *nowCompound,
+                                 CompoundInstanceElement *frontCompound) {
+  auto *parentScope = getParentScope(frontCompound);
+  if (parentScope == nullptr) {
+    return nullptr;
+  }
+  if (parentScope->elementOp == nullptr) {
+    return nullptr;
+  }
+  if (auto *branchOp = dyn_cast<BranchInstanceElement>(parentScope)) {
+    if (auto ifOp = dyn_cast<scf::IfOp>(parentScope->elementOp)) {
+      if (ifOp->hasAttr("hivm.unlikely_condition")) {
+        auto *placeHolder = dyn_cast<PlaceHolderInstanceElement>(
+            syncIR[branchOp->endId - 1].get());
+        assert(placeHolder != nullptr);
+        return placeHolder;
+      }
+    }
+  }
+  return nullptr;
+}
+
+void SyncAnalyzer::insertUnlikelySyncOperation(
+    PlaceHolderInstanceElement *placeHolder,
+    CompoundInstanceElement *nowCompound,
+    CompoundInstanceElement *frontCompound,
+    DepBaseMemInfoPairVec &depBaseMemInfosVec,
+    const std::optional<unsigned> &forEndIndex) {
+  auto nowPipe = nowCompound->kPipeValue;
+  auto frontPipe = frontCompound->kPipeValue;
+  ChangeToVirtualMTE2IfNeed(nowCompound, frontCompound, nowPipe, frontPipe,
+                            depBaseMemInfosVec);
+  if (nowPipe == frontPipe) {
+    unsigned insertBarrierId = placeHolder->GetIndex();
+    auto barrierSyncOp = std::make_unique<SyncOperation>(
+        SyncOperation{SyncOperation::TYPE::PIPE_BARRIER, frontPipe, nowPipe,
+                      syncIndex, nowCompound->GetIndex(), forEndIndex});
+    barrierSyncOp->SetDepSyncIRIndex(frontCompound->GetIndex());
+    syncIR[insertBarrierId]->pipeBefore.push_back(barrierSyncOp.get());
+    barrierSyncOp->SetSyncIRIndex(insertBarrierId);
+    SmallVector<std::unique_ptr<SyncOperation>> newSync;
+    newSync.emplace_back(std::move(barrierSyncOp));
+    syncOperations.emplace_back(std::move(newSync));
+  } else {
+    unsigned insertWaitId = placeHolder->GetIndex();
+    unsigned insertSetId = frontCompound->GetIndex();
+    auto setFlag = std::make_unique<SyncOperation>(
+        SyncOperation{SyncOperation::TYPE::SET_EVENT, frontPipe, nowPipe,
+                      syncIndex, insertSetId, forEndIndex});
+    auto waitFlag = setFlag->GetMatchSync(insertWaitId);
+    UpdateBackSyncMultiBufferInfo(setFlag.get(), waitFlag.get(),
+                                  depBaseMemInfosVec, forEndIndex);
+    syncIR[insertSetId]->pipeAfter.push_back(setFlag.get());
+    syncIR[insertWaitId]->pipeBefore.push_back(waitFlag.get());
+    SmallVector<std::unique_ptr<SyncOperation>> newSync;
+    newSync.emplace_back(std::move(setFlag));
+    newSync.emplace_back(std::move(waitFlag));
+    syncOperations.emplace_back(std::move(newSync));
+  }
+  syncIndex++;
+  assert(syncOperations.size() == syncIndex);
+}
+
 void SyncAnalyzer::InsertSyncOperation(
     CompoundInstanceElement *nowCompound,
     CompoundInstanceElement *frontCompound,
     DepBaseMemInfoPairVec &depBaseMemInfosVec,
     const std::optional<unsigned> &forEndIndex) {
+  if (auto *placeHolder = checkUnlikelyScope(nowCompound, frontCompound)) {
+    insertUnlikelySyncOperation(placeHolder, nowCompound, frontCompound,
+                                depBaseMemInfosVec, forEndIndex);
+    return;
+  }
+
   auto nowPipe = nowCompound->kPipeValue;
   auto frontPipe = frontCompound->kPipeValue;
   ChangeToVirtualMTE2IfNeed(nowCompound, frontCompound, nowPipe, frontPipe,
