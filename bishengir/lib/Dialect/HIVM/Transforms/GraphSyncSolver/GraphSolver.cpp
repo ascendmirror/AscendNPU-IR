@@ -1,0 +1,116 @@
+//===----------- GraphSolver.cpp ---- Graph Sync Solver -------------------===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+
+#include "bishengir/Dialect/HIVM/Transforms/GraphSyncSolver/GraphSolver.h"
+
+#include "bishengir/Dialect/HIVM/IR/HIVM.h"
+#include <optional>
+#include <queue>
+
+#define DEBUG_TYPE "hivm-graph-sync-solver-dij"
+
+using namespace mlir;
+using namespace hivm::syncsolver;
+
+bool GraphSolver::Edge::operator<(const Edge &other) const {
+  assert(pipeFromId == other.pipeFromId && pipeToId == other.pipeToId);
+  if (startIndex != other.startIndex) {
+    return startIndex < other.startIndex;
+  }
+  return endIndex < other.endIndex;
+}
+
+void GraphSolver::addPair(hivm::PIPE startPipeId, hivm::PIPE endPipeId,
+                          int startIndex, int endIndex) {
+  Edge edge(startPipeId, endPipeId, startIndex, endIndex);
+  adjacencyList[startPipeId][endPipeId].insert(edge);
+}
+
+void GraphSolver::addConflictPair(ConflictPair *conflictPair) {
+  assert(conflictPair != nullptr);
+  if (conflictPair->isBarrier() &&
+      conflictPair->setPipe == hivm::PIPE::PIPE_ALL) {
+    for (int i = 0; i < static_cast<int>(hivm::PIPE::PIPE_NUM); i++) {
+      int startIndex = conflictPair->startIndex;
+      int endIndex = conflictPair->endIndex;
+      assert(startIndex == endIndex);
+      auto setPipe = static_cast<hivm::PIPE>(i);
+      auto waitPipe = hivm::PIPE::PIPE_ALL;
+      addPair(setPipe, waitPipe, startIndex, endIndex);
+    }
+  } else {
+    int startIndex = conflictPair->startIndex;
+    int endIndex = conflictPair->endIndex;
+    auto setPipe = conflictPair->setPipe;
+    auto waitPipe = conflictPair->waitPipe;
+    addPair(setPipe, waitPipe, startIndex, endIndex);
+  }
+}
+
+void GraphSolver::optimizeAdjacencyList() {
+  for (auto &[startPipeId, toMap] : adjacencyList) {
+    for (auto &[endPipeId, edges] : toMap) {
+      std::set<Edge> optimizedEdges;
+      for (auto &edge : edges) {
+        while (!optimizedEdges.empty() &&
+               optimizedEdges.rbegin()->endIndex >= edge.endIndex) {
+          optimizedEdges.erase(*optimizedEdges.rbegin());
+        }
+        optimizedEdges.insert(edge);
+      }
+      edges = std::move(optimizedEdges);
+    }
+  }
+}
+
+std::optional<int> GraphSolver::runDijkstra(hivm::PIPE startPipe,
+                                            hivm::PIPE endPipe, int startIndex,
+                                            int maxDistance) {
+  llvm::DenseMap<hivm::PIPE, int> distance;
+  std::priority_queue<std::pair<int, hivm::PIPE>,
+                      std::vector<std::pair<int, hivm::PIPE>>,
+                      std::greater<std::pair<int, hivm::PIPE>>>
+      que;
+  que.emplace(startIndex, startPipe);
+
+  while (!que.empty()) {
+    auto [endIndex, curPipe] = que.top();
+    que.pop();
+
+    if (curPipe == endPipe && distance.count(curPipe)) {
+      break;
+    }
+
+    if (distance.count(curPipe) && distance[curPipe] < endIndex) {
+      continue;
+    }
+
+    if (distance.count(curPipe) && distance[curPipe] > maxDistance) {
+      break;
+    }
+
+    if (curPipe == hivm::PIPE::PIPE_ALL) {
+      distance[endPipe] = endIndex;
+      break;
+    }
+
+    for (auto &[endPipe, edges] : adjacencyList[curPipe]) {
+      auto it = edges.lower_bound(Edge(curPipe, endPipe, endIndex, -1));
+      for (; it != edges.end(); it++) {
+        if (!distance.count(endPipe) || distance[endPipe] > (it->endIndex)) {
+          distance[endPipe] = it->endIndex;
+          que.emplace(it->endIndex, endPipe);
+        } else {
+          break;
+        }
+      }
+    }
+  }
+
+  return distance.count(endPipe) ? distance[endPipe] : std::optional<int>();
+}
