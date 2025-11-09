@@ -431,6 +431,10 @@ bool SyncAnalyzer::IsNoNeedToInsertSync(
     }
   }
   if (syncAnalysisMode == SyncAnalysisMode::BLOCKSYNC) {
+    // will be handled by normal sync analysis.
+    if (frontCompound->compoundCoreType == TCoreType::CUBE_AND_VECTOR) {
+      return false;
+    }
     // TODO: support vector-vector
     // currently we only support cube-cube (vv unsupported)
     if (nowCompound->compoundCoreType == frontCompound->compoundCoreType) {
@@ -667,9 +671,19 @@ void SyncAnalyzer::InsertBlockSyncOperation(
       UpdateBackSyncMultiBufferInfo(syncBlockSetOp.get(), syncBlockWaitOp.get(),
                                     depBaseMemInfosVec, forEndIndex);
     }
-
+    // set the core-type info.
     syncBlockSetOp->syncCoreType = frontCompound->compoundCoreType;
     syncBlockWaitOp->syncCoreType = nowCompound->compoundCoreType;
+    // only wait/core-type can be CUBE_AND_VECTOR, set/core-type cannot.
+    assert(syncBlockSetOp->syncCoreType != TCoreType::CUBE_AND_VECTOR);
+    // if wait/core-type is CUBE_AND_VECTOR, change it to the other type.
+    if (syncBlockWaitOp->syncCoreType == TCoreType::CUBE_AND_VECTOR) {
+      if (syncBlockSetOp->syncCoreType == TCoreType::CUBE) {
+        syncBlockWaitOp->syncCoreType = TCoreType::VECTOR;
+      } else if (syncBlockSetOp->syncCoreType == TCoreType::VECTOR) {
+        syncBlockWaitOp->syncCoreType = TCoreType::CUBE;
+      }
+    }
     syncIR[insertSetId]->pipeAfter.push_back(syncBlockSetOp.get());
     syncIR[insertWaitId]->pipeBefore.push_back(syncBlockWaitOp.get());
     SmallVector<std::unique_ptr<SyncOperation>> newSync;
