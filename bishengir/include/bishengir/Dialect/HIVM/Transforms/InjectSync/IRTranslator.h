@@ -17,12 +17,8 @@
 #ifndef BISHENGIR_IRTRANSLATOR_H
 #define BISHENGIR_IRTRANSLATOR_H
 
-#include "bishengir/Dialect/Annotation/IR/Annotation.h"
-#include "bishengir/Dialect/HACC/Utils/Utils.h"
-#include "bishengir/Dialect/HIVM/IR/HIVMImpl.h"
 #include "bishengir/Dialect/HIVM/Transforms/InjectSync/MemoryDependentAnalyzer.h"
 #include "bishengir/Dialect/HIVM/Transforms/InjectSync/SyncCommon.h"
-#include "bishengir/Dialect/HIVM/Utils/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -81,6 +77,9 @@ public:
   /// Collect information on result replace source baseAddress and allocate
   /// size.
   virtual void UpdateAliasBufferInfo(Value result, Value source);
+
+  /// Determine whether the loadOp is from tensor extract op.
+  bool isTensorExtractLoadOp(Operation *op);
 
   /// Save the Global syncIR.
   SyncIRs &syncIR;
