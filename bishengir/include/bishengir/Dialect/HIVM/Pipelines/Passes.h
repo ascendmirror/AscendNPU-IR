@@ -45,6 +45,9 @@ void buildOptimizeHIVMPipeline(OpPassManager &pm,
 /// Register the "LowerHIVM" pipeline.
 void registerLowerHIVMPipelines();
 
+/// A canonicalization pipeline for HIVM pipeline.
+void canonicalizationHIVMPipeline(OpPassManager &pm);
+
 } // namespace hivm
 } // namespace mlir
 
