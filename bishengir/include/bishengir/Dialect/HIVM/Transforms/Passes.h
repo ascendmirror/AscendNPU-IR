@@ -130,6 +130,10 @@ std::unique_ptr<Pass> createHIVMOptFuncOutputPass();
 // Create a pass to split davinci aicore and aivector kernel
 std::unique_ptr<Pass> createSplitMixKernelPass();
 
+// Create a pass to mark scalar operations with core-type attribute.
+std::unique_ptr<Pass>
+createMarkRealCoreTypePass(const MarkRealCoreTypeOptions &options = {});
+
 // Create a pass to set buffer size
 std::unique_ptr<Pass> createSetBufferSizePass();
 
