@@ -32,7 +32,7 @@
 namespace mlir {
 namespace hivm {
 
-static void canonicalizationPipeline(OpPassManager &pm) {
+void canonicalizationHIVMPipeline(OpPassManager &pm) {
   pm.addPass(createArithToAffineConversionPass());
   pm.nest<func::FuncOp>().addPass(scf::createCanonicalizeIterArgPass());
   pm.addPass(bishengir::createExtendedCanonicalizerPass());
@@ -59,14 +59,14 @@ bufferizationPipeline(OpPassManager &pm,
   oneShotOptions.allowReturnAllocsFromLoops = true;
   oneShotOptions.allowUnknownOps = true;
   pm.addPass(bufferization::createOneShotBufferizePass(oneShotOptions));
-  canonicalizationPipeline(pm);
+  canonicalizationHIVMPipeline(pm);
   if (hivmPipelineOptions.enableTritonKernelCompile) {
     // For triton kernels, bufferization will generate `memref.copy` ops,
     // and they need to be converted to `hivm.copy` ops.
     pm.addPass(createConvertToHIVMOpPass());
   }
   pm.addPass(bufferization::createDropEquivalentBufferResultsPass());
-  canonicalizationPipeline(pm);
+  canonicalizationHIVMPipeline(pm);
   pm.addPass(bufferization::createDropEquivalentBufferResultsPass());
   if (!hivmPipelineOptions.enableTritonKernelCompile) {
     // For non-triton kernels, there could also be `memref.copy` ops generated
@@ -153,6 +153,7 @@ static void hivmPreBufferizationOptimizationPipeline(
         hivmPipelineOptions.enableHIVMGlobalWorkspaceReuse;
     pm.nest<func::FuncOp>().addPass(createPlanMemoryPass(planMemoryOption));
   }
+  pm.addPass(createMarkRealCoreTypePass());
   InjectBlockSyncOptions blockSyncOption;
   blockSyncOption.blockAllSync =
       hivmPipelineOptions.enableHIVMInjectBlockAllSync;
@@ -161,6 +162,9 @@ static void hivmPreBufferizationOptimizationPipeline(
   blockSyncOption.disableAutoInjectBlockSync =
       hivmPipelineOptions.disableAutoInjectBlockSync;
   pm.nest<func::FuncOp>().addPass(createInjectBlockSyncPass(blockSyncOption));
+  MarkRealCoreTypeOptions markRealCoreTypeOptions;
+  markRealCoreTypeOptions.removeCoreTypeAttrs = true;
+  pm.addPass(createMarkRealCoreTypePass(markRealCoreTypeOptions));
   if (hivmPipelineOptions.enableTritonKernelCompile &&
       !hivmPipelineOptions.disableAutoCVWorkSpaceManage)
     // Must place after plan-workspace-memory
@@ -172,7 +176,7 @@ static void hivmPreBufferizationOptimizationPipeline(
   if (hivmPipelineOptions.enableAutoBindSubBlock)
     pm.addPass(createTileAndBindSubBlockPass());
   pm.nest<func::FuncOp>().addPass(tensor::createFoldTensorEmptyPass());
-  canonicalizationPipeline(pm);
+  canonicalizationHIVMPipeline(pm);
   if (hivmPipelineOptions.enableCodeMotion) {
     // call canonicalization to contantize the variable, then hoist can work for
     // some cases
@@ -265,7 +269,7 @@ static void hivmPostBufferizationOptimizationPipeline(
   pm.nest<func::FuncOp>().addPass(createAllocExtraBufferPass());
   // Infer memory scope for newly allocated extra buffer
   pm.addPass(createInferHIVMMemScopePass());
-  canonicalizationPipeline(pm);
+  canonicalizationHIVMPipeline(pm);
 
   if (!hivmPipelineOptions.disableAutoCVWorkSpaceManage) {
     MarkMultiBufferOptions multiBufferOptions;
