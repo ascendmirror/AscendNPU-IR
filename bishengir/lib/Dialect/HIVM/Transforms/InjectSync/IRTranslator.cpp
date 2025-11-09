@@ -17,9 +17,11 @@
 
 #include "bishengir/Dialect/HIVM/Transforms/InjectSync/IRTranslator.h"
 #include "bishengir/Dialect/HACC/Utils/Utils.h"
+#include "bishengir/Dialect/HIVM/Transforms/InjectSync/SyncCommon.h"
 #include "bishengir/Dialect/Utils/Util.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include <memory>
 
 #define DEBUG_TYPE "hivm-inject-sync"
 
@@ -287,33 +289,38 @@ void IRTranslator::UpdateWhileInitArgsAliasInfo(scf::WhileOp whileOp) {
   }
 }
 
+void IRTranslator::insertPlaceHolderInst(InstanceElement *parentScope) {
+  auto placeHolder = std::make_unique<PlaceHolderInstanceElement>(
+      index, parentScope->GetIndex());
+  syncIR.emplace_back(std::move(placeHolder));
+  index++;
+  assert(syncIR.size() == index && "Sync IR Construction failed.");
+}
+
 void IRTranslator::UpdateIfOpInform(scf::IfOp ifOp) {
   auto ifBeginElement = std::make_unique<BranchInstanceElement>(
       index, index, KindOfBranch::IF_BEGIN);
   ifBeginElement->elementOp = ifOp.getOperation();
+  auto *ifPtr = ifBeginElement.get();
   syncIR.emplace_back(std::move(ifBeginElement));
-  std::unique_ptr<InstanceElement> &ifElement = syncIR[index];
   index++;
   assert(syncIR.size() == index && "Sync IR Construction failed.");
-  auto *ifPtr = dyn_cast<BranchInstanceElement>(ifElement.get());
-  assert(ifPtr != nullptr);
 
   RecursionIR(&ifOp.getThenRegion());
-
+  insertPlaceHolderInst(ifPtr);
   ifPtr->branchId = index;
+
   if (ifOp.elseBlock()) {
     auto ifElseElement = ifPtr->CloneBranch(KindOfBranch::ELSE_BEGIN);
     ifElseElement->elementOp = ifOp.getOperation();
+    auto *elsePtr = ifElseElement.get();
+
     syncIR.emplace_back(std::move(ifElseElement));
-    std::unique_ptr<InstanceElement> &elseElement = syncIR[index];
     index++;
     assert(syncIR.size() == index && "Sync IR Construction failed.");
-    BranchInstanceElement *elsePtr =
-        dyn_cast<BranchInstanceElement>(elseElement.get());
-    assert(elsePtr != nullptr);
 
     RecursionIR(&ifOp.getElseRegion());
-
+    insertPlaceHolderInst(elsePtr);
     elsePtr->endId = index;
   }
   ifPtr->endId = index;
