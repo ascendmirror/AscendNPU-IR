@@ -165,21 +165,15 @@ bool isAllocLikeOrGMPointerCastOp(Value v) {
 }
 
 bool isFromGMSpace(Value v) {
-  bool result = true;
   SmallVector<Value> targetOPVec =
       utils::tracebackMemRefVecByTargetFn(v, isAllocLikeOrGMPointerCastOp);
-  for (int i = 1; i < targetOPVec.size(); i++) {
-    assert(isa<hivm::PointerCastOp>(targetOPVec[i].getDefiningOp()) ==
-           isa<hivm::PointerCastOp>(targetOPVec[i - 1].getDefiningOp()));
-  }
   for (auto targetOP : targetOPVec) {
     auto defOp = targetOP.getDefiningOp();
     if (defOp != nullptr && !isa<hivm::PointerCastOp>(defOp)) {
-      result = false;
-      break;
+      return false;
     }
   }
-  return result;
+  return true;
 }
 
 struct MemrefCopyOpLowering : public OpRewritePattern<memref::CopyOp> {
