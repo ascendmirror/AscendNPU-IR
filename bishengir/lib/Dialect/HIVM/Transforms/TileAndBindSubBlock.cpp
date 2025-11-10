@@ -1,4 +1,4 @@
-//===--------------------- TileAndBindSubBlock.cpp-------------------------===//
+//===- TileAndBindSubBlock.cpp---------------------------------------------===//
 //
 // Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,12 +19,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "bishengir/Dialect/Annotation/IR/Annotation.h"
-#include "bishengir/Dialect/HFusion/Transforms/AutoSchedule/AutoScheduleBase.h"
 #include "bishengir/Dialect/HIVM/Analysis/DimensionAnalyzer.h"
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
 #include "bishengir/Dialect/HIVM/IR/HIVMImpl.h"
-#include "bishengir/Dialect/HIVM/Transforms/BubbleUpExtractSlice/MoveUpAffineMap.h"
 #include "bishengir/Dialect/HIVM/Transforms/BubbleUpExtractSlice/Pattern.h"
 #include "bishengir/Dialect/HIVM/Transforms/Passes.h"
 #include "bishengir/Dialect/HIVM/Transforms/TileAndBindSubBlock/Helper.h"
@@ -38,6 +35,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
@@ -58,7 +56,6 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
@@ -66,7 +63,6 @@
 #include "llvm/Support/LogicalResult.h"
 #include <cstdint>
 #include <utility>
-#include <vector>
 
 namespace mlir {
 #define GEN_PASS_DEF_TILEANDBINDSUBBLOCK
@@ -83,7 +79,7 @@ using namespace mlir::hivm;
 namespace {
 static constexpr llvm::StringLiteral kLimitedSubBlockOpAttrName =
     "limit_sub_block_id0";
-static constexpr llvm::StringLiteral tiledOp = "tiled_op";
+static constexpr llvm::StringLiteral kTiledOp = "tiled_op";
 } // namespace
 
 namespace {
@@ -96,113 +92,145 @@ struct TileAndBindSubBlockPass
 };
 } // namespace
 
-/// Calculates the buffer size in bytes for a tensor value.
-///
-/// This function computes the total buffer size needed for a tensor by:
-/// 1. Getting the total size in bits (shape × element type size)
-/// 2. Dividing by the number of tiles (kSubBlockDim)
-/// 3. Converting from bits to bytes (with ceiling division)
-///
-/// @param v The tensor value whose buffer size is to be calculated
-/// @return The buffer size in bytes
-static int64_t calculateBufferSize(Value v) {
-  auto tensorType = cast<RankedTensorType>(v.getType());
-  assert(tensorType.hasStaticShape() &&
-         "Tensor must have static shape for buffer size calculation");
-  auto shape = tensorType.getShape();
-  auto elementType = tensorType.getElementType();
-  auto totalBits = mlir::utils::getStaticTotalSizeInBits(shape, elementType);
-  if (!totalBits.has_value())
-    llvm::report_fatal_error("Failed to calculate total size in bits");
-
-  // Calculate buffer size: (totalBits / tileNum) converted to bytes
-  constexpr int64_t tileCount = kSubBlockDim; // Currently 2 sub-blocks
-  int64_t bitsPerTile = totalBits.value() / tileCount;
-  int64_t bytesPerTile = llvm::divideCeilSigned(
-      bitsPerTile, static_cast<int64_t>(utils::kBitsToByte));
-
-  return bytesPerTile;
+// This function is from TileUsingInterface.cpp
+// Check if `stride` evenly divides the trip count `size - offset`.
+static bool tileDividesIterationDomain(Range loopRange) {
+  std::optional<int64_t> offsetAsInt = getConstantIntValue(loopRange.offset);
+  if (!offsetAsInt)
+    return false;
+  std::optional<int64_t> sizeAsInt = getConstantIntValue(loopRange.size);
+  if (!sizeAsInt)
+    return false;
+  std::optional<int64_t> strideAsInt = getConstantIntValue(loopRange.stride);
+  if (!strideAsInt)
+    return false;
+  return ((sizeAsInt.value() - offsetAsInt.value()) % strideAsInt.value() == 0);
 }
 
-void setBufferSizeInLoopOp(RewriterBase &rewriter, Location loc,
-                           Operation *loop,
-                           DenseMap<Operation *, Operation *> &map) {
-  auto forOp = dyn_cast<scf::ForOp>(loop);
-  assert(forOp && "tile loop must be scf.for");
-  Block *block = &forOp.getRegion().front();
-  for (Operation &bodyOp : *block) {
-    if (map.find(&bodyOp) == map.end())
-      continue;
-    for (OpResult result : bodyOp.getResults()) {
-      auto maybeShapedType = dyn_cast<ShapedType>(result.getType());
-      if (!maybeShapedType || maybeShapedType.hasStaticShape())
-        continue;
+/// This function is from TileUsingInterface.cpp.cpp
+/// Returns the bounded tile size given the current `iv`, `loopRange` and
+/// `tileSize`, i.e., `min(tileSize, range.end() - iv)`.
+static OpFoldResult getBoundedTileSize(RewriterBase &rewriter, Location loc,
+                                       Range loopRange, Value iv,
+                                       OpFoldResult tileSize) {
+  ImplicitLocOpBuilder::InsertionGuard g(rewriter);
+  std::optional<int64_t> ts = getConstantIntValue(tileSize);
+  if (ts && ts.value() == 1)
+    return tileSize;
 
-      if (bodyOp.getDialect()->getNamespace() !=
-          HIVMDialect::getDialectNamespace())
-        continue;
+  if (tileDividesIterationDomain(
+          Range{loopRange.offset, loopRange.size, tileSize}))
+    return tileSize;
 
-      // calculate buffer size
-      auto maybeInit =
-          traceDefOp<tensor::EmptyOp>(map[&bodyOp]->getOperands().back());
-      if (!maybeInit.has_value()) {
-        llvm::report_fatal_error("Cannot trace inits for op");
-      }
-      auto calculationBufferSizeResult =
-          calculateBufferSize(maybeInit.value()->getResult(0));
-      OpBuilder::InsertionGuard g(rewriter);
-      rewriter.setInsertionPointAfter(&bodyOp);
-      auto mark = rewriter.create<annotation::MarkOp>(
-          loc, bodyOp.getResult(result.getResultNumber()));
-      rewriter.modifyOpInPlace(mark, [&]() {
-        mark->setAttr(kBufferSizeInByteAttr,
-                      rewriter.getI64IntegerAttr(calculationBufferSizeResult));
-      });
+  // The tile size to use (to avoid out of bounds access) is  minimum of
+  // `tileSize` and `ub - iv`, where `iv` is the induction variable of the tiled
+  // loop.
+  // Since the sub block loop is normalized (with lb=0, ub=2, step=1), we have
+  // to multiple the `iv` with the `tileSize`.
+  AffineExpr s0, s1, d0;
+  bindDims(rewriter.getContext(), d0);
+  bindSymbols(rewriter.getContext(), s0, s1);
+  AffineMap minMap =
+      AffineMap::get(1, 2, {s0, s1 - (d0 * s0)}, rewriter.getContext());
+  Value size = getValueOrCreateConstantIndexOp(rewriter, loc, loopRange.size);
+  return affine::makeComposedFoldedAffineMin(
+      rewriter, loc, minMap, SmallVector<OpFoldResult>{iv, tileSize, size});
+}
+
+/// This function calculates the tile size by dividing the dimension size
+/// by kSubBlockDim (using ceiling division).
+///
+/// For static dimensions: tile_size = ceil(dim_size / kSubBlockDim)
+/// For dynamic dimensions: creates affine operations to compute at runtime
+///
+/// @param rewriter The rewriter.
+/// @param loc The location.
+/// @param dimSize The original dimension size.
+/// @return The computed tile size as an OpFoldResult, or failure if the
+///         static dimension size is less than kSubBlockDim
+static FailureOr<OpFoldResult>
+getSingleTileSize(RewriterBase &rewriter, Location loc, OpFoldResult dimSize) {
+  ImplicitLocOpBuilder::InsertionGuard g(rewriter);
+  auto maybeStaticDimSize = getConstantIntValue(dimSize);
+  // Case 1: Static dimension - compute tile size at compile time
+  if (maybeStaticDimSize.has_value()) {
+    assert(!ShapedType::isDynamic(maybeStaticDimSize.value()));
+    if (maybeStaticDimSize.value() < kSubBlockDim) {
+      return emitError(loc)
+             << "dimension size (" << maybeStaticDimSize.value()
+             << ") is less than minimum tile size (" << kSubBlockDim << ")";
     }
+    int64_t tileSize =
+        llvm::divideCeil(maybeStaticDimSize.value(), kSubBlockDim);
+    return getAsIndexOpFoldResult(rewriter.getContext(), tileSize);
   }
-}
-
-static void modifyStoreToSliced(RewriterBase &rewriter, StoreOp storeOp,
-                                SmallVector<OpFoldResult, 4> mixedOffsets,
-                                SmallVector<OpFoldResult, 4> mixedSize,
-                                SmallVector<OpFoldResult, 4> mixedStrides,
-                                SmallVector<int64_t, 4> newShape) {
-  auto rankType = cast<RankedTensorType>(storeOp.getSrc().getType());
-  auto loc = storeOp->getLoc();
-
-  auto newType =
-      mlir::RankedTensorType::get(newShape, rankType.getElementType());
-  auto slicedStore = rewriter.create<tensor::ExtractSliceOp>(
-      loc, newType, storeOp->getOperand(0), mixedOffsets, mixedSize,
-      mixedStrides);
-  markCreatedExtractSliceOp(rewriter, slicedStore);
-
-  auto initsType = storeOp.getDpsInitOperand(0)->get().getType();
-  if (isa<mlir::RankedTensorType>(initsType)) {
-    auto slicedInit = rewriter.create<tensor::ExtractSliceOp>(
-        loc, newType, storeOp.getDpsInitOperand(0)->get(), mixedOffsets,
-        mixedSize, mixedStrides);
-    rewriter.modifyOpInPlace(
-        storeOp, [&]() { storeOp.setDpsInitOperand(0, slicedInit); });
-    markCreatedExtractSliceOp(rewriter, slicedInit);
-  } else if (isa<mlir::MemRefType>(initsType)) {
-    auto subviewedInits = rewriter.create<memref::SubViewOp>(
-        loc, storeOp.getDpsInitOperand(0)->get(), mixedOffsets, mixedSize,
-        mixedStrides);
-    markCreatedExtractSliceOp(rewriter, subviewedInits);
-
-    rewriter.modifyOpInPlace(
-        storeOp, [&]() { storeOp.setDpsInitOperand(0, subviewedInits); });
-  }
-  rewriter.modifyOpInPlace(storeOp, [&]() {
-    storeOp->setOperand(0, slicedStore);
-    if (storeOp->getNumResults() > 0)
-      storeOp->getResult(0).setType(newType);
-    storeOp->setAttr(tiledOp, UnitAttr::get(storeOp->getContext()));
-  });
+  auto dynDimSize = dimSize.get<Value>();
+  rewriter.setInsertionPointAfterValue(dynDimSize);
+  // Case 2: Dynamic dimension - generate runtime computation
+  // Create affine expression: ceil(dim0 / kSubBlockDim)
+  AffineExpr dim0;
+  bindDims(rewriter.getContext(), dim0);
+  auto ceilDivMap = AffineMap::get(/*dimCount=*/1, /*symbolCount=*/0,
+                                    dim0.ceilDiv(kSubBlockDim));
+  auto tileSizeOp = rewriter.create<affine::AffineApplyOp>(
+      loc, ceilDivMap, ValueRange{dynDimSize});
+  return getAsOpFoldResult(tileSizeOp);
 }
 
 namespace {
+
+static OpFoldResult calculateOffsetAtTilingDim(RewriterBase &rewriter,
+                                               Location loc, Value inductionVar,
+                                               OpFoldResult singleTileSize) {
+  ImplicitLocOpBuilder::InsertionGuard g(rewriter);
+  AffineExpr mulExpr =
+      rewriter.getAffineSymbolExpr(0) * rewriter.getAffineSymbolExpr(1);
+  OpFoldResult offsetAtTileDim = affine::makeComposedFoldedAffineApply(
+      rewriter, loc, mulExpr, {inductionVar, singleTileSize});
+  return offsetAtTileDim;
+}
+
+static FailureOr<linalg::SliceParameters>
+calculateTiledParams(RewriterBase &rewriter, hivm::StoreOp storeOp,
+                     int64_t tilingDim, scf::ForOp containingLoop) {
+  Location loc = storeOp.getLoc();
+  linalg::SliceParameters result;
+
+  // Get the original shape info
+  auto tilingOp = cast<TilingInterface>(storeOp.getOperation());
+  auto iterationDomain = tilingOp.getIterationDomain(rewriter);
+  auto [originalOffsets, originalSizes, originalStrides] =
+      getOffsetsSizesAndStrides(iterationDomain);
+
+  for (unsigned int i = 0; i < storeOp.getNumLoops(); i++) {
+    // We only support unit stride for now
+    result.strides.push_back(rewriter.getIndexAttr(1));
+    if (i != tilingDim) {
+      result.offsets.push_back(rewriter.getIndexAttr(0));
+      result.sizes.push_back(originalSizes[i]);
+      continue;
+    }
+
+    LDBG("original loop dim size: " << originalSizes[i]);
+    auto unboundedTileSize = getSingleTileSize(rewriter, loc, originalSizes[i]);
+    if (failed(unboundedTileSize))
+      return rewriter.notifyMatchFailure(storeOp, "tile size is invalid");
+    // Offset is dependent on tile size (the unbounded tile should be fine)
+    auto offsetAtTileDim = calculateOffsetAtTilingDim(
+        rewriter, loc, containingLoop.getInductionVar(),
+        unboundedTileSize.value());
+
+    rewriter.setInsertionPoint(storeOp);
+    auto boundedTileSize = getBoundedTileSize(
+        rewriter, loc, iterationDomain[tilingDim],
+        containingLoop.getInductionVar(), unboundedTileSize.value());
+    LDBG("bounded tile size is :" << boundedTileSize);
+
+    result.offsets.push_back(offsetAtTileDim);
+    result.sizes.push_back(boundedTileSize);
+  }
+  return result;
+}
 
 /// try to tile store ops and bind sub block mapping
 class TileAndSliceStore : public OpRewritePattern<hivm::StoreOp> {
@@ -215,43 +243,34 @@ public:
         analyzer(analyzer) {}
   LogicalResult matchAndRewrite(hivm::StoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
-    if (storeOp->hasAttrOfType<UnitAttr>(tiledOp))
-      return failure();
-    int64_t tilingDim = analyzer.getTilingDim(storeOp.getSrc());
+    if (storeOp->hasAttrOfType<UnitAttr>(kTiledOp))
+      return rewriter.notifyMatchFailure(storeOp, "op is already tiled");
+
     auto maybeContainingLoop = findContainingSubblockLoop(storeOp);
-    if (tilingDim == -1 || failed(maybeContainingLoop))
-      return failure();
+    if (failed(maybeContainingLoop))
+      return rewriter.notifyMatchFailure(storeOp, "failed to find parent loop");
 
-    auto containingLoop = maybeContainingLoop.value();
-    auto loc = storeOp.getLoc();
-    auto maybeSingleTileSize = getSingleTileSize(
-        rewriter, loc, storeOp.getSrc(), tilingDim, containingLoop);
-    if (failed(maybeSingleTileSize))
-      return failure();
-    rewriter.setInsertionPointToStart(containingLoop.getBody());
-    auto offsetAtTileDim = calculateOffsetAtTilingDim(
-        rewriter, loc, containingLoop, maybeSingleTileSize.value());
+    int64_t tilingDim = analyzer.getTilingDim(storeOp.getSrc());
+    if (tilingDim == -1)
+      return rewriter.notifyMatchFailure(storeOp, "no parallel dim to tile");
+    LDBG("subblock tiling dim is: " << tilingDim);
 
-    rewriter.setInsertionPoint(storeOp);
+    auto maybeSliceParams = calculateTiledParams(rewriter, storeOp, tilingDim,
+                                                 maybeContainingLoop.value());
+    if (failed(maybeSliceParams))
+      return rewriter.notifyMatchFailure(storeOp,
+                                         "failed to get offset/size/stride");
 
-    SmallVector<OpFoldResult, 4> mixedStrides, mixedOffsets, mixedSize;
-    SmallVector<int64_t, 4> newShape;
-    auto rankType = cast<ShapedType>(storeOp.getSrc().getType());
-    assert(!ShapedType::isDynamicShape(rankType.getShape()));
-    if (failed(findCorrespondingSizesOffsetsStrides(
-            rewriter, rankType, tilingDim, offsetAtTileDim,
-            maybeSingleTileSize.value(), mixedStrides, mixedOffsets, mixedSize,
-            newShape)))
-      return failure();
+    auto tilingOp = cast<TilingInterface>(storeOp.getOperation());
+    FailureOr<TilingResult> tileResult = tilingOp.getTiledImplementation(
+        rewriter, maybeSliceParams.value().offsets,
+        maybeSliceParams.value().sizes);
+    if (failed(tileResult))
+      return rewriter.notifyMatchFailure(storeOp, "failed to tile");
 
-    modifyStoreToSliced(rewriter, storeOp, mixedOffsets, mixedSize,
-                        mixedStrides, newShape);
-
-    // Maybe we need to maintain this map when doing bubble up.
-    DenseMap<Operation *, Operation *> map;
-    map[storeOp] = storeOp;
-    setBufferSizeInLoopOp(rewriter, loc, containingLoop, map);
-
+    auto *tiledStoreOp = tileResult->tiledOps.front();
+    tiledStoreOp->setAttr(kTiledOp, UnitAttr::get(storeOp->getContext()));
+    rewriter.replaceOp(storeOp, tiledStoreOp);
     return success();
   }
 };
@@ -335,7 +354,7 @@ public:
 
 } // namespace
 
-static LogicalResult limitUniqueSubBlockToStore(func::FuncOp funcOp) {
+static LogicalResult LimitUniqueSubBlockToStore(func::FuncOp funcOp) {
   RewritePatternSet patterns(funcOp.getContext());
   patterns.add<LimitUniqueSubBlockIdToStore>(funcOp.getContext());
   GreedyRewriteConfig config;
@@ -366,9 +385,10 @@ static scf::ForOp createSubBlockLoop(Location loc, OpBuilder &builder,
   return subBlockLoop;
 }
 
-static void failAndRevert(func::FuncOp func) {
-  LLVM_DEBUG(DBGS() << "tile and bind subblock fail for "
-                    << func.getSymNameAttr().str() << "\n\n");
+static void failAndRevert(func::FuncOp func, StringRef errorMsg){
+  LDBG("tile and bind subblock fail for "
+                    << func.getSymNameAttr() << "\n\n");
+  func->emitError(errorMsg);
   LLVM_DEBUG(func->dump());
   func->erase();
 }
@@ -390,28 +410,23 @@ static LogicalResult tileAndSliceStore(func::FuncOp func) {
 
   analyzer.computeTilingDim();
 
-  // Check there is no dynamic shape store, if there is, we cannot tile it to 2
-  // for now.
-  std::vector<hivm::StoreOp> allStoreOps;
-  func->walk([&allStoreOps](hivm::StoreOp storeOp) {
-    allStoreOps.push_back(storeOp);
-  });
-  if (llvm::any_of(allStoreOps, [&](hivm::StoreOp storeOp) {
-        auto srcShapedType = dyn_cast<ShapedType>(storeOp.getSrcOperandType());
-        auto dstShapedType = dyn_cast<ShapedType>(storeOp.getDstOperandType());
-        if (!srcShapedType || !dstShapedType)
-          return true;
-        return ShapedType::isDynamicShape(srcShapedType.getShape()) ||
-               ShapedType::isDynamicShape(dstShapedType.getShape());
-      })) {
-    return failure();
-  }
-
   RewritePatternSet patterns(func->getContext());
   patterns.add<TileAndSliceStore>(func->getContext(), analyzer);
   GreedyRewriteConfig config;
-  config.maxIterations = kMaxIterations;
-  return applyPatternsGreedily(func, std::move(patterns), config);
+
+  auto listener = hivm::detail::BubbleUpListener();
+  config.listener = &listener;
+  bool tiled = false;
+  if (failed(applyPatternsGreedily(func, std::move(patterns), config,
+                                          &tiled))) {
+    failAndRevert(func, "Failed to apply tile and slice store pattern");
+    return failure();
+  }
+
+  if (!tiled) {
+    failAndRevert(func, "No effect after tile and slice store");
+     return failure();
+   }return success();
 }
 
 /// Attempts to tile and bind sub-blocks within a function
@@ -437,6 +452,7 @@ TileAndBindSubBlockPass::attemptBindSubBlock(func::FuncOp func) {
   builder.setInsertionPoint(func);
   // We cloned newFunc for processing.
   func::FuncOp newFunc = cast<func::FuncOp>(builder.cloneWithoutRegions(func));
+  newFunc.setName(func.getName().str() + "_Processing");
   newFunc.addEntryBlock();
   builder.setInsertionPointToStart(&newFunc.getBody().getBlocks().front());
 
@@ -472,8 +488,9 @@ TileAndBindSubBlockPass::attemptBindSubBlock(func::FuncOp func) {
   // outside of subblock loop body and use as cloned newFunc's terminator.
   bb1->erase();
 
+  LDBG("Moudle:" << *getOperation());
   if (failed(tileAndSliceStore(newFunc))) {
-    failAndRevert(newFunc);
+    failAndRevert(newFunc, "Failed to analyze dimensions");
     return failure();
   }
 
@@ -483,7 +500,7 @@ TileAndBindSubBlockPass::attemptBindSubBlock(func::FuncOp func) {
   LogicalResult bubbleUpResult = pm.run(newFunc);
   if (bubbleUpResult.failed() || newFunc.verify().failed() ||
       newFunc.verifyBody().failed() || newFunc.verifyRegions().failed()) {
-    failAndRevert(newFunc);
+    failAndRevert(newFunc, "Failed to bubble up");
     return failure();
   }
 
@@ -491,7 +508,7 @@ TileAndBindSubBlockPass::attemptBindSubBlock(func::FuncOp func) {
   patternsPost.add<mlir::hivm::detail::BubbleUpSubviewFromTiling>(
       &getContext());
   if (failed(applyPatternsGreedily(newFunc, std::move(patternsPost)))) {
-    failAndRevert(newFunc);
+    failAndRevert(newFunc, "Failed to applyPatternGreedily");
     return failure();
   }
 
@@ -529,13 +546,13 @@ void TileAndBindSubBlockPass::runOnOperation() {
     // Attempt transformation on the clone
     FailureOr<func::FuncOp> res = attemptBindSubBlock(originalFunc);
     if (failed(res)) {
-      if (failed(limitUniqueSubBlockToStore(originalFunc))) {
-        LLVM_DEBUG(DBGS() << "Failed to limit unique subblock: " << symNameStr
+      if (failed(LimitUniqueSubBlockToStore(originalFunc))) {
+        LDBG("Failed to limit unique subblock: " << symNameStr
                           << "\n");
         signalPassFailure();
       }
-      LLVM_DEBUG(DBGS() << "Failed to transform function: " << symNameStr
-                        << ", keeping original\n");
+      LDBG("Failed to transform function: " << symNameStr
+                  << ", keeping original\n");
       return;
     }
     auto processedFunc = res.value();
@@ -546,14 +563,14 @@ void TileAndBindSubBlockPass::runOnOperation() {
       processedFunc.setName(symNameStr);
 #ifndef NDEBUG
       tiledFunctionCount++;
-      LLVM_DEBUG(DBGS() << "Successfully transformed function #"
+      LDBG("Successfully transformed function #"
                         << tiledFunctionCount << ": " << symNameStr << "\n");
 #endif
     }
   }
 
 #ifndef NDEBUG
-  LLVM_DEBUG(DBGS() << "TileAndBindSubBlock pass completed. "
+  LDBG("TileAndBindSubBlock pass completed. "
                     << "Successfully transformed " << tiledFunctionCount
                     << " functions.\n");
 #endif

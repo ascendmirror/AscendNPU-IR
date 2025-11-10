@@ -1,4 +1,4 @@
-//===- CSEPattern.h --------------------------------------------------===//
+//===- MoveUpAffineMap.h --------------------------------------------------===//
 //
 // Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,14 +15,18 @@
 //
 //============================================================================//
 
-#ifndef BISHENGIR_DIALECT_HIVM_TRANSFORMS_CSE_EXTRACT_SLICE_PATTERN_H
-#define BISHENGIR_DIALECT_HIVM_TRANSFORMS_CSE_EXTRACT_SLICE_PATTERN_H
+#ifndef BISHENGIR_DIALECT_HIVM_TRANSFORMS_MOVE_UP_AFFINE_PATTERN_H
+#define BISHENGIR_DIALECT_HIVM_TRANSFORMS_MOVE_UP_AFFINE_PATTERN_H
 
 namespace mlir {
 class RewritePatternSet;
-
 namespace hivm::detail {
-void populateCSEPattern(mlir::RewritePatternSet &patterns);
+
+/// Populate patterns to move up affine dialect ops.
+void populateMoveUpAffinePattern(RewritePatternSet &patterns);
+
 } // namespace hivm::detail
+
 } // namespace mlir
+
 #endif

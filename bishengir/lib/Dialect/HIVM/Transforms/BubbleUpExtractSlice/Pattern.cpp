@@ -168,6 +168,19 @@ createNewChildOpAfterBubbledUp(RewriterBase &rewriter, size_t tilingDim,
                                 newViewSizes, parentOp.getMixedStrides());
 }
 
+//===----------------------------------------------------------------------===//
+// Bubble up pattern common impl.
+//===----------------------------------------------------------------------===//
+
+void BubbleUpListener::notifyOperationInserted(
+    Operation *op, IRRewriter::InsertPoint previous) {
+
+  // Add an attribute to mark that the current slice is bubbled.s
+  if (isa<tensor::ExtractSliceOp>(op)) {
+    op->setAttr("bubbled_slice", UnitAttr::get(op->getContext()));
+  }
+ }
+
 LogicalResult
 BubbleUpPattern::matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                  PatternRewriter &rewriter) const {
@@ -193,9 +206,6 @@ BubbleUpPattern::matchAndRewrite(tensor::ExtractSliceOp sliceOp,
   if (extractSliceCount != 1)
     return rewriter.notifyMatchFailure(
         sliceOp, "source has more than one usage beside extract slice.");
-  auto *sourceDefiningOp = source.getDefiningOp();
-  if (sourceDefiningOp && !areOperandsUpperLevel(sliceOp))
-    return failure();
 
   // Try each strategy
   for (const auto &strategy : bubbleUpStrategies) {
@@ -248,10 +258,13 @@ Operation *BubbleUpPattern::getDefOpForInsertionPoint(OpOperand &opr) const {
   return opr.get().getDefiningOp();
 }
 
+//===----------------------------------------------------------------------===//
+// Bubble up broadcast
+//===----------------------------------------------------------------------===//
 bool BroadcastBubbleUpStrategy::isSupportedOperation(
     tensor::ExtractSliceOp sliceOp) const {
   auto *sourceOp = sliceOp.getSource().getDefiningOp();
-  return isa_and_nonnull<hivm::VBrcOp>(sourceOp) && !isDynamicSlice(sliceOp);
+  return isa_and_nonnull<hivm::VBrcOp>(sourceOp);
 }
 
 LogicalResult
@@ -262,8 +275,7 @@ BroadcastBubbleUpStrategy::execute(tensor::ExtractSliceOp sliceOp,
   if (!broadcastOp)
     return failure();
 
-  auto outputType =
-      dyn_cast<RankedTensorType>(broadcastOp.getResult().front().getType());
+  auto outputType = dyn_cast<RankedTensorType>(broadcastOp.getDst().getType());
 
   // Get the positions of the input dimensions in the output
   auto broadcastDimMask =
@@ -275,7 +287,6 @@ BroadcastBubbleUpStrategy::execute(tensor::ExtractSliceOp sliceOp,
 
   // Compute the input offsets and sizes
   SmallVector<OpFoldResult> inputOffsets, inputSizes;
-
   // Construct the new input offset, size and stride tuple
   for (int position = 0; position < outputType.getRank(); position++) {
     if (!broadcastDimMask[position]) {
@@ -300,7 +311,6 @@ BroadcastBubbleUpStrategy::execute(tensor::ExtractSliceOp sliceOp,
     rewriter.setInsertionPoint(broadcastOp);
     auto newSlicedInput = rewriter.create<tensor::ExtractSliceOp>(
         loc, broadcastOp.getSrc(), inputOffsets, inputSizes, inputStrides);
-    markCreatedExtractSliceOp(rewriter, newSlicedInput);
     newOperands.push_back(newSlicedInput.getResult());
   } else {
     newOperands.push_back(broadcastOp.getSrc());
@@ -308,8 +318,6 @@ BroadcastBubbleUpStrategy::execute(tensor::ExtractSliceOp sliceOp,
   auto newSlicedInit = rewriter.create<tensor::ExtractSliceOp>(
       loc, broadcastOp.getDpsInits().front(), sliceOp.getMixedOffsets(),
       sliceOp.getMixedSizes(), sliceOp.getMixedStrides());
-  markCreatedExtractSliceOp(rewriter, newSlicedInit);
-
   newOperands.push_back(newSlicedInit);
 
   // Create the new BroadcastOp with the tiled input
@@ -321,10 +329,13 @@ BroadcastBubbleUpStrategy::execute(tensor::ExtractSliceOp sliceOp,
   return success();
 }
 
+//===----------------------------------------------------------------------===//
+// Bubble up reduce
+//===----------------------------------------------------------------------===//
 bool ReduceBubbleUpStrategy::isSupportedOperation(
     tensor::ExtractSliceOp sliceOp) const {
   auto *sourceOp = sliceOp.getSource().getDefiningOp();
-  return isa_and_nonnull<hivm::VReduceOp>(sourceOp) && !isDynamicSlice(sliceOp);
+  return isa_and_nonnull<hivm::VReduceOp>(sourceOp);
 }
 
 LogicalResult ReduceBubbleUpStrategy::execute(tensor::ExtractSliceOp sliceOp,
@@ -347,13 +358,9 @@ LogicalResult ReduceBubbleUpStrategy::execute(tensor::ExtractSliceOp sliceOp,
   if (reduceOp.getNumDpsInits() != 1)
     return rewriter.notifyMatchFailure(
         reduceOp, "doesn't support bubble up on multiple inits of vreduce");
+
   // Compute the input offsets and sizes
-
   auto inputShape = inputType.getShape();
-  if (ShapedType::isDynamicShape(inputShape))
-    return rewriter.notifyMatchFailure(reduceOp,
-                                       "better dynamic analysis is needed");
-
   auto inputSizes = sliceSizes;
   for (unsigned i = 0; i < rank; ++i) {
     if (isReductionDim[i]) {
@@ -366,7 +373,6 @@ LogicalResult ReduceBubbleUpStrategy::execute(tensor::ExtractSliceOp sliceOp,
   auto newSlicedInput = rewriter.create<tensor::ExtractSliceOp>(
       reduceOp.getLoc(), reduceOp.getSrc(), sliceOffsets, inputSizes,
       inputStrides);
-  markCreatedExtractSliceOp(rewriter, newSlicedInput);
 
   auto initReduce = reduceOp.getDpsInitOperand(0)->get();
   rewriter.setInsertionPoint(reduceOp);
@@ -402,11 +408,14 @@ static std::optional<int64_t> findOnlyNonUnit(ArrayRef<int64_t> shape) {
   return ret;
 }
 
+//===----------------------------------------------------------------------===//
+// Bubble up expand
+//===----------------------------------------------------------------------===//
+
 bool ExpandBubbleUpStrategy::isSupportedOperation(
     tensor::ExtractSliceOp sliceOp) const {
   auto *sourceOp = sliceOp.getSource().getDefiningOp();
-  return isa_and_nonnull<tensor::ExpandShapeOp>(sourceOp) &&
-         !isDynamicSlice(sliceOp);
+  return isa_and_nonnull<tensor::ExpandShapeOp>(sourceOp);
 }
 
 LogicalResult ExpandBubbleUpStrategy::execute(tensor::ExtractSliceOp sliceOp,
@@ -444,7 +453,6 @@ LogicalResult ExpandBubbleUpStrategy::execute(tensor::ExtractSliceOp sliceOp,
   Location loc = expandOp.getLoc();
   auto newSliceOp = rewriter.create<tensor::ExtractSliceOp>(
       loc, expandOp.getSrc(), inputOffsets, inputSizes, inputStrides);
-  markCreatedExtractSliceOp(rewriter, newSliceOp);
 
   auto newExpandOp = rewriter.create<tensor::ExpandShapeOp>(
       loc, sliceOp.getResultType(), newSliceOp,
@@ -795,11 +803,14 @@ InsertSliceBubbleUpStrategy::execute(tensor::ExtractSliceOp sliceOp,
   return failure();
 }
 
+//===----------------------------------------------------------------------===//
+// Bubble up collapse
+//===----------------------------------------------------------------------===//
+
 bool CollapseBubbleUpStrategy::isSupportedOperation(
     tensor::ExtractSliceOp sliceOp) const {
   auto *sourceOp = sliceOp.getSource().getDefiningOp();
-  return isa_and_nonnull<tensor::CollapseShapeOp>(sourceOp) &&
-         !isDynamicSlice(sliceOp);
+  return isa_and_nonnull<tensor::CollapseShapeOp>(sourceOp);
 }
 
 LogicalResult
@@ -860,7 +871,6 @@ CollapseBubbleUpStrategy::execute(tensor::ExtractSliceOp sliceOp,
   auto tiledInput = rewriter.create<tensor::ExtractSliceOp>(
       inputCollapse.getLoc(), inputCollapse, inputOffsets, inputSizes,
       inputStrides);
-  markCreatedExtractSliceOp(rewriter, tiledInput);
 
   auto staticOutputShape = decomposeMixedValues(outputSizes);
   auto newCollapse = rewriter.create<tensor::CollapseShapeOp>(
@@ -869,12 +879,15 @@ CollapseBubbleUpStrategy::execute(tensor::ExtractSliceOp sliceOp,
   return success();
 }
 
+//===----------------------------------------------------------------------===//
+// Bubble up for
+//===----------------------------------------------------------------------===//
+
 bool LoopBubbleUpStrategy::isSupportedOperation(
     tensor::ExtractSliceOp sliceOp) const {
   auto *sourceOp = sliceOp.getSource().getDefiningOp();
-  return isa_and_nonnull<scf::ForOp>(sourceOp) && !isDynamicSlice(sliceOp);
+  return isa_and_nonnull<scf::ForOp>(sourceOp);
 }
-
 LogicalResult LoopBubbleUpStrategy::execute(tensor::ExtractSliceOp sliceOp,
                                             PatternRewriter &rewriter) const {
   auto forOp = dyn_cast<scf::ForOp>(sliceOp.getSource().getDefiningOp());
@@ -928,43 +941,8 @@ LogicalResult LoopBubbleUpStrategy::execute(tensor::ExtractSliceOp sliceOp,
       /* resultType */ cast<RankedTensorType>(sliceOp.getType()),
       /* src */ forOpInit.get(), sliceOp.getMixedOffsets(),
       sliceOp.getMixedSizes(), sliceOp.getMixedStrides());
-  markCreatedExtractSliceOp(rewriter, slicedInit);
 
   forOpInit.set(slicedInit.getResult());
-
-  return success();
-}
-
-bool LoopArgsBubbleUpStrategy::isSupportedOperation(
-    tensor::ExtractSliceOp sliceOp) const {
-  return false;
-}
-
-LogicalResult
-LoopArgsBubbleUpStrategy::execute(tensor::ExtractSliceOp sliceOp,
-                                  PatternRewriter &rewriter) const {
-  llvm_unreachable("This should not happen anymore");
-  auto forOp = sliceOp->getParentOfType<scf::ForOp>();
-  if (!forOp) {
-    return failure();
-  }
-
-  BlockArgument blockArg = dyn_cast<BlockArgument>(sliceOp.getSource());
-  if (!blockArg)
-    return failure();
-
-  auto blockArgIdx = blockArg.getArgNumber() - 1;
-
-  rewriter.setInsertionPoint(forOp);
-  auto movedOutSlice = rewriter.create<tensor::ExtractSliceOp>(
-      sliceOp->getLoc(), cast<RankedTensorType>(sliceOp.getType()),
-      forOp.getInitArgsMutable()[blockArgIdx].get(), sliceOp.getMixedOffsets(),
-      sliceOp.getMixedSizes(), sliceOp.getMixedStrides());
-  markCreatedExtractSliceOp(rewriter, movedOutSlice);
-
-  blockArg.setType(sliceOp.getType());
-  rewriter.replaceAllUsesWith(sliceOp, blockArg);
-  forOp.getInitArgsMutable()[blockArgIdx].set(movedOutSlice);
 
   return success();
 }

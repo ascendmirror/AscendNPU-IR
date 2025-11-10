@@ -26,6 +26,15 @@
 
 namespace mlir::hivm::detail {
 
+class BubbleUpListener : public RewriterBase::Listener {
+public:
+  BubbleUpListener() : RewriterBase::Listener() {}
+
+protected:
+  void notifyOperationInserted(Operation *op,
+                               IRRewriter::InsertPoint previous) override;
+};
+
 // Strategy pattern for different bubble up operations
 class BubbleUpStrategy {
 public:
@@ -70,14 +79,6 @@ public:
 };
 
 class LoopBubbleUpStrategy : public BubbleUpStrategy {
-public:
-  bool isSupportedOperation(tensor::ExtractSliceOp sliceOp) const override;
-
-  LogicalResult execute(tensor::ExtractSliceOp sliceOp,
-                        PatternRewriter &rewriter) const override;
-};
-
-class LoopArgsBubbleUpStrategy : public BubbleUpStrategy {
 public:
   bool isSupportedOperation(tensor::ExtractSliceOp sliceOp) const override;
 

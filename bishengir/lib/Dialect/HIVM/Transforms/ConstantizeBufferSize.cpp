@@ -133,7 +133,8 @@ private:
     });
 
     for (Operation *user : annotateUsers)
-      rewriter.eraseOp(user);
+      rewriter.modifyOpInPlace(
+          user, [&rewriter, &user]() { rewriter.eraseOp(user); });
   }
 };
 

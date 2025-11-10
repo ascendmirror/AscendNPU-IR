@@ -23,6 +23,7 @@
 #include "llvm/ADT/SmallVector.h"
 
 namespace mlir::hivm::detail {
+
 static bool isEqual(const Operation *lhsC, const Operation *rhsC) {
   auto *lhs = cast<Operation *>(lhsC);
   auto *rhs = cast<Operation *>(rhsC);
@@ -72,17 +73,18 @@ struct CSEExtractSlicePattern : OpRewritePattern<tensor::ExtractSliceOp> {
   }
 };
 
-struct CSEAffineApplyPattern : OpRewritePattern<affine::AffineApplyOp> {
-  using OpRewritePattern<affine::AffineApplyOp>::OpRewritePattern;
+template <typename AffineOpTy>
+struct CSEAffinePattern : OpRewritePattern<AffineOpTy> {
+  using OpRewritePattern<AffineOpTy>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(affine::AffineApplyOp baseOp,
-                                PatternRewriter &rewriter) const final {
-    Block *blockParent = baseOp->getBlock();
-    SmallVector<affine::AffineApplyOp> siblingGroup;
-    blockParent->walk([&](affine::AffineApplyOp applyOp) {
-      if (isEqual(applyOp, baseOp))
-        siblingGroup.push_back(applyOp);
-    });
+  LogicalResult matchAndRewrite(AffineOpTy baseOp,
+                                 PatternRewriter &rewriter) const final {
+     Block *blockParent = baseOp->getBlock();
+    SmallVector<AffineOpTy> siblingGroup;
+    blockParent->walk([&](AffineOpTy applyOp) {
+       if (isEqual(applyOp, baseOp))
+         siblingGroup.push_back(applyOp);
+     });
     if (siblingGroup.size() == 1)
       return failure();
     for (size_t i = 1; i < siblingGroup.size(); ++i) {
@@ -94,7 +96,8 @@ struct CSEAffineApplyPattern : OpRewritePattern<affine::AffineApplyOp> {
 
 void populateCSEPattern(RewritePatternSet &patterns) {
   patterns.add<CSEExtractSlicePattern>(patterns.getContext());
-  patterns.add<CSEAffineApplyPattern>(patterns.getContext());
+  patterns.add<CSEAffinePattern<affine::AffineApplyOp>,
+               CSEAffinePattern<affine::AffineMinOp>>(patterns.getContext());
 }
 
 } // namespace mlir::hivm::detail
