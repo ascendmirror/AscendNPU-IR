@@ -165,21 +165,27 @@ bool isAllocLikeOrGMPointerCastOp(Value v) {
 }
 
 bool isFromGMSpace(Value v) {
-  bool result = true;
   SmallVector<Value> targetOPVec =
       utils::tracebackMemRefVecByTargetFn(v, isAllocLikeOrGMPointerCastOp);
-  for (int i = 1; i < targetOPVec.size(); i++) {
-    assert(isa<hivm::PointerCastOp>(targetOPVec[i].getDefiningOp()) ==
-           isa<hivm::PointerCastOp>(targetOPVec[i - 1].getDefiningOp()));
+  Operation *prevDefOp = nullptr;
+  if (targetOPVec.size() > 0) {
+    prevDefOp = targetOPVec[0].getDefiningOp();
+  }
+  for (size_t i = 1; i < targetOPVec.size(); i++) {
+    auto currDefOp = targetOPVec[i].getDefiningOp();
+    if (currDefOp != nullptr && prevDefOp != nullptr)
+      assert(isa<hivm::PointerCastOp>(currDefOp) ==
+             isa<hivm::PointerCastOp>(prevDefOp));
+    if (currDefOp != nullptr)
+      prevDefOp = currDefOp;
   }
   for (auto targetOP : targetOPVec) {
     auto defOp = targetOP.getDefiningOp();
     if (defOp != nullptr && !isa<hivm::PointerCastOp>(defOp)) {
-      result = false;
-      break;
+      return false;
     }
   }
-  return result;
+  return true;
 }
 
 struct MemrefCopyOpLowering : public OpRewritePattern<memref::CopyOp> {
