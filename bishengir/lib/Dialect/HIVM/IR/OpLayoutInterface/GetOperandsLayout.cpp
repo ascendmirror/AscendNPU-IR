@@ -100,3 +100,19 @@ llvm::SmallDenseMap<Value, DataLayoutAttr> MmadL1Op::getOperandsTargetLayout() {
   }
   return valLayoutMap;
 }
+
+//===----------------------------------------------------------------------===//
+// Conv1dL1Op
+//===----------------------------------------------------------------------===//
+
+llvm::SmallDenseMap<Value, DataLayoutAttr>
+Conv1DL1Op::getOperandsCurrentLayout() {
+  llvm::SmallDenseMap<Value, DataLayoutAttr> valLayoutMap;
+  return valLayoutMap;
+}
+
+llvm::SmallDenseMap<Value, DataLayoutAttr>
+Conv1DL1Op::getOperandsTargetLayout() {
+  llvm::SmallDenseMap<Value, DataLayoutAttr> valLayoutMap;
+  return valLayoutMap;
+}
