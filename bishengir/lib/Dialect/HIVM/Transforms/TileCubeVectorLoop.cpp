@@ -1251,6 +1251,10 @@ areValuesAlignedAfterTiling(ValueRange valueRange,
       }
     }
     bitUsed = bitUsed * resultType.getElementTypeBitWidth();
+    // size must be aligned if bitUsed less than alignSize,
+    // because this value will not tiled
+    if (bitUsed < alignSize)
+      return true;
     if (bitUsed % alignSize != 0)
       return false;
   }
