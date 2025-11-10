@@ -57,6 +57,10 @@ LogicalResult inferAndPropagateMemScopeForPointerCast(hivm::PointerCastOp op);
 /// \note Set alloc memory scope to ub.
 LogicalResult inferAndPropagateUbufMemScope(memref::AllocOp allocOp);
 
+/// Infer, propagate, and set memory scope information to AllocOp.
+/// \note Set alloc which not used by HIVM op memory scope to L1.
+LogicalResult inferAndPropagateToL1MemScopeForUnusedByHIVMOp(memref::AllocOp op);
+
 } // namespace hivm
 } // namespace mlir
 

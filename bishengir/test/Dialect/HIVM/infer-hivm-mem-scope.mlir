@@ -252,3 +252,16 @@ module {
     return
   }
 }
+
+// -----
+
+// CHECK-LABEL: test_infer_mem_scope_set_cbuf_for_aic_func_unused_alloc
+module {
+  func.func @test_infer_mem_scope_set_cbuf_for_aic_func_unused_alloc() attributes {hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, hivm.func_core_type = #hivm.func_core_type<AIC>} {
+    // CHECK: #hivm.address_space<cbuf>
+    %alloc = memref.alloc() : memref<8x16xf32>
+    // CHECK: #hivm.address_space<cbuf>
+    annotation.mark %alloc {MayImplicitTransposeWithLastAxis} : memref<8x16xf32>
+    return
+  }
+}
