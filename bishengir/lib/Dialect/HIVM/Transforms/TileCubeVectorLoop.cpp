@@ -364,11 +364,11 @@ public:
           "dst's must only have a single, bufferization.to_tensor user");
     }
     bufferization::ToTensorOp toTensorUser = toTensorUsers.front();
-    Location loc = toTensorUser.getLoc();
 
     auto newDst = getExtractSliceFromSubview(dstSubviewOp, rewriter);
     auto newSrc = getExtractSliceFromSubview(srcSubviewOp, rewriter);
-    rewriter.setInsertionPointAfter(toTensorUser);
+    Location loc = loadOp.getLoc();
+    rewriter.setInsertionPointAfter(loadOp);
     auto tensorType =
         RankedTensorType::get(dstType.getShape(), dstType.getElementType());
 
