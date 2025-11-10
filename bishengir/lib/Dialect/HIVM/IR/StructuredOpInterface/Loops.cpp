@@ -437,3 +437,38 @@ SmallVector<hivm::IteratorType> MmadL1Op::getIteratorTypesArray() {
   }
   return {hivm::IteratorType::kOpaque};
 }
+
+//===----------------------------------------------------------------------===//
+// Conv1DL1Op
+//===----------------------------------------------------------------------===//
+
+ArrayAttr Conv1DL1Op::getIndexingMaps() {
+  MLIRContext *ctx = getContext();
+  AffineMap scalarMap = AffineMap::get(getNumParallelLoops(), 0, ctx);
+  SmallVector<AffineMap> indexingMaps(getNumOperands(), scalarMap);
+  AffineMap iMap =
+      parseAffineMap("(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)", ctx);
+  indexingMaps[getInputMutable().getOperandNumber()] = iMap;
+
+  AffineMap wMap =
+      parseAffineMap("(d0, d1, d2, d3, d4, d5) -> (d3, d1, d4)", ctx);
+  indexingMaps[getWeightMutable().getOperandNumber()] = wMap;
+
+  auto bias=getBiasMutable();
+  if(!bias.empty()){
+    AffineMap bMap = parseAffineMap("(d0, d1, d2, d3, d4, d5) -> (d3)", ctx);
+    indexingMaps[bias.begin()->getOperandNumber()] = bMap;
+  }
+  AffineMap oMap =
+      parseAffineMap("(d0, d1, d2, d3, d4, d5) -> (d0, d3, d5)", ctx);
+  indexingMaps[getInitMutable().getOperandNumber()] = oMap;
+  return Builder(ctx).getAffineMapArrayAttr(indexingMaps);
+}
+
+SmallVector<hivm::IteratorType> Conv1DL1Op::getIteratorTypesArray() {
+  return SmallVector<hivm::IteratorType>{
+      hivm::IteratorType::kParallel,  hivm::IteratorType::kReduction,
+      hivm::IteratorType::kReduction, hivm::IteratorType::kParallel,
+      hivm::IteratorType::kReduction, hivm::IteratorType::kParallel,
+  };
+}

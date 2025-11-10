@@ -547,4 +547,57 @@ def MixGroupMatmulOp : HIVM_GlobalMmadOp<"mix_group_matmul"> {
   ];
 }
 
+def Conv1DL1Op : HIVM_MacroOp<"Conv1dL1",[
+  CubeCoreTypeTrait,
+  MacroOpPipeTrait<"PIPE::PIPE_MTE1, PIPE::PIPE_M">,
+  DeclareOpInterfaceMethods<HIVMStructuredOpInterface, ["getIndexingMaps"]>,
+  OpLayoutInterface,
+]>{
+  let arguments = (ins Arg<TensorOrMemref, "Matrix input">:$input,
+                       Arg<TensorOrMemref, "Matrix weight">:$weight,
+                       Arg<Optional<TensorOrMemref>, "Matrix bias">:$bias,
+                       Arg<TensorOrMemref, "Matrix init">:$init,
+                       Arg<I1, [{
+                        The condition under which
+                        data in L0C is cleared before use
+                       }]>:$init_condition,
+                       I32Attr:$stride,
+                       I32Attr:$padding,
+                       I32Attr:$dilation,
+                       I32Attr:$groups
+                       );
+  let results = (outs AnyRankedTensor:$result_tensor);
+  let summary = [{
+
+  }];
+  let assemblyFormat = [{
+    attr-dict `ins` `(`
+    $input
+    `,` $weight
+    (`,` $bias^)?
+    `,` $init_condition
+    `:`
+    type($input)
+    `,` type($weight)
+    (`,` type($bias)^)? 
+    `,` type($init_condition) `)`
+    `outs` `(` $init `:` type($init) `)`
+    `->` type($result_tensor)
+  }];
+
+  let extraClassDeclaration = [{
+    // Implement functions necessary for DestinationStyleOpInterface.
+    ::mlir::MutableOperandRange getDpsInitsMutable() {
+      return getInitMutable();
+    }
+    bool isInitConstant(std::optional<bool> cst = std::nullopt);
+    void setInitCondition(Value init);
+  
+    static StringRef getOpName() { return "conv1d"; }
+
+    llvm::SmallDenseMap<Value, DataLayoutAttr> getOperandsTargetLayout();
+    llvm::SmallDenseMap<Value, DataLayoutAttr> getOperandsCurrentLayout();
+  }];
+}
+
 #endif // BISHENGIR_DIALECT_HIVM_IR_HIVMMACROOPS_TD
