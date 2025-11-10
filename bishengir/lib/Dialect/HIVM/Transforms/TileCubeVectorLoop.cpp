@@ -667,6 +667,13 @@ public:
   }
 };
 
+LogicalResult applyRemoveDummyStore(ModuleOp module) {
+  MLIRContext *ctx = module.getContext();
+  RewritePatternSet patterns(ctx);
+  patterns.add<RemoveDummyStore>(ctx);
+  return applyPatternsGreedily(module, std::move(patterns));
+}
+
 //===----------------------------------------------------------------------===//
 // OpToTile
 //===----------------------------------------------------------------------===//
@@ -731,12 +738,6 @@ public:
   static bool classof(const LoopInfo *) { return true; }
 
 public:
-  /// Perform post transformation action to the loop.
-  virtual LogicalResult
-  performPostTransformationAction(ModuleOp /*module*/) const {
-    return success();
-  }
-
   /// Get the core type of the loop.
   hivm::TCoreType getLoopType() const { return loopCoreType; }
 
@@ -973,14 +974,6 @@ public:
 
   static bool classof(const LoopInfo *T) {
     return T->getLoopType() == hivm::TCoreType::VECTOR;
-  }
-
-  LogicalResult
-  performPostTransformationAction(ModuleOp module) const override {
-    MLIRContext *ctx = module.getContext();
-    RewritePatternSet patterns(ctx);
-    patterns.add<RemoveDummyStore>(ctx);
-    return applyPatternsGreedily(module, std::move(patterns));
   }
 };
 
@@ -1484,11 +1477,12 @@ void TileCubeVectorLoopPass::runOnOperation() {
                                        map);
       cloned->erase();
     }
-    if (failed(loopInfo->performPostTransformationAction(topLevelModule)))
-      topLevelModule.emitError("Failed to apply post transformation action");
   }
   topLevelModule->removeAttr(
       transform::TransformDialect::kWithNamedSequenceAttrName);
+
+  if (failed(applyRemoveDummyStore(topLevelModule)))
+    signalPassFailure();
 
   if (failed(mergeConsecutiveInsertExtractSlice(topLevelModule)))
     signalPassFailure();
