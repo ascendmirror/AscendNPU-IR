@@ -240,4 +240,49 @@ def GatherOp
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// Conv1DOp
+//===----------------------------------------------------------------------===//
+
+def Conv1DOp
+    : HFusionStructuredBase_Op<
+          "conv1d", [AllElementTypesMatch<["input","weight","bias", "init"]>,
+                     ResultOnlyIfTensor,
+                     BiShengIRAggregatedOpInterface]>
+{
+
+  let description = [{
+    conv1d
+    }];
+  let arguments = (ins AnyShaped:$input,
+                       AnyShaped:$weight,
+                       Optional<AnyShaped>:$bias,
+                       AnyShaped:$init,
+                       I32Attr:$stride,
+                       I32Attr:$padding,
+                       I32Attr:$dilation,
+                       I32Attr:$groups);
+  let results = (outs AnyTensor:$result);
+  let regions = (region AnyRegion:$region);
+  let skipDefaultBuilders = 1;
+  let builders = [OpBuilder<
+                    (ins "ValueRange":$inputs,
+                         "Value":$output,
+                         "int32_t":$stride,
+                         "int32_t":$padding,
+                         "int32_t":$dilation,
+                         "int32_t":$groups)>];
+  let hasCustomAssemblyFormat = 1;
+  let extraClassDeclaration = structuredOpsBaseDecls#[{
+    // Declare functions necessary for DestinationStyleOpInterface.
+    ::mlir::MutableOperandRange getDpsInitsMutable();
+    // Declare functions necessary for LinalgStructuredInterface.
+    SmallVector<utils::IteratorType> getIteratorTypesArray();
+    ArrayAttr getIndexingMaps();
+    static std::function<void(mlir::ImplicitLocOpBuilder &, mlir::Block &,
+                              mlir::ArrayRef<mlir::NamedAttribute>)>
+    getRegionBuilder();
+  }];
+}
+
 #endif // BISHENGIR_DIALECT_HFUSION_IR_HFUSIONSTRUCTUREDOPS_TD
