@@ -15,26 +15,24 @@
 //
 //============================================================================//
 
+#include "bishengir/Dialect/HIVM/IR/HIVM.h"
 #include "bishengir/Dialect/HIVM/IR/HIVMImpl.h"
 #include "bishengir/Dialect/HIVM/Transforms/BubbleUpExtractSlice/CSEPattern.h"
-#include "bishengir/Dialect/HIVM/Transforms/BubbleUpExtractSlice/MoveUpAffineMap.h"
+#include "bishengir/Dialect/HIVM/Transforms/BubbleUpExtractSlice/MoveUpAffine.h"
 #include "bishengir/Dialect/HIVM/Transforms/BubbleUpExtractSlice/Pattern.h"
 #include "bishengir/Dialect/HIVM/Transforms/Passes.h"
-#include "bishengir/Dialect/HIVM/Transforms/TileAndBindSubBlock/Helper.h"
 #include "bishengir/Dialect/HIVM/Utils/Utils.h"
 #include "bishengir/Transforms/Passes.h"
 #include "bishengir/Transforms/Transforms.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/IR/AsmState.h"
-#include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/Value.h"
-#include "mlir/IR/Visitors.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#include "llvm/Support/Casting.h"
+#include "llvm/Support/LogicalResult.h"
 
 namespace mlir {
 #define GEN_PASS_DEF_HIVMBUBBLEUPEXTRACTSLICE
@@ -58,79 +56,69 @@ public:
     return !traceDefOp<memref::AllocOp>(value).has_value();
   }
 
+ // If the bubble-up-ed extract slice op was "stuck" in the middle, return
+ // failure.
   LogicalResult
   verifyMarkedExtractSlicesAreBubbledUp(func::FuncOp funcOp) const {
-    auto walkResult = funcOp->walk([](Operation *op) {
-      if (!isa<tensor::ExtractSliceOp>(op)) {
+    auto walkResult = funcOp->walk([&](tensor::ExtractSliceOp extractSliceOp) {
+      if (!extractSliceOp->hasAttrOfType<UnitAttr>("bubbled_slice"))
         return WalkResult::advance();
-      }
-      auto extractSliceOp = cast<tensor::ExtractSliceOp>(op);
 
-      if (extractSliceOp->hasAttrOfType<UnitAttr>(toBeBubbleUpSlice)) {
-        auto extractSrc = extractSliceOp->getOperand(0);
-        if (isa<BlockArgument>(extractSrc)) {
-          return WalkResult::advance();
-        }
-        if (failed(findContainingSubblockLoop(extractSrc.getDefiningOp()))) {
-          return WalkResult::advance();
-        }
-        if (auto bufferizeToTensor = dyn_cast<bufferization::ToTensorOp>(
-                (extractSrc.getDefiningOp()))) {
-          if (!traceAndCheckIsGM(bufferizeToTensor->getOperand(0))) {
-            return WalkResult::interrupt();
-          } else {
-            return WalkResult::advance();
-          }
-        }
-        if (!isa<tensor::EmptyOp>(extractSrc.getDefiningOp())) {
-          return WalkResult::interrupt();
-        }
-      }
-      return WalkResult::advance();
-    });
-    if (walkResult.wasInterrupted()) {
-      return failure();
-    }
-    return success();
+      auto extractSrc = extractSliceOp->getOperand(0);
+      if (isa<BlockArgument>(extractSrc))
+        return WalkResult::advance();
+
+      if (!isa<bufferization::ToTensorOp, tensor::EmptyOp>(
+              extractSrc.getDefiningOp())) {
+        extractSliceOp.emitOpError() << "not bubbled up";
+        return WalkResult::interrupt();
+       }
+       return WalkResult::advance();
+     });
+
+    return failure(walkResult.wasInterrupted());
   }
 
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
+
     GreedyRewriteConfig config;
+    BubbleUpListener listener = BubbleUpListener();
     config.maxIterations = 50;
-    // Apply bubble up patterns
-    RewritePatternSet patterns(funcOp.getContext());
-    populateMoveUpAffineMapPattern(patterns);
-    populateBubbleUpExtractSliceOpPatterns(patterns);
-    populateCSEPattern(patterns);
-    tensor::populateFoldTensorEmptyPatterns(patterns, true);
-    if (failed(applyPatternsGreedily(funcOp, std::move(patterns), config))) {
-      return signalPassFailure();
-    }
-    PassManager pm(funcOp->getContext());
-    CanonicalizerOptions options;
-    SmallVector<std::string> disabledPatterns(
-        {"ReinterpretCastConstantArgumentFolder"});
-    options.disabledPatterns = disabledPatterns;
-    pm.addPass(bishengir::createExtendedCanonicalizerPass(options));
-    pm.addPass(createCSEPass());
-    if (failed(pm.run(funcOp))) {
-      return signalPassFailure();
-    }
-    // Apply bubble up once more, because canonicalize might bring more
-    // opportunity.
-    RewritePatternSet patterns2(funcOp.getContext());
-    populateMoveUpAffineMapPattern(patterns2);
-    populateBubbleUpExtractSliceOpPatterns(patterns2);
-    populateCSEPattern(patterns2);
-    tensor::populateFoldTensorEmptyPatterns(patterns2, true);
-    if (failed(applyPatternsGreedily(funcOp, std::move(patterns2), config))) {
-      return signalPassFailure();
-    }
+    config.listener = &listener;
+
+    bool isChanged;
+    int64_t iterationCount = 0;
+    int64_t maxIterations = 5;
+    do {
+      isChanged = false;
+      // Apply canonicalization
+      PassManager pm(funcOp->getContext());
+      pm.addPass(createCanonicalizerPass());
+      pm.addPass(createCSEPass());
+      if (failed(pm.run(funcOp)))
+        return signalPassFailure();
+
+      // Apply bubble up patterns
+      RewritePatternSet patterns(funcOp.getContext());
+      populateHoistAffinePattern(patterns);
+      populateBubbleUpExtractSliceOpPatterns(patterns);
+      populateCSEPattern(patterns);
+      tensor::populateFoldTensorEmptyPatterns(patterns,
+                                              /*foldSingleUseOnly=*/true);
+      tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns),
+                                              config, &isChanged)))
+        return signalPassFailure();
+
+      iterationCount++;
+    } while (isChanged && iterationCount < maxIterations);
+
     if (failed(verifyMarkedExtractSlicesAreBubbledUp(funcOp))) {
-      return signalPassFailure();
-    }
-  }
+      funcOp.emitOpError("some slice ops were not bubbled up");
+       return signalPassFailure();
+     }
+   }
 
 private:
   void
@@ -145,7 +133,6 @@ private:
     strategies.push_back(std::make_shared<CollapseBubbleUpStrategy>());
     strategies.push_back(std::make_shared<ElementwiseBubbleUpStrategy>());
     strategies.push_back(std::make_shared<LoopBubbleUpStrategy>());
-    strategies.push_back(std::make_shared<LoopArgsBubbleUpStrategy>());
     strategies.push_back(std::make_shared<ExtractSliceBubbleUpStrategy>());
     strategies.push_back(std::make_shared<InsertSliceBubbleUpStrategy>());
 

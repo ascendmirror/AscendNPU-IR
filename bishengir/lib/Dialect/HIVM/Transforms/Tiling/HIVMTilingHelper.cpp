@@ -21,8 +21,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "bishengir/Dialect/HIVM/Transforms/HIVMTilingInterfaceImpl.h"
-
-#include "bishengir/Dialect/HIVM/IR/HIVM.h"
 #include "bishengir/Dialect/Utils/Util.h"
 #include "llvm/ADT/TypeSwitch.h"
 
