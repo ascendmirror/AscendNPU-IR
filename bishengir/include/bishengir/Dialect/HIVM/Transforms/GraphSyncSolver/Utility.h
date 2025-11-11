@@ -45,12 +45,16 @@ struct Occurrence {
       : op(op), parentOcc(parentOcc), depth(depth), startIndex(startIndex),
         endIndex(endIdx) {}
 
+  // Return true if occ1 and occ2 have the same immediate parent occurrence.
   static bool sameScope(Occurrence *occ1, Occurrence *occ2);
 
+  // Return depth (number of ancestors + 1) for the given occurrence.
   static int getDepth(Occurrence *occ);
 
+  // Walk up parents to find the first ancestor occurrence associated with 'op'.
   Occurrence *getParentWithOp(OperationBase *op);
 
+  // Return the ancestor that is `dist` levels above this occurrence.
   Occurrence *getNthParent(int dist);
 
   static llvm::DenseMap<std::pair<Occurrence *, Occurrence *>,
@@ -59,15 +63,20 @@ struct Occurrence {
 
   static void resetLCAMem() { getLCAOccMem.clear(); }
 
+  // Compute/return the pair of sibling occurrences just below their LCA.
   static std::pair<Occurrence *, Occurrence *> getLCAPair(Occurrence *occ1,
                                                           Occurrence *occ2);
 
+  // Find and return the nearest parent occurrence that is a loop.
   static Occurrence *getParentloop(Occurrence *occ);
 
+  // Find and return the nearest parent occurrence that is a condition.
   static Occurrence *getParentCondition(Occurrence *occ);
 
+  // Return true if this occurrence is a strict ancestor of `occ`.
   bool isProperAncestor(Occurrence *occ);
 
+  // Collect and return all occurrence parents (in upward order).
   std::vector<Occurrence *> getAllParents();
 };
 
@@ -107,8 +116,11 @@ struct ConflictPair {
 
   bool isBarrier() const { return setPipe == waitPipe; }
 
+  // Human-readable description of the conflict pair for debug printing.
   std::string str() const;
 
+  // Update the stored set/wait operation pointers and their indices from
+  // occurrences.
   void updateSetWaitOps(Occurrence *setOcc, Occurrence *waitOcc) {
     if (setOcc != nullptr) {
       opSet = setOcc->op;
@@ -160,25 +172,37 @@ struct MmadL1SyncArgs {
   Value BackPipeMPipeMTE1Event1;
 };
 
+// Check if two integer ranges intersect.
 bool checkIntersect(int l1, int r1, int l2, int r2);
 
+// Check whether two ConflictPair ranges/event mapping intersect (same
+// pipes/events).
 bool checkIntersect(ConflictPair *conflictPair1, ConflictPair *conflictPair2);
 
+// Return explicit integer ranges covered by a conflict pair (empty for
+// barrier).
 std::vector<std::pair<int, int>> getRanges(ConflictPair *conflictPair);
 
+// Return hardware-available EVENT ids for a given (setPipe, waitPipe) pair.
 llvm::SmallVector<hivm::EVENT> getHWAvailableEventIds(hivm::PIPE setPipe,
                                                       hivm::PIPE waitPipe);
 
+// Create a boolean Value that is true for the first iteration of `forOp`.
 Value getIsFirstIterationValue(scf::ForOp forOp, Location loc,
                                IRRewriter &rewriter);
 
+// Create a boolean Value that is true for the last iteration of `forOp`.
 Value getIsLastIterationValue(scf::ForOp forOp, Location loc,
                               IRRewriter &rewriter);
 
+// Helper to stringify a Value to std::string for logging.
 std::string op2str(Value val);
 
+// Helper to stringify an Operation pointer to std::string for logging.
 std::string op2str(Operation *op);
 
+// Verify that all loop-like parents of `op` are SCF ForOps (returns true if
+// so).
 bool checkAllLoopParentsAreForLoops(Operation *op);
 
 } // namespace mlir::hivm::syncsolver

@@ -37,6 +37,8 @@
 using namespace mlir;
 using namespace hivm::syncsolver;
 
+// Choose where to insert generated sync ops (handles function-scope, ghost
+// blocks, op-based insertion).
 void Solver::setProperInsertionPoint(IRRewriter &rewriter,
                                      OperationBase *opBase,
                                      bool insertAfterOp) {
@@ -65,6 +67,7 @@ void Solver::setProperInsertionPoint(IRRewriter &rewriter,
   }
 }
 
+// Determine a proper Location for newly generated ops based on opBase context.
 Location Solver::getProperLoc(OperationBase *opBase) {
   assert(opBase != nullptr);
   if (auto *ghostOp = dyn_cast<Ghost>(opBase)) {
@@ -77,6 +80,7 @@ Location Solver::getProperLoc(OperationBase *opBase) {
   return opBase->op->getLoc();
 }
 
+// Insert a PipeBarrierOp at the resolved insertion point and location.
 void Solver::insertBarrierOp(IRRewriter &rewriter, OperationBase *opBase,
                              BarrierOp *barrierOp, bool insertAfterOp) {
   assert(opBase != nullptr && barrierOp != nullptr);
@@ -86,6 +90,8 @@ void Solver::insertBarrierOp(IRRewriter &rewriter, OperationBase *opBase,
   rewriter.create<hivm::PipeBarrierOp>(loc, pipe);
 }
 
+// Insert SetFlagOp(s) handling multi-buffer and conditional (first/last iter)
+// wrapping.
 void Solver::insertSetFlagOp(IRRewriter &rewriter, OperationBase *opBase,
                              SetFlagOp *setFlagOp, bool insertAfterOp) {
   assert(opBase != nullptr && setFlagOp != nullptr);
@@ -121,6 +127,7 @@ void Solver::insertSetFlagOp(IRRewriter &rewriter, OperationBase *opBase,
   }
 }
 
+// Insert WaitFlagOp(s) handling multi-buffer and conditional wrapping.
 void Solver::insertWaitFlagOp(IRRewriter &rewriter, OperationBase *opBase,
                               WaitFlagOp *waitFlagOp, bool insertAfterOp) {
   assert(opBase != nullptr && waitFlagOp != nullptr);
@@ -156,6 +163,8 @@ void Solver::insertWaitFlagOp(IRRewriter &rewriter, OperationBase *opBase,
   }
 }
 
+// Build/select a runtime i64 value that picks which buffer/event to use for
+// multi-buffer sync.
 Value Solver::getMultiBufferSelectOp(IRRewriter &rewriter, SetWaitOp *syncOp) {
   assert(syncOp != nullptr);
   assert(syncOp->eventIds.size() == 2);
@@ -187,6 +196,7 @@ Value Solver::getMultiBufferSelectOp(IRRewriter &rewriter, SetWaitOp *syncOp) {
   return bufferSelected;
 }
 
+// Helper wrappers for explicit multi-buffer insertion variants.
 void Solver::insertMultiBufferSetFlagOp(IRRewriter &rewriter,
                                         OperationBase *opBase,
                                         SetFlagOp *setFlagOp,
@@ -223,6 +233,8 @@ void Solver::insertMultiBufferWaitFlagOp(IRRewriter &rewriter,
                                     selectedBuffer);
 }
 
+// Get an event id Value for a given SetWaitOp (creates constant or uses
+// select).
 Value Solver::getEventIdValue(IRRewriter &rewriter, SetWaitOp *setWaitOp,
                               Location loc) {
   assert(setWaitOp != nullptr);
@@ -236,6 +248,8 @@ Value Solver::getEventIdValue(IRRewriter &rewriter, SetWaitOp *setWaitOp,
       rewriter.getI64Type());
 }
 
+// Attempt to attach sync args to MmadL1 ops by recognizing special load L0 / L1
+// patterns.
 llvm::LogicalResult Solver::handleMmadL1SyncOps(IRRewriter &rewriter,
                                                 OperationBase *opBase,
                                                 SyncOp *syncOp) {
@@ -283,6 +297,7 @@ Value Solver::getLoopDBCond(IRRewriter &rewriter, Operation *op) {
   return loopDBCondMap[parentLoop] = createNestedIndexForOp(rewriter, op);
 }
 
+// Create and propagate sync args into MmadL1 op arguments.
 void Solver::insertMmadL1SyncArgs(IRRewriter &rewriter) {
   for (auto &[mmadL1Op, syncArgs] : mmadl1SyncArgsMap) {
     rewriter.setInsertionPoint(mmadL1Op);
@@ -306,6 +321,8 @@ void Solver::insertMmadL1SyncArgs(IRRewriter &rewriter) {
   }
 }
 
+// Unit-flag helpers: compute final mode and create runtime conditions if
+// needed.
 hivm::UNIT_FLAG Solver::getUnitFlagMode(RWOperation *rwOp) {
   static DenseMap<std::pair<UNIT_FLAG, UNIT_FLAG>, UNIT_FLAG> possibleStates = {
       {std::make_pair(UNIT_FLAG::DISABLED, UNIT_FLAG::DISABLED),
@@ -416,6 +433,7 @@ void Solver::handleUnitFlagEnabledOps(IRRewriter &rewriter) {
   }
 }
 
+// Insert a PIPE_ALL barrier before function return.
 void Solver::insertBarrierAllBeforeReturn(IRRewriter &rewriter) {
   auto returnOp = utils::getAssumedUniqueReturnOp(func);
   assert(returnOp != nullptr);
@@ -425,6 +443,7 @@ void Solver::insertBarrierAllBeforeReturn(IRRewriter &rewriter) {
   rewriter.create<hivm::PipeBarrierOp>(loc, pipe);
 }
 
+// Collect indices for all Set/Wait ops to facilitate merging decisions.
 void Solver::collectSetWaitOpsIndexes(OperationBase *op, SyncMap &syncMapBefore,
                                       SyncMap &syncMapAfter) {
   assert(op != nullptr);
@@ -470,6 +489,7 @@ void Solver::resetAndBuildSetWaitOpIndex(SyncMap &syncMapBefore,
   collectSetWaitOpsIndexes(funcIr.get(), syncMapBefore, syncMapAfter);
 }
 
+// Check whether a backward-sync event id can be merged at scope level.
 bool Solver::checkMergeable(Scope *scopeOp, hivm::PIPE pipeSrc,
                             hivm::PIPE pipeDst, hivm::EVENT eventId,
                             bool shouldBeUsedAtleastOnce) {
@@ -529,6 +549,7 @@ bool Solver::checkMergeable(Scope *scopeOp, hivm::PIPE pipeSrc,
   return true;
 }
 
+// Attempt to merge backward sync events across children and prune duplicates.
 void Solver::mergeBackwardSyncEventIds(OperationBase *op) {
   auto *scopeOp = llvm::dyn_cast_if_present<Scope>(op);
   if (scopeOp == nullptr) {
@@ -675,6 +696,7 @@ SyncBeforeAfterMap Solver::getBeforeAfterSyncMaps() {
   return std::make_pair(std::move(syncMapBefore), std::move(syncMapAfter));
 }
 
+// Generate MLIR ops from computed sync maps (inserting via rewriter).
 void Solver::generateResultOps() {
   IRRewriter rewriter(func->getContext());
   auto [syncMapBefore, syncMapAfter] = getBeforeAfterSyncMaps();
@@ -708,6 +730,7 @@ void Solver::generateResultOps() {
   insertBarrierAllBeforeReturn(rewriter);
 }
 
+// Insert generated sync ops into funcIr (in-memory IR) for testing/inspection.
 void Solver::generateFuncIrResultOps() {
   auto [syncMapBefore, syncMapAfter] = getBeforeAfterSyncMaps();
   for (auto &e : syncMapBefore) {

@@ -100,8 +100,10 @@ public:
     randGenerator = std::make_unique<std::mt19937>(this->seed);
   }
 
+  // Generate a full solver test, run the solver and simulate the result.
   llvm::LogicalResult test();
 
+  // Helper to toggle running as test mode (external use).
   static bool runTestMode();
 
 private:
@@ -139,14 +141,20 @@ private:
     return (rnd % b) < a;
   }
 
+  // Produce a randomly generated IR (OperationBase tree) used by the tester.
   std::unique_ptr<OperationBase> getGeneratedRandomTest();
 
+  // Recursively create a random region body (scopes/loops/cond/rw ops).
   void generateRandTest(Scope *scopeOp, const std::vector<int> &pointerOps,
                         const std::vector<hivm::PIPE> &pipesVec, int &remOpNum,
                         int depth);
 
+  // Walk the generated IR and place operations into pipeline queues for
+  // simulation.
   void fillPipelines(const OperationBase *op, int loopCnt = 0, int loopIdx = 0);
 
+  // Simulate execution of queued pipeline operations, checking for memory/sync
+  // conflicts.
   llvm::LogicalResult runSimulation(int runId, bool debugPrint = false);
 };
 

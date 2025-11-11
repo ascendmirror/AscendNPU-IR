@@ -33,6 +33,8 @@
 using namespace mlir;
 using namespace hivm::syncsolver;
 
+// Random test IR generator: recursively builds scopes, loops, conditions and RW
+// ops. Used by the tester to create synthetic cases exercising the solver.
 void SyncTester::generateRandTest(Scope *scopeOp,
                                   const std::vector<int> &pointerOps,
                                   const std::vector<hivm::PIPE> &pipesVec,
@@ -148,6 +150,8 @@ std::unique_ptr<OperationBase> SyncTester::getGeneratedRandomTest() {
   return funcIr;
 }
 
+// Walk generated IR and populate per-pipeline queues. The produced queues are
+// consumed by runSimulation to emulate runtime ordering and check conflicts.
 void SyncTester::fillPipelines(const OperationBase *op, int loopCnt,
                                int loopIdx) {
 
@@ -239,6 +243,8 @@ void SyncTester::fillPipelines(const OperationBase *op, int loopCnt,
   }
 }
 
+// Simulate execution of pipeline queues, detect memory and synchronization
+// violations. Returns success when no conflicts occur for the run.
 llvm::LogicalResult SyncTester::runSimulation(int runId, bool debugPrint) {
 
   auto compairPipelines = [&](const hivm::PIPE &pipe1,
@@ -555,6 +561,8 @@ llvm::LogicalResult SyncTester::runSimulation(int runId, bool debugPrint) {
   return success();
 }
 
+// High-level test runner: generate random test, run solver, generate result
+// ops, and run multiple simulation runs to verify correctness.
 llvm::LogicalResult SyncTester::test() {
   llvm::outs() << "generated test with: "
                << " seed(" << seed << ")"

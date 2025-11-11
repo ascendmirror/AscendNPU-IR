@@ -35,6 +35,7 @@
 using namespace mlir;
 using namespace hivm::syncsolver;
 
+// Lightweight memory-conflict checker used by the test harness (integer ptr model).
 bool Solver::checkTestRWMemoryConflicts(
     const llvm::SmallVector<llvm::SmallVector<int>> &memValsList1,
     const llvm::SmallVector<llvm::SmallVector<int>> &memValsList2) {
@@ -52,6 +53,8 @@ bool Solver::checkTestRWMemoryConflicts(
   return false;
 }
 
+// Compute candidate pipe pairs for memory conflicts between two RW operations
+// using the test-model memory lists.
 std::vector<std::pair<hivm::PIPE, hivm::PIPE>>
 Solver::checkTestMemoryConflicts(RWOperation *rwOp1, RWOperation *rwOp2) {
   assert(rwOp1 != nullptr && rwOp2 != nullptr);
@@ -76,6 +79,8 @@ Solver::checkTestMemoryConflicts(RWOperation *rwOp1, RWOperation *rwOp2) {
   return it->second = collectedConflicts;
 }
 
+// Validate whether a chosen eventIdNum avoids conflicts across repeating
+// memory access patterns (LCM coverage check).
 bool Solver::checkEventIdNum(
     const llvm::SmallVector<llvm::SmallVector<int>> &memValsList1,
     const llvm::SmallVector<llvm::SmallVector<int>> &memValsList2, int lcmLen,
@@ -100,6 +105,7 @@ bool Solver::checkEventIdNum(
   return true;
 }
 
+// Find maximum safe number of event ids for two RW test ops based on shapes.
 uint32_t Solver::getTestEventIdNum(RWOperation *rwOp1, RWOperation *rwOp2) {
   int lcm = 1;
   int minWriteSize = INT_MAX;
@@ -139,6 +145,7 @@ uint32_t Solver::getTestEventIdNum(RWOperation *rwOp1, RWOperation *rwOp2) {
   return eventIdNum;
 }
 
+// Test-mode variant of getTestEventIdNum that uses occurrences (wraps ops).
 uint32_t Solver::getTestEventIdNum(Occurrence *occ1, Occurrence *occ2,
                                    hivm::PIPE setPipe, hivm::PIPE waitPipe) {
   assert(occ1 != nullptr && occ2 != nullptr);
@@ -175,6 +182,7 @@ uint32_t Solver::getTestEventIdNum(Occurrence *occ1, Occurrence *occ2,
   return getTestEventIdNum(rwOp1, rwOp2);
 }
 
+// Process the processing orders in test mode, discover conflicts and call the handler.
 void Solver::processOrdersTest() {
   for (auto &[curOcc, start, end, reverseOrder, isUseless, skip] :
        processingOrders) {
@@ -249,6 +257,7 @@ void Solver::processOrdersTest() {
   }
 }
 
+// Orchestrate iterative test-mode solving passes and optional merging behavior.
 void Solver::solveTest(int runNum) {
   LLVM_DEBUG(llvm::dbgs() << "runNum: " << runNum << '\n');
   processOrdersTest();
@@ -288,6 +297,7 @@ void Solver::solveTest(int runNum) {
   }
 }
 
+// If environment indicates tester mode, parse env vars and run SyncTester.
 bool SyncTester::runTestMode() {
   bool testMode = false;
   auto *testModeEnvVar = getenv("BISHENGIR_GSS_TESTER");

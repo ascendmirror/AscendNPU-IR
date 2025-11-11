@@ -26,6 +26,8 @@
 using namespace mlir;
 using namespace hivm::syncsolver;
 
+// Compare edges (used for ordered sets). Edges must share endpoints when
+// compared.
 bool GraphSolver::Edge::operator<(const Edge &other) const {
   assert(pipeFromId == other.pipeFromId && pipeToId == other.pipeToId);
   if (startIndex != other.startIndex) {
@@ -34,12 +36,15 @@ bool GraphSolver::Edge::operator<(const Edge &other) const {
   return endIndex < other.endIndex;
 }
 
+// Add an adjacency edge annotated with an active index interval.
 void GraphSolver::addPair(hivm::PIPE startPipeId, hivm::PIPE endPipeId,
                           int startIndex, int endIndex) {
   Edge edge(startPipeId, endPipeId, startIndex, endIndex);
   adjacencyList[startPipeId][endPipeId].insert(edge);
 }
 
+// Convert a ConflictPair into adjacency edges (handles PIPE_ALL
+// special-casing).
 void GraphSolver::addConflictPair(ConflictPair *conflictPair) {
   assert(conflictPair != nullptr);
   if (conflictPair->isBarrier() &&
@@ -61,6 +66,7 @@ void GraphSolver::addConflictPair(ConflictPair *conflictPair) {
   }
 }
 
+// Compact adjacency lists by removing dominated edges to accelerate queries.
 void GraphSolver::optimizeAdjacencyList() {
   for (auto &[startPipeId, toMap] : adjacencyList) {
     for (auto &[endPipeId, edges] : toMap) {
@@ -77,6 +83,9 @@ void GraphSolver::optimizeAdjacencyList() {
   }
 }
 
+// Run a Dijkstra-like search over pipes using index intervals as
+// weights/constraints. Returns minimal reachable index for endPipe or empty
+// optional if unreachable.
 std::optional<int> GraphSolver::runDijkstra(hivm::PIPE startPipe,
                                             hivm::PIPE endPipe, int startIndex,
                                             int maxDistance) {

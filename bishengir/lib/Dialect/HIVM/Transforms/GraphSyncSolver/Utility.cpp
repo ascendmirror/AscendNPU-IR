@@ -210,11 +210,13 @@ bool OperationBase::isProperAncestor(OperationBase *op) {
 
 namespace mlir::hivm::syncsolver {
 
+// Check if two integer ranges intersect (half-open semantics: [l, r) )
 bool checkIntersect(int l1, int r1, int l2, int r2) {
   // return !(r1 <= l2 || r2 <= l1);
   return r1 > l2 && r2 > l1;
 }
 
+// Check whether two ConflictPair entries conflict in pipe and time ranges.
 bool checkIntersect(ConflictPair *conflictPair1, ConflictPair *conflictPair2) {
   assert(conflictPair1 != nullptr && conflictPair2 != nullptr);
   if (conflictPair1->setPipe != conflictPair2->setPipe ||
@@ -231,6 +233,7 @@ bool checkIntersect(ConflictPair *conflictPair1, ConflictPair *conflictPair2) {
   return false;
 }
 
+// Return explicit integer ranges covered by a conflict pair (barrier -> empty).
 std::vector<std::pair<int, int>> getRanges(ConflictPair *conflictPair) {
   assert(conflictPair != nullptr);
   if (conflictPair->isBarrier()) {
@@ -241,6 +244,9 @@ std::vector<std::pair<int, int>> getRanges(ConflictPair *conflictPair) {
   return ret;
 }
 
+// Return the hardware-available EVENT ids for a given (setPipe, waitPipe) pair.
+// Respects reserved ids for special pipe pairs and returns a vector of usable
+// ids.
 SmallVector<hivm::EVENT> getHWAvailableEventIds(hivm::PIPE setPipe,
                                                 hivm::PIPE waitPipe) {
   const llvm::DenseMap<std::pair<hivm::PIPE, hivm::PIPE>, uint64_t>
@@ -262,6 +268,8 @@ SmallVector<hivm::EVENT> getHWAvailableEventIds(hivm::PIPE setPipe,
   return hwAvailableEventIds;
 }
 
+// Build a Value that is true for the first iteration of the given scf::ForOp.
+// Inserted at the start of the loop body and compares induction var with lower.
 Value getIsFirstIterationValue(scf::ForOp forOp, Location loc,
                                IRRewriter &rewriter) {
   OpBuilder::InsertionGuard guard(rewriter);
@@ -273,6 +281,8 @@ Value getIsFirstIterationValue(scf::ForOp forOp, Location loc,
   return isFirstIter;
 }
 
+// Build a Value that is true for the last iteration of the given scf::ForOp.
+// Compares next induction value with the upper bound.
 Value getIsLastIterationValue(scf::ForOp forOp, Location loc,
                               IRRewriter &rewriter) {
   OpBuilder::InsertionGuard guard(rewriter);
@@ -286,6 +296,7 @@ Value getIsLastIterationValue(scf::ForOp forOp, Location loc,
   return isLastIter;
 }
 
+// Convert a Value to its string representation for debugging/logging.
 std::string op2str(Value val) {
   std::string printBuffer;
   llvm::raw_string_ostream os(printBuffer);
@@ -293,6 +304,7 @@ std::string op2str(Value val) {
   return os.str();
 }
 
+// Convert an Operation pointer to its string representation.
 std::string op2str(Operation *op) {
   std::string printBuffer;
   llvm::raw_string_ostream os(printBuffer);
@@ -300,6 +312,8 @@ std::string op2str(Operation *op) {
   return os.str();
 }
 
+// Verify that all loop-like parents of `op` are SCF ForOps. Used to ensure
+// certain multi-buffer/loop transformations are safe to apply.
 bool checkAllLoopParentsAreForLoops(Operation *op) {
   while (op != nullptr) {
     auto parLoop = op->getParentOfType<LoopLikeOpInterface>();

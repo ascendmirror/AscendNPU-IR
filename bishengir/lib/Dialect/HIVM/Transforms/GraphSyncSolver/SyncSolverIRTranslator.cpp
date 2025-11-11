@@ -45,6 +45,9 @@
 using namespace mlir;
 using namespace hivm::syncsolver;
 
+// Resolve a Value into the underlying pointer-like Values used for memory
+// conflict analysis (handles block args, selects, scf::If, scf::For/While
+// results etc.).
 llvm::SmallVector<Value> Solver::collectPointerOps(Value val) {
   if (auto blockArg = dyn_cast<BlockArgument>(val)) {
     if (auto forOp = dyn_cast_if_present<scf::ForOp>(
@@ -131,6 +134,7 @@ llvm::SmallVector<Value> Solver::collectPointerOps(Value val) {
   return {};
 }
 
+// Collect pointer operands for a vector of Values (flattening aliases).
 llvm::SmallVector<Value> Solver::getMemOps(const SmallVector<Value> &vals) {
   SmallVector<Value> collectedOps;
   for (auto val : vals) {
@@ -141,6 +145,8 @@ llvm::SmallVector<Value> Solver::getMemOps(const SmallVector<Value> &vals) {
   return collectedOps;
 }
 
+// Return read/write memory operands for a generic operation by consulting
+// DestinationStyleOpInterface and ExtraBufferOpInterface.
 std::pair<llvm::SmallVector<Value>, llvm::SmallVector<Value>>
 Solver::getReadWriteMemOps(Operation *op) {
   assert(op != nullptr);
@@ -157,6 +163,7 @@ Solver::getReadWriteMemOps(Operation *op) {
   return std::make_pair(readMemVals, writeMemVals);
 }
 
+// Wrap memref/affine load/store into RWOperation nodes when appropriate.
 template <typename OP>
 typename std::enable_if<std::is_same_v<OP, memref::LoadOp> ||
                             std::is_same_v<OP, affine::AffineLoadOp> ||
@@ -188,6 +195,8 @@ Solver::getLoadStoreOp(OP *loadStoreOp, OperationBase *parentOp) {
   return rwOp;
 }
 
+// Decompose specific MmadL1 ops into a small inline sequence in the IR for
+// easier sync handling.
 std::unique_ptr<OperationBase>
 Solver::getDecomposedMmadl1(hivm::MmadL1Op mmadl1Op, OperationBase *parentOp) {
   auto mmadl1LoopOp = std::make_unique<MmadL1LoopOp>(mmadl1Op, parentOp);
@@ -224,6 +233,7 @@ Solver::getDecomposedMmadl1(hivm::MmadL1Op mmadl1Op, OperationBase *parentOp) {
   return mmadl1LoopOp;
 }
 
+// Build a Scope tree (funcIr) from MLIR Region recursively.
 std::unique_ptr<Scope> Solver::funcIrBuilder(Region &region,
                                              OperationBase *parentOp) {
   auto scopeOp = std::make_unique<Scope>();
@@ -301,6 +311,8 @@ std::unique_ptr<Scope> Solver::funcIrBuilder(Region &region,
   return scopeOp;
 }
 
+// Various processing-order and sync IR builder helpers
+// (generateProcessingOrders, syncIrBuilder).
 void Solver::generateProcessingOrders(Occurrence *scopeOcc, int l, int r,
                                       bool isUseless) {
   int start = scopeOcc->syncIrIndex;
@@ -357,6 +369,8 @@ void Solver::generateProcessingOrders(int l1, int r1, int l2, int r2,
   }
 }
 
+// Build the linearized sync IR (syncIr) and record occurrence ranges for
+// analysis.
 void Solver::syncIrBuilder(OperationBase *op, Occurrence *parentOcc, int depth,
                            bool isUseless) {
   assert(op != nullptr);
@@ -414,6 +428,8 @@ void Solver::syncIrBuilder(OperationBase *op, Occurrence *parentOcc, int depth,
   occPtr->syncIrEndIndex = syncIr.size();
 }
 
+// Helpers to find first/last iteration occurrences relative to parent
+// occurrences.
 Occurrence *Solver::getFirstIterOcc(Occurrence *occ, Occurrence *parOcc) {
   assert(occ != nullptr && parOcc != nullptr);
   if (parOcc->depth + 1 < occ->depth) {

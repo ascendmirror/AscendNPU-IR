@@ -69,6 +69,7 @@ public:
   OperationBase *parentOp{nullptr};
 
 private:
+  // Monotonic id allocator used to assign stable ids to in-memory ops.
   static int globalIndex;
 
 public:
@@ -81,29 +82,41 @@ public:
 public:
   virtual ~OperationBase() = default;
 
+  // Return true when op1 and op2 share the same immediate parent operation.
   static bool sameScope(OperationBase *op1, OperationBase *op2);
 
+  // Compute the depth (levels up to root) of the provided operation.
   static int getDepth(OperationBase *op);
 
+  // Return the ancestor `dist` levels above this operation.
   OperationBase *getNthParent(int dist);
 
+  // Cache mapping pair<op1,op2> -> pair<op_below_lca_op1, op_below_lca_op2>
+  // used to avoid repeated LCA walks between operation pairs.
   static llvm::DenseMap<std::pair<OperationBase *, OperationBase *>,
                         std::pair<OperationBase *, OperationBase *>>
       getLCAOpMem;
 
   static void resetLCAMem() { getLCAOpMem.clear(); }
 
+  // Given two operations, return the pair of operations directly below their
+  // LCA.
   static std::pair<OperationBase *, OperationBase *>
   getLCAPair(OperationBase *op1, OperationBase *op2);
 
+  // Find nearest parent operation that is a loop-like construct, or nullptr.
   static OperationBase *getParentloop(OperationBase *op);
 
+  // Find the nearest parent condition operation, or nullptr.
   static OperationBase *getParentCondition(OperationBase *op);
 
+  // Return true if this operation is a strict ancestor of `op`.
   bool isProperAncestor(OperationBase *op);
 
+  // Collect and return all parent operations (walking upwards).
   std::vector<OperationBase *> getAllParents();
 
+  // Human-readable string representation (override in derived classes).
   virtual std::string str(int indent = 0, bool recursive = false) const = 0;
 };
 
@@ -415,6 +428,7 @@ public:
   std::string str(int indent, bool recursive) const override;
 };
 
+// Bool comparator for sync ops ordering (used for containers).
 bool operator<(const SyncOp &op1, const SyncOp &op2);
 } // namespace mlir::hivm::syncsolver
 

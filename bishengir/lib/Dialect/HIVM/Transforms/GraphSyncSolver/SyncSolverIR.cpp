@@ -25,6 +25,7 @@ namespace mlir::hivm::syncsolver {
 
 int OperationBase::globalIndex = 0;
 
+// Map OpType enum to human-readable strings for debugging output.
 std::string getOpTypeStr(OpType opType) {
   std::map<OpType, std::string> conv = {
       {OpType::OPERATION, "OperationBase"},
@@ -60,6 +61,8 @@ struct Comma {
   }
 };
 
+// Provide readable string representations for IR nodes used in logs and dumps.
+// Each specialized .str implementation documents what it prints.
 std::string Ghost::str(int indent, bool recursive) const {
   std::string opStr =
       (op != nullptr

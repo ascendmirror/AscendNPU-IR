@@ -38,17 +38,27 @@ public:
     bool operator<(const Edge &other) const;
   };
 
+  // adjacencyList[pipeFrom][pipeTo] stores a set of Edge objects representing
+  // directed transitions from pipeFrom to pipeTo that are valid for a given
+  // (startIndex,endIndex) lifetime. Used by runDijkstra to compute minimum
+  // distance paths between two pipe ids taking ordering constraints into
+  // account.
   llvm::DenseMap<mlir::hivm::PIPE,
                  llvm::DenseMap<mlir::hivm::PIPE, std::set<Edge>>>
       adjacencyList;
 
+  // Add a pipe-pair edge annotated with its active index interval.
   void addPair(mlir::hivm::PIPE startPipeId, mlir::hivm::PIPE endPipeId,
                int startIndex, int endIndex);
 
+  // Build adjacency list from a ConflictPair by decomposing it into edges.
   void addConflictPair(syncsolver::ConflictPair *conflictPair);
 
+  // Compact or merge overlapping edges to speed up Dijkstra queries.
   void optimizeAdjacencyList();
 
+  // Run shortest-path search (Dijkstra-like) with ordering constraints to find
+  // the minimal reachable index for a path from startPipe to endPipe.
   std::optional<int> runDijkstra(mlir::hivm::PIPE startPipe,
                                  mlir::hivm::PIPE endPipe, int startIndex,
                                  int maxDistance);

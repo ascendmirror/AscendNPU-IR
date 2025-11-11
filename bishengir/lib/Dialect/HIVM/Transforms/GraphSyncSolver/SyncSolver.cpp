@@ -41,6 +41,7 @@
 using namespace mlir;
 using namespace hivm::syncsolver;
 
+// Reset per-pass bookkeeping to start fresh.
 void Solver::reset() {
   skipOcc.clear();
   syncedPairs.clear();
@@ -54,6 +55,9 @@ void Solver::reset() {
   replacedWithReusableSyncedPairs.clear();
 }
 
+// Return true if two operations cannot be synchronized due to being in
+// different branches of an if (if-else mutual exclusive) under the same
+// condition.
 bool Solver::checkImpossibleOpPair(OperationBase *op1, OperationBase *op2) {
   assert(op1 != nullptr && op2 != nullptr);
   if (op1->op == op2->op) {
@@ -67,6 +71,7 @@ bool Solver::checkImpossibleOpPair(OperationBase *op1, OperationBase *op2) {
   return isIfElseSituation;
 }
 
+// Check whether occurrences belong to impossible (if-else) pairing.
 bool Solver::checkImpossibleOccPair(Occurrence *occ1, Occurrence *occ2) {
   assert(occ1 != nullptr && occ2 != nullptr);
   if (occ1->op == occ2->op) {
@@ -81,6 +86,7 @@ bool Solver::checkImpossibleOccPair(Occurrence *occ1, Occurrence *occ2) {
   return isIfElseSituation;
 }
 
+// Detect whether occ1 and occ2 have already been covered by an earlier sync.
 bool Solver::checkAlreadySynced(Occurrence *occ1, Occurrence *occ2) {
   assert(occ1 != nullptr && occ2 != nullptr);
   assert(occ1->op != nullptr && occ2->op != nullptr);
@@ -93,6 +99,7 @@ bool Solver::checkAlreadySynced(Occurrence *occ1, Occurrence *occ2) {
          OperationBase::getParentloop(parOp1);
 }
 
+// Unit-flag reuse check between two RWOperations.
 bool Solver::checkAlreadySyncedWithUnitFlag(RWOperation *rwOp1,
                                             RWOperation *rwOp2) {
   if (!enableUnitFlagFeature) {
@@ -111,6 +118,8 @@ bool Solver::checkAlreadySyncedWithUnitFlag(RWOperation *rwOp1,
   return false;
 }
 
+// Check pointer-cast based buffer overlap conservatively when addresses are
+// known. Used for memref pointer-cast conflict detection.
 bool Solver::checkPointerCastMemConflict(hivm::PointerCastOp pointerCastOp1,
                                          hivm::PointerCastOp pointerCastOp2) {
   auto spaceAttr1 = GetBufferSpaceAttr(pointerCastOp1.getResult());
@@ -152,6 +161,8 @@ bool Solver::checkPointerCastMemConflict(hivm::PointerCastOp pointerCastOp1,
   return false;
 }
 
+// General RW memory-conflict check between lists of Values (handles
+// pointer-casts).
 bool Solver::checkRWMemoryConflicts(
     const llvm::SmallVector<Value> &memValsList1,
     const llvm::SmallVector<Value> &memValsList2) {
@@ -174,6 +185,8 @@ bool Solver::checkRWMemoryConflicts(
   return false;
 }
 
+// High-level wrapper computing pipe pairs that represent memory conflicts
+// between two RW ops.
 std::vector<std::pair<hivm::PIPE, hivm::PIPE>>
 Solver::checkMemoryConflicts(RWOperation *rwOp1, RWOperation *rwOp2) {
   assert(rwOp1 != nullptr && rwOp2 != nullptr);
@@ -194,6 +207,8 @@ Solver::checkMemoryConflicts(RWOperation *rwOp1, RWOperation *rwOp2) {
   return it->second = collectedConflicts;
 }
 
+// Helpers that determine whether multi-buffer double-event-id is possible by
+// exploring pointer-cast patterns.
 std::optional<LoopLikeOpInterface>
 Solver::checkDoubleMultiBufferEventId(hivm::PointerCastOp pointerCastOp1,
                                       hivm::PointerCastOp pointerCastOp2) {
@@ -323,6 +338,8 @@ Solver::checkDoubleMultiBufferEventId(RWOperation *rwOp1, RWOperation *rwOp2) {
   return loopPar;
 }
 
+// Determine required event id count and optional multibuffer loop parent for
+// occurrences.
 std::pair<uint32_t, LoopLikeOpInterface>
 Solver::getEventIdNum(Occurrence *occ1, Occurrence *occ2, hivm::PIPE setPipe,
                       hivm::PIPE waitPipe) {
@@ -362,6 +379,9 @@ Solver::getEventIdNum(Occurrence *occ1, Occurrence *occ2, hivm::PIPE setPipe,
   return {2, loopPar};
 }
 
+// Graph-based check to determine if adding a sync between occ1 and occ2 would
+// block progress. Uses GraphSolver (Dijkstra) to estimate minimal reachable
+// index.
 bool Solver::checkGraphConflict(Occurrence *occ1, Occurrence *occ2,
                                 hivm::PIPE startPipe, hivm::PIPE endPipe,
                                 uint32_t eventIdNum) {
@@ -468,6 +488,7 @@ bool Solver::checkGraphConflict(Occurrence *occ1, Occurrence *occ2,
   return !mnDistance.has_value() || mnDistance.value() > occ2->startIndex;
 }
 
+// Obtain available event ids while accounting for already chosen conflicts.
 SmallVector<hivm::EVENT>
 Solver::getAvailableEventIds(ConflictPair *conflictPair) {
   assert(conflictPair != nullptr);
@@ -499,6 +520,7 @@ Solver::getAvailableEventIds(ConflictPair *conflictPair) {
   return availableEventIds;
 }
 
+// Processed-pair tracking helpers.
 bool Solver::checkVisited(Occurrence *occ1, Occurrence *occ2) {
   auto [it, inserted] = processedOccPairs.insert(std::make_pair(occ1, occ2));
   return !inserted;
@@ -506,6 +528,7 @@ bool Solver::checkVisited(Occurrence *occ1, Occurrence *occ2) {
 
 bool Solver::checkSkippable(Occurrence *occ) { return skipOcc.contains(occ); }
 
+// Synced-pair memoization helpers.
 std::optional<llvm::SmallVector<hivm::EVENT>>
 Solver::getOldEventIdIfExists(OperationBase *scopeOp, Occurrence *occ1,
                               Occurrence *occ2, ConflictPair *conflictPair) {
@@ -540,6 +563,7 @@ void Solver::memorizeReusedSyncedPair(OperationBase *scopeOp,
       conflictPair->waitPipe}] = reusedConflictPair;
 }
 
+// Select an available event id (or multiple) with optional reversed priority.
 llvm::SmallVector<hivm::EVENT>
 Solver::getAnyAvailableEventId(ConflictPair *conflictPair, uint32_t count,
                                bool reversedPriority) {
@@ -917,6 +941,8 @@ bool Solver::reuseConflictPair(ConflictPair *conflictPair,
   return true;
 }
 
+// Core handler that records a discovered conflict, chooses event ids (or
+// converts to barrier-all), and records necessary bookkeeping structures.
 void Solver::handleConflict(Occurrence *occ1, Occurrence *occ2,
                             hivm::PIPE setPipe, hivm::PIPE waitPipe,
                             bool isUseless, uint32_t eventIdNum,
@@ -1165,6 +1191,8 @@ void Solver::handleConflict(Occurrence *occ1, Occurrence *occ2,
   chosenConflictedPairs.push_back(std::move(conflictPair));
 }
 
+// Main processing loop that iterates processingOrders and attempts to discover
+// and record conflicts.
 void Solver::processOrders() {
   for (auto &[curOcc, start, end, reverseOrder, isUseless, skip] :
        processingOrders) {
@@ -1236,6 +1264,8 @@ void Solver::processOrders() {
   }
 }
 
+// When barrier-all markers need to be chosen, insert them before all
+// occurrences for the chosen op.
 void Solver::pickAndInsertABarrierAll() {
   assert(!insertedBarrierAllBefore.empty());
   OperationBase *chosenOp = nullptr;
@@ -1254,6 +1284,8 @@ void Solver::pickAndInsertABarrierAll() {
   return;
 }
 
+// High-level solve orchestration with multiple passes and optional merging
+// iterations.
 void Solver::solve(int runNum) {
   LLVM_DEBUG(llvm::dbgs() << "runNum: " << runNum << '\n');
   processOrders();
