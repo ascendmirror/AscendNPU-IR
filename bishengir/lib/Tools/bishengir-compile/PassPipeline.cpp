@@ -126,6 +126,9 @@ public:
         .setenableHfusionCountBufferDmaOpt(enableHfusionCountBufferDmaOpt)
         .setCubeTilingTuning(cubeTilingTuning);
 
+    // Debug options
+    config.setSaveTemps(saveTemps).setPrintCommands(printCommands);
+
     SmallVector<Pass::Option<bool> *> sharedWithHIVMCompileBool = {
         &enableAutoBindSubBlock,
         &enableAutoBlockifyLoop,

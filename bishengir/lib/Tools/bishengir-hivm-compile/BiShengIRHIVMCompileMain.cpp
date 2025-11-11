@@ -72,6 +72,12 @@ LogicalResult runExternalHIVMC(ModuleOp module,
            "hivm compile.\n";
     return failure();
   }
+
+  if (config.getSaveTemps()) {
+    tempDirsStore.save();
+    inputFileHandler->keep();
+  }
+
   inputFile = inputFileHandler->outputFilename();
   module.print(inputFileHandler->os(),
                mlir::OpPrintingFlags().enableDebugInfo(
@@ -93,7 +99,8 @@ LogicalResult runExternalHIVMC(ModuleOp module,
 #endif
 
   SmallVector<StringRef> argumentsRef(arguments.begin(), arguments.end());
-  if (failed(execute(getHIVMCName(), getBiShengInstallPath(), argumentsRef))) {
+  if (failed(execute(getHIVMCName(), getBiShengInstallPath(), argumentsRef,
+                     config.getPrintCommands()))) {
     return failure();
   }
 
