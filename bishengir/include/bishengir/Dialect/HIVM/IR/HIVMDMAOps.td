@@ -313,7 +313,8 @@ def FixpipeOp : HIVM_DmaOp<"fixpipe", [
                        Arg<OptionalAttr<HIVM_UnitFlagAttr>, [{
                         Enable unit-flag for synchronization, it is
                         managed by inject-sync passes.
-                       }]>:$unit_flag_mode
+                       }]>:$unit_flag_mode,
+                       OptionalAttr<HIVM_AtomicKindAttr>:$atomic_kind
   );
   let results = (outs Optional<AnyRankedTensor>:$result_tensor);
   let builders = [
@@ -346,7 +347,7 @@ def FixpipeOp : HIVM_DmaOp<"fixpipe", [
     `ins` `(` $src `:` type($src) `)`
     `outs` `(` $dst `:` type($dst) `)`
     (`unit_flag` `[` $unit_flag_mode^ (`,` $unit_flag_cond^)? `]`)?
-    (`->` type($result_tensor)^)?
+    (`->` type($result_tensor)^)? (`atomic` `=` $atomic_kind^)?
   }];
 #else
   let assemblyFormat = [{
