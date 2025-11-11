@@ -272,8 +272,31 @@ private:
       matched = true;
       auto scfForOp = dyn_cast_if_present<scf::ForOp>(curOp->getParentOp());
       moveFixpipeOutOfScfFor(rewriter, loc, op, scfForOp, op.getResultTensor());
+    } else if (auto memref =
+                   dyn_cast_if_present<bufferization::ToMemrefOp>(curOp)) {
+      auto opStoreOp = findStoreAtomic(op, memref);
+      if (opStoreOp.has_value()) {
+        matched = true;
+        addFixpipeAtomic(rewriter, loc, op, opStoreOp.value());
+      }
     }
     return matched ? success() : failure();
+  }
+
+  std::optional<StoreOp>
+  findStoreAtomic(FixpipeOp op, bufferization::ToMemrefOp memref) const {
+    // Find bufferization.to_memref after fixpipe
+    if (memref->getNumResults() != 1)
+      return std::nullopt;
+    if (!memref->getResult(0).hasOneUse())
+      return std::nullopt;
+    // find StoreOp
+    auto *userOp = *memref->getResult(0).getUsers().begin();
+    if (auto storeOp = dyn_cast_if_present<hivm::StoreOp>(userOp)) {
+      if (storeOp.getAtomicKind() != AtomicKind::NONE)
+        return storeOp;
+    }
+    return std::nullopt;
   }
 
   void inlineFixPipeWithRreQuant(PatternRewriter &rewriter, Location loc,
@@ -350,6 +373,28 @@ private:
     rewriter.replaceOp(extractSliceOp, newFixpipeOp.getResultTensor());
     rewriter.eraseOp(op);
     LDBG("InlineFixpipeWithExtractSliceReshape");
+  }
+
+  void addFixpipeAtomic(PatternRewriter &rewriter, Location loc,
+                        hivm::FixpipeOp op, hivm::StoreOp storeOp) const {
+    rewriter.setInsertionPointAfter(op);
+    auto storeDst = storeOp.getDst();
+    auto memref = rewriter.create<bufferization::ToMemrefOp>(
+        op.getSrc().getLoc(), storeDst.getType(), op->getOperand(0));
+
+    rewriter.setInsertionPointAfter(memref);
+    auto newFixpipeOp = rewriter.create<FixpipeOp>(
+        op->getLoc(), storeOp->getResultTypes(),
+        /*src=*/memref, /*dst=*/storeDst, rewriter.getUnitAttr(),
+        op.getPreQuantAttr(), op.getPreReluAttr());
+
+    auto storeAttr = storeOp.getAtomicKindAttr();
+    newFixpipeOp.setAtomicKindAttr(storeAttr);
+    rewriter.replaceOp(storeOp, newFixpipeOp);
+    // erase memref
+    rewriter.eraseOp(*op->user_begin());
+    rewriter.eraseOp(op);
+    LDBG("addFixpipeAtomic");
   }
 
   void swapFixpipeAndInsertSliceOp(PatternRewriter &rewriter, Location loc,

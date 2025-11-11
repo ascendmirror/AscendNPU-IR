@@ -565,12 +565,13 @@ void FixpipeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                       FixpipePreReluModeAttr pre_relu, BoolAttr channel_split) {
 #if (!BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES)
   build(odsBuilder, odsState, result, src, dst, /*unit_flag_cond=*/nullptr,
-        enable_nz2nd, pre_quant, pre_relu, channel_split,	
-        /*unit_flag_mode=*/nullptr);
+        enable_nz2nd, pre_quant, pre_relu, channel_split,
+        /*unit_flag_mode=*/nullptr, AtomicKindAttr{});
 #else
   build(odsBuilder, odsState, result, src, dst, /*unit_flag_cond=*/nullptr,
-        enable_nz2nd, /*dual_dst_mode=*/nullptr, pre_quant, pre_relu, channel_split,
-        /*unit_flag_mode=*/nullptr);
+        enable_nz2nd, /*dual_dst_mode=*/nullptr, pre_quant, pre_relu,
+        channel_split,
+        /*unit_flag_mode=*/nullptr, AtomicKindAttr{});
 #endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
 }
 
@@ -580,12 +581,13 @@ void FixpipeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                       FixpipePreReluModeAttr pre_relu, BoolAttr channel_split) {
 #if (!BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES)
   build(odsBuilder, odsState, result, src, dst, /*unit_flag_cond=*/nullptr,
-        enable_nz2nd, pre_quant, pre_relu, channel_split,	
-        /*unit_flag_mode=*/nullptr);
+        enable_nz2nd, pre_quant, pre_relu, channel_split,
+        /*unit_flag_mode=*/nullptr, AtomicKindAttr{});
 #else
   build(odsBuilder, odsState, result, src, dst, /*unit_flag_cond=*/nullptr,
-        enable_nz2nd, /*dual_dst_mode=*/nullptr, pre_quant, pre_relu, channel_split,
-        /*unit_flag_mode=*/nullptr);
+        enable_nz2nd, /*dual_dst_mode=*/nullptr, pre_quant, pre_relu,
+        channel_split,
+        /*unit_flag_mode=*/nullptr, AtomicKindAttr{});
 #endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
 }
 
@@ -598,7 +600,7 @@ void FixpipeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                       FixpipePreReluModeAttr pre_relu, BoolAttr channel_split) {
   build(odsBuilder, odsState, result, src, dst, /*unit_flag_cond=*/nullptr,
         enable_nz2nd, dual_dst_mode, pre_quant, pre_relu, channel_split,
-        /*unit_flag_mode=*/nullptr);
+        /*unit_flag_mode=*/nullptr, AtomicKindAttr{});
 }
 
 void FixpipeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
@@ -608,7 +610,7 @@ void FixpipeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                       FixpipePreReluModeAttr pre_relu, BoolAttr channel_split) {
   build(odsBuilder, odsState, result, src, dst, /*unit_flag_cond=*/nullptr,
         enable_nz2nd, dual_dst_mode, pre_quant, pre_relu, channel_split,
-        /*unit_flag_mode=*/nullptr);
+        /*unit_flag_mode=*/nullptr, AtomicKindAttr{});
 }
 #endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
 
