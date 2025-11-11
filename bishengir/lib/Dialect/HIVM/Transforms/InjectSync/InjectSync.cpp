@@ -69,6 +69,8 @@ void InjectSyncAnalysis::AutoInjectSync(bool enableUnitFlag,
   IRTranslator trans(syncIR, memAnalyzer, buffer2MemInfoMap, func_,
                      SyncAnalysisMode::NORMALSYNC);
   trans.Build();
+  LLVM_DEBUG(llvm::dbgs() << "IRTranslator\n");
+  LLVM_DEBUG(SyncDebug(syncIR).PrintSyncIr());
 
   // Single instruction or no instruction, no need to insert synchronization.
   if (syncIR.size() <= 1) {
@@ -80,18 +82,28 @@ void InjectSyncAnalysis::AutoInjectSync(bool enableUnitFlag,
                             assumeAliveLoops);
   syncAnalyzer.SetBuffer2ParentAliasBuffer(trans.GetBuffer2ParentAliasBuffer());
   syncAnalyzer.Plan();
+  LLVM_DEBUG(llvm::dbgs() << "SyncAnalyzer\n");
+  LLVM_DEBUG(SyncDebug(syncIR).PrintSyncIr());
 
   MoveSyncState syncMove(syncIR, syncOperations);
   syncMove.StateOptimize();
+  LLVM_DEBUG(llvm::dbgs() << "MoveSyncState\n");
+  LLVM_DEBUG(SyncDebug(syncIR).PrintSyncIr());
 
   RemoveRedundantSync removeRedundantSync(syncIR, syncOperations);
   removeRedundantSync.Plan();
+  LLVM_DEBUG(llvm::dbgs() << "RemoveRedundantSync\n");
+  LLVM_DEBUG(SyncDebug(syncIR).PrintSyncIr());
 
   SyncEventIdAllocation eventIdAllocation(syncIR, syncOperations);
   eventIdAllocation.Allocate();
+  LLVM_DEBUG(llvm::dbgs() << "SyncEventIdAllocation\n");
+  LLVM_DEBUG(SyncDebug(syncIR).PrintSyncIr());
 
   SyncCodegen syncCodegen(syncIR, func_, SyncAnalysisMode::NORMALSYNC);
   syncCodegen.Build();
+  LLVM_DEBUG(llvm::dbgs() << "SyncCodegen\n");
+  LLVM_DEBUG(SyncDebug(syncIR).PrintSyncIr());
 }
 
 void InjectSyncPass::runOnOperation() {

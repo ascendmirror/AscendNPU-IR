@@ -83,6 +83,9 @@ void SyncCodegen::UpdateOpInsertSync(IRRewriter &rewriter) {
       handleEnableUnitFlag(rewriter, compoundElement);
       UpdateCompoundOpInsertSync(compoundElement);
       UpdateSyncTemplateInterForBackPipeMPipeMTE1DB(compoundElement);
+    } else if (auto *placeHolder =
+                   dyn_cast<PlaceHolderInstanceElement>(nowElement.get())) {
+      updatePlaceHolderOpInsertSync(placeHolder);
     } else if (auto *loopElement =
                    dyn_cast<LoopInstanceElement>(nowElement.get())) {
       UpdateLoopOpInsertSync(loopElement);
@@ -117,6 +120,38 @@ void SyncCodegen::handleEnableUnitFlag(
     }
   } else {
     llvm_unreachable("Unsupport op to have unit-flag enabled.");
+  }
+}
+
+void SyncCodegen::updatePlaceHolderOpInsertSync(
+    PlaceHolderInstanceElement *placeHolder) {
+  Operation *terminatorOp;
+  auto *parentScope = syncIR[placeHolder->parentScopeId].get();
+  if (auto *branchOp = dyn_cast<BranchInstanceElement>(parentScope)) {
+    if (auto ifOp = dyn_cast<scf::IfOp>(branchOp->elementOp)) {
+      if (branchOp->getBranchKind() == KindOfBranch::IF_BEGIN) {
+        terminatorOp = ifOp.getThenRegion().front().getTerminator();
+      } else {
+        terminatorOp = ifOp.getElseRegion().front().getTerminator();
+      }
+    }
+  } else if (auto *loopOp = dyn_cast<LoopInstanceElement>(parentScope)) {
+    if (auto forOp = dyn_cast<scf::ForOp>(loopOp->elementOp)) {
+      terminatorOp = forOp.getRegion().front().getTerminator();
+    }
+  }
+  assert(terminatorOp != nullptr);
+  assert(placeHolder->pipeAfter.empty());
+  auto iter = op2InsertSync.find(terminatorOp);
+  if (iter != op2InsertSync.end()) {
+    // There are two MacroOp elements insert sync.
+    iter->second.pipeBefore.insert(iter->second.pipeBefore.end(),
+                                   placeHolder->pipeBefore.begin(),
+                                   placeHolder->pipeBefore.end());
+  } else {
+    SyncPipeBuild pipeBuild;
+    pipeBuild.pipeBefore = placeHolder->pipeBefore;
+    op2InsertSync[terminatorOp] = pipeBuild;
   }
 }
 
