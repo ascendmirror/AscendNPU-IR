@@ -608,6 +608,9 @@ protected:
   /// Apply a pass to re-cache io to \c target.
   LogicalResult applyReCacheIOPass(func::FuncOp target) const;
 
+  /// Apply a pass to apply symbol analysis to \c target.
+  LogicalResult applySymbolAnalysisPass(func::FuncOp target) const;
+
   /// Apply a pass to aggressively bubble up extract slice to \c target
   LogicalResult applyAggressiveBubbleUpExtractSlice(func::FuncOp target) const;
 
