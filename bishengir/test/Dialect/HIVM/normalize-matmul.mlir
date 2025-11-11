@@ -404,3 +404,33 @@ module {
     return
   }
 }
+
+// -----
+module {   
+  func.func @bmm_decompose_when_yield(%arg4: memref<?xf32>, %bias_pr : tensor<2x128x64xf32>) -> tensor<2x128x64xf32> {     
+    %c0 = arith.constant 0 : index
+    %false = arith.constant false
+    %c5_i32 = arith.constant 5 : i32
+    %c128_i32 = arith.constant 128 : i32
+    %c0_i32 = arith.constant 0 : i32
+    %c64 = arith.constant 64 : index
+    %c1_i32 = arith.constant 1 : i32
+    %b = memref.alloc() : memref<2x256x64xf16>
+    %bTensor = bufferization.to_tensor %b restrict writable : memref<2x256x64xf16>
+    %bias = arith.constant dense<1.000000e+00> : tensor<1x64xf32>
+    %1 = tensor.empty() : tensor<2x128x64xf32>
+    %res = scf.for %arg = %c0_i32 to %c5_i32 step %c1_i32  iter_args(%arg0 = %1) -> (tensor<2x128x64xf32>)  : i32 {
+      %2 = arith.muli %arg, %c128_i32 : i32
+      %3 = arith.index_cast %2 : i32 to index
+      %a = memref.alloc() : memref<2x128x256xf16>
+      %aTensor = bufferization.to_tensor %a restrict writable : memref<2x128x256xf16>
+      %mad = hivm.hir.batchMmadL1 ins(%aTensor, %bTensor, %false, %c0, %c0, %c0 : tensor<2x128x256xf16>, tensor<2x256x64xf16>, i1, index, index, index) outs(%arg0 : tensor<2x128x64xf32>) -> tensor<2x128x64xf32>
+      // CHECK: hivm.hir.batchMmadL1
+      // CHECK: hivm.hir.vadd
+      scf.yield %mad : tensor<2x128x64xf32>    
+    }
+    %2 = tensor.empty() : tensor<2x128x64xf32>
+    %vadd = hivm.hir.vadd ins(%res, %bias_pr : tensor<2x128x64xf32>, tensor<2x128x64xf32>) outs(%2 : tensor<2x128x64xf32>) -> tensor<2x128x64xf32>
+    return %vadd : tensor<2x128x64xf32>   
+  } 
+}

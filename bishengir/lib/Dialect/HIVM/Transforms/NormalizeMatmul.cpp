@@ -413,10 +413,22 @@ public:
   }
 };
 
+struct DecomposeAccumulatingBatchMatmulPattern
+    : public OpRewritePattern<hivm::BatchMmadL1Op> {
+public:
+  using OpRewritePattern<hivm::BatchMmadL1Op>::OpRewritePattern;
+  LogicalResult matchAndRewrite(hivm::BatchMmadL1Op op,
+                                PatternRewriter &rewriter) const override {
+    if (!mlir::hivm::util::judgeWhetherUserScfYield(op))
+      return failure();
+    return decomposeMatmulWithElementwiseAdd(rewriter, op);
+  }
+};
+
 void populateNormalizeMatmulPattern(RewritePatternSet &patterns) {
   patterns.add<DecomposeMatmulWithBiasPattern<hivm::MmadL1Op>,
-               DecomposeMatmulWithBiasPattern<hivm::BatchMmadL1Op>>(
-      patterns.getContext());
+               DecomposeMatmulWithBiasPattern<hivm::BatchMmadL1Op>,
+               DecomposeAccumulatingBatchMatmulPattern>(patterns.getContext());
   patterns.add<SetRealMKNPattern<hivm::MmadL1Op>,
                SetRealMKNPattern<hivm::BatchMmadL1Op>>(patterns.getContext());
 }
