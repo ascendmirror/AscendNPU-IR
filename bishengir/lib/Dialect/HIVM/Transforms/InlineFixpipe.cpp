@@ -44,8 +44,6 @@ using namespace mlir::hivm;
 
 namespace {
 static constexpr llvm::StringLiteral printType = "print";
-static constexpr llvm::StringLiteral fixpipeAlreadyInserted =
-    "fixpipe_already_inserted";
 } // namespace
 
 namespace {
@@ -113,6 +111,11 @@ public:
       // the op will decompose to mmadL1 + vadd, so fixpipe cannot be inserted
       // now, and fixpipe should be inserted after the decomposition
       return failure();
+    }
+
+    if constexpr (std::is_same_v<hivm::BatchMmadL1Op, OpType>) {
+      if (mlir::hivm::util::judgeWhetherUserScfYield(op))
+        return failure();
     }
 
     if (op->getAttr(fixpipeAlreadyInserted))
