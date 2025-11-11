@@ -60,6 +60,7 @@ add_bishengir_dialect_library(BiShengIRHIVMTransforms
   ReduceRankSubview.cpp
   SetBufferSize.cpp
   SplitMixKernel.cpp
+  MarkRealCoreType.cpp
   TileAndBindSubBlock.cpp
   TileBatchMMIntoLoop.cpp
   TileCubeVectorLoop.cpp

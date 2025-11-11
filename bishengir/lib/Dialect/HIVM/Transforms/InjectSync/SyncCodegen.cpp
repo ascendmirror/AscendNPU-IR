@@ -83,6 +83,9 @@ void SyncCodegen::UpdateOpInsertSync(IRRewriter &rewriter) {
       handleEnableUnitFlag(rewriter, compoundElement);
       UpdateCompoundOpInsertSync(compoundElement);
       UpdateSyncTemplateInterForBackPipeMPipeMTE1DB(compoundElement);
+    } else if (auto *placeHolder =
+                   dyn_cast<PlaceHolderInstanceElement>(nowElement.get())) {
+      updatePlaceHolderOpInsertSync(placeHolder);
     } else if (auto *loopElement =
                    dyn_cast<LoopInstanceElement>(nowElement.get())) {
       UpdateLoopOpInsertSync(loopElement);
@@ -117,6 +120,38 @@ void SyncCodegen::handleEnableUnitFlag(
     }
   } else {
     llvm_unreachable("Unsupport op to have unit-flag enabled.");
+  }
+}
+
+void SyncCodegen::updatePlaceHolderOpInsertSync(
+    PlaceHolderInstanceElement *placeHolder) {
+  Operation *terminatorOp;
+  auto *parentScope = syncIR[placeHolder->parentScopeId].get();
+  if (auto *branchOp = dyn_cast<BranchInstanceElement>(parentScope)) {
+    if (auto ifOp = dyn_cast<scf::IfOp>(branchOp->elementOp)) {
+      if (branchOp->getBranchKind() == KindOfBranch::IF_BEGIN) {
+        terminatorOp = ifOp.getThenRegion().front().getTerminator();
+      } else {
+        terminatorOp = ifOp.getElseRegion().front().getTerminator();
+      }
+    }
+  } else if (auto *loopOp = dyn_cast<LoopInstanceElement>(parentScope)) {
+    if (auto forOp = dyn_cast<scf::ForOp>(loopOp->elementOp)) {
+      terminatorOp = forOp.getRegion().front().getTerminator();
+    }
+  }
+  assert(terminatorOp != nullptr);
+  assert(placeHolder->pipeAfter.empty());
+  auto iter = op2InsertSync.find(terminatorOp);
+  if (iter != op2InsertSync.end()) {
+    // There are two MacroOp elements insert sync.
+    iter->second.pipeBefore.insert(iter->second.pipeBefore.end(),
+                                   placeHolder->pipeBefore.begin(),
+                                   placeHolder->pipeBefore.end());
+  } else {
+    SyncPipeBuild pipeBuild;
+    pipeBuild.pipeBefore = placeHolder->pipeBefore;
+    op2InsertSync[terminatorOp] = pipeBuild;
   }
 }
 
@@ -233,20 +268,20 @@ void SyncCodegen::SyncInsert(IRRewriter &rewriter, Operation *op,
     CreateBarrierOp(rewriter, op, sync, beforeInsert);
   } else if (sync->GetType() == SyncOperation::TYPE::SET_EVENT ||
              sync->GetType() == SyncOperation::TYPE::WAIT_EVENT) {
+    checkCondition(!sync->eventIds.empty(),
+                   "eventIds expected to not be empty");
     if (sync->eventIds.size() == 1) {
       CreateSetWaitOpForSingleBuffer(rewriter, op, sync, beforeInsert);
     } else {
-      checkCondition(sync->eventIds.size() > 1,
-                     "eventIds expected to have more than 1 element");
       CreateSetWaitOpForMultiBuffer(rewriter, op, sync, beforeInsert);
     }
   } else if (sync->GetType() == SyncOperation::TYPE::SYNC_BLOCK_SET ||
              sync->GetType() == SyncOperation::TYPE::SYNC_BLOCK_WAIT) {
+    checkCondition(!sync->eventIds.empty(),
+                   "eventIds expected to not be empty");
     if (sync->eventIds.size() == 1) {
       CreateSetWaitBlockOpForSingleBuffer(rewriter, op, sync, beforeInsert);
     } else {
-      checkCondition(sync->eventIds.size() > 1,
-                     "eventIds expected to have more than 1 element");
       CreateSetWaitBlockOpForMultiBuffer(rewriter, op, sync, beforeInsert);
     }
   } else if (sync->GetType() == SyncOperation::TYPE::SYNC_BLOCK_ALL) {
