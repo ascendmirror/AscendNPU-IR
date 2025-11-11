@@ -405,6 +405,9 @@ public:
   using OpRewritePattern<MMOP>::OpRewritePattern;
   LogicalResult matchAndRewrite(MMOP matmulOp,
                                 PatternRewriter &rewriter) const final {
+    if (!matmulOp.hasPureTensorSemantics()) {
+      return failure();
+    }
     if (isOpTriviallyDead(matmulOp)) {
       rewriter.eraseOp(matmulOp);
       return success();
