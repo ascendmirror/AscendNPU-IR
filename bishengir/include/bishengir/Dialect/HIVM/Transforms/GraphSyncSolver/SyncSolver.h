@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 //===----------------------------------------------------------------------===//
-#ifndef BISHENG_DIALECT_HIVM_GRAPHSYNCSOLVER_SYNCSOLVER_H
-#define BISHENG_DIALECT_HIVM_GRAPHSYNCSOLVER_SYNCSOLVER_H
+#ifndef BISHENG_DIALECT_HIVM_TRANSFORMS_GRAPHSYNCSOLVER_SYNCSOLVER_H
+#define BISHENG_DIALECT_HIVM_TRANSFORMS_GRAPHSYNCSOLVER_SYNCSOLVER_H
 
 #include "bishengir/Dialect/HIVM/Transforms/GraphSyncSolver/SyncSolverIR.h"
 #include "bishengir/Dialect/HIVM/Transforms/GraphSyncSolver/Utility.h"
@@ -479,4 +479,4 @@ private:
 
 } // namespace mlir::hivm::syncsolver
 
-#endif // BISHENG_DIALECT_HIVM_GRAPHSYNCSOLVER_SYNCSOLVER_H
+#endif // BISHENG_DIALECT_HIVM_TRANSFORMS_GRAPHSYNCSOLVER_SYNCSOLVER_H

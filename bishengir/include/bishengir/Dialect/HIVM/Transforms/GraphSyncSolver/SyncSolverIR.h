@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 //===----------------------------------------------------------------------===//
-#ifndef BISHENG_DIALECT_HIVM_GRAPHSYNCSOLVER_TRANSFORMS_SYNCSOLVERIR_H
-#define BISHENG_DIALECT_HIVM_GRAPHSYNCSOLVER_TRANSFORMS_SYNCSOLVERIR_H
+#ifndef BISHENG_DIALECT_HIVM_TRANSFORMS_GRAPHSYNCSOLVER_SYNCSOLVERIR_H
+#define BISHENG_DIALECT_HIVM_TRANSFORMS_GRAPHSYNCSOLVER_SYNCSOLVERIR_H
 
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
 #include "mlir/Interfaces/LoopLikeInterface.h"
@@ -432,4 +432,4 @@ public:
 bool operator<(const SyncOp &op1, const SyncOp &op2);
 } // namespace mlir::hivm::syncsolver
 
-#endif // BISHENG_DIALECT_HIVM_GRAPHSYNCSOLVER_TRANSFORMS_SYNCSOLVERIR_H
+#endif // BISHENG_DIALECT_HIVM_TRANSFORMS_GRAPHSYNCSOLVER_SYNCSOLVERIR_H

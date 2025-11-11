@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 //===----------------------------------------------------------------------===//
-#ifndef BISHENG_DIALECT_HIVM_GRAPHSYNCSOLVER_UTILITY_H
-#define BISHENG_DIALECT_HIVM_GRAPHSYNCSOLVER_UTILITY_H
+#ifndef BISHENG_DIALECT_HIVM_TRANSFORMS_GRAPHSYNCSOLVER_UTILITY_H
+#define BISHENG_DIALECT_HIVM_TRANSFORMS_GRAPHSYNCSOLVER_UTILITY_H
 
 #include "bishengir/Dialect/HIVM/Transforms/GraphSyncSolver/SyncSolverIR.h"
 
@@ -207,4 +207,4 @@ bool checkAllLoopParentsAreForLoops(Operation *op);
 
 } // namespace mlir::hivm::syncsolver
 
-#endif // BISHENG_DIALECT_HIVM_GRAPHSYNCSOLVER_UTILITY_H
+#endif // BISHENG_DIALECT_HIVM_TRANSFORMS_GRAPHSYNCSOLVER_UTILITY_H
