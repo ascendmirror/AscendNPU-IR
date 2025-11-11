@@ -23,6 +23,7 @@
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
+#include <memory>
 #include <utility>
 
 #define DEBUG_TYPE "hivm-inject-sync"
@@ -161,6 +162,12 @@ BranchInstanceElement::CloneBranch(KindOfBranch branchKind) const {
       beginId, beginId, branchId, endId, KindOfBranch::IF_BEGIN);
   res->elementOp = elementOp;
   return res;
+}
+
+std::unique_ptr<PlaceHolderInstanceElement>
+PlaceHolderInstanceElement::Clone() const {
+  return std::make_unique<PlaceHolderInstanceElement>(this->kIndex,
+                                                      this->parentScopeId);
 }
 
 bool LoopInstanceElement::classof(const InstanceElement *e) {
