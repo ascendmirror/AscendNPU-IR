@@ -257,6 +257,9 @@ public:
   PlaceHolderInstanceElement(unsigned index, unsigned parentScopeId)
       : InstanceElement(KindTy::PLACE_HOLDER, index),
         parentScopeId(parentScopeId) {};
+
+  std::unique_ptr<PlaceHolderInstanceElement> Clone() const;
+
   static bool classof(const InstanceElement *e);
 };
 
