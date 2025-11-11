@@ -430,6 +430,13 @@ def InlineOTFBroadcast : Pass<"hivm-inline-otf-broadcast", "func::FuncOp"> {
   ];
 }
 
+def InlineLoadCopy : Pass<"hivm-inline-load-copy", "func::FuncOp"> {
+  let summary = "Inline Copied load";
+  let constructor = "mlir::hivm::createInlineLoadCopyPass()";
+  let dependentDialects = ["mlir::memref::MemRefDialect", "hivm::HIVMDialect",
+  ];
+}
+
 def InitEntryKernel : Pass<"hivm-init-entry-kernel", "func::FuncOp"> {
   let summary = "Insert set_mask_norm() at the beginning of entry kernel";
   let constructor = "mlir::hivm::createInitEntryKernelPass()";
