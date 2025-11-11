@@ -155,6 +155,10 @@ void SyncAnalyzer::DealWithLoopSync(LoopInstanceElement *nowElement) {
         auto newBranchPtr =
             branchElement->CloneBranch(branchElement->getBranchKind());
         backSyncIr.emplace_back(std::move(newBranchPtr));
+      } else if (auto *placeHolderElement =
+                     dyn_cast<PlaceHolderInstanceElement>(syncIR[i].get())) {
+        auto newPlaceHolderElement = placeHolderElement->Clone();
+        backSyncIr.emplace_back(std::move(newPlaceHolderElement));
       }
     }
   }
