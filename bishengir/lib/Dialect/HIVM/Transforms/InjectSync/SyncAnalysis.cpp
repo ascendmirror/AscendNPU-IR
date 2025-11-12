@@ -777,7 +777,7 @@ SyncAnalyzer::checkUnlikelyScope(CompoundInstanceElement *nowCompound,
   }
   if (auto *branchOp = dyn_cast<BranchInstanceElement>(parentScope)) {
     if (auto ifOp = dyn_cast<scf::IfOp>(parentScope->elementOp)) {
-      if (ifOp->hasAttr("hivm.unlikely_condition")) {
+      if (ifOp->hasAttrOfType<UnitAttr>(hivm::UnlikelyConditionAttr::name)) {
         auto *placeHolder = dyn_cast<PlaceHolderInstanceElement>(
             syncIR[branchOp->endId - 1].get());
         assert(placeHolder != nullptr);
