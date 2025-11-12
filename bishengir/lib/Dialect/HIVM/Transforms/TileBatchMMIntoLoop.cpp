@@ -67,15 +67,14 @@ LogicalResult
 getBatchSingleUseChain(Operation *op, int64_t batchDim,
                        SmallVector<Operation *> &recursiveUseChain,
                        Block *fixedBlock) {
-  if (op->isUsedOutsideOfBlock(fixedBlock))
-    return failure();
-
   if (isa<hivm::FixpipeOp>(op)) {
     assert(recursiveUseChain.empty());
     recursiveUseChain.push_back(op);
     return success();
   }
 
+  if (op->isUsedOutsideOfBlock(fixedBlock))
+    return failure();
   // ToDo: Generalize more states.
   // Currently here exists restriction that tile couple batch matmul and
   // fixpipe, which also requests shape operations between above have to keep
