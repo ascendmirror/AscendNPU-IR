@@ -848,4 +848,11 @@ def HIVM_ParallelLoopAttr : HIVM_Attr<"ParallelLoop", "parallel_loop"> {
   }];
 }
 
+def HIVM_UnlikelyConditionAttr
+    : HIVM_Attr<"UnlikelyCondition", "unlikely_condition"> {
+  let description = [{
+    Specifies that marked condition is unlikely to evaluate to true.
+  }];
+}
+
 #endif // BISHENGIR_DIALECT_HIVM_IR_HIVMATTRS_TD
