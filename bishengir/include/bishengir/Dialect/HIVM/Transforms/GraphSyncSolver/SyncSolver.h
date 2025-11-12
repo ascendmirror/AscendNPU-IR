@@ -62,9 +62,11 @@ public:
   bool resultFuncIrWasGenerated{false};
   bool considerMergedBackwardSyncEventIds{true};
   bool disableMultiEventIdForBarrierAllPairs{true};
-  bool reuseSyncPairToSaveEventIds{false};
+  bool reuseSyncPairToSaveEventIds{true};
   bool enableUnitFlagFeature{false};
   bool decomposeMmadl1Op{true};
+  uint64_t maxReuseNum{20};
+  uint64_t maxRunNum{99};
 
   // Original MLIR function being processed (may be null for test-only Solver).
   func::FuncOp func;
@@ -166,8 +168,12 @@ public:
   // Set of pipe pairs that were forced to barrier-all (no event ids available).
   llvm::DenseSet<std::pair<hivm::PIPE, hivm::PIPE>> barrierAllPairs;
 
+  // Set of pipe pairs for which multi-event-id usage is disabled.
+  llvm::DenseSet<std::pair<hivm::PIPE, hivm::PIPE>> disabledMultiEventIdPairs;
+
   // Count-per-pipe-pair used to limit reuse of conflict pairs (reuse budget).
-  llvm::DenseMap<std::pair<hivm::PIPE, hivm::PIPE>, int> reusePairs;
+  llvm::DenseMap<std::pair<hivm::PIPE, hivm::PIPE>, int> reusePairs,
+      reusedPairs;
 
   // Tracks inserted barrier-all markers before occurrences: op -> set of (occ,
   // isUseless).
@@ -202,10 +208,10 @@ public:
   }
 
   // Orchestrate the solving process (entry point).
-  void solve(int runNum = 0);
+  void solve(uint64_t runNum = 0, uint64_t flag = 0);
 
   // Solve function variant used in tests (keeps internal behaviour compatible).
-  void solveTest(int runNum = 0);
+  void solveTest(uint64_t runNum = 0, uint64_t flag = 0);
 
   // Insert sync ops into func-ir.
   void generateFuncIrResultOps();

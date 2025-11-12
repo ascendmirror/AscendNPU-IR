@@ -53,6 +53,9 @@ void Solver::reset() {
   scopeOccPairChosenConflicts.clear();
   backwardSyncEvents.clear();
   replacedWithReusableSyncedPairs.clear();
+  reusedPairs.clear();
+  barrierAllPairs.clear();
+  insertedBarrierAllBefore.clear();
 }
 
 // Return true if two operations cannot be synchronized due to being in
@@ -113,7 +116,7 @@ bool Solver::checkAlreadySyncedWithUnitFlag(RWOperation *rwOp1,
     if (curRwOp == rwOp2) {
       return true;
     }
-    curRwOp = rwOp1->linkedUnitFlagOpAsSet;
+    curRwOp = curRwOp->linkedUnitFlagOpAsSet;
   }
   return false;
 }
@@ -344,7 +347,7 @@ std::pair<uint32_t, LoopLikeOpInterface>
 Solver::getEventIdNum(Occurrence *occ1, Occurrence *occ2, hivm::PIPE setPipe,
                       hivm::PIPE waitPipe) {
   assert(occ1 != nullptr && occ2 != nullptr);
-  if (barrierAllPairs.contains({setPipe, waitPipe})) {
+  if (disabledMultiEventIdPairs.contains({setPipe, waitPipe})) {
     return {1, nullptr};
   }
   assert(occ1->op != nullptr && occ2->op != nullptr);
@@ -537,6 +540,9 @@ Solver::getOldEventIdIfExists(OperationBase *scopeOp, Occurrence *occ1,
   if (it == syncedPairs.end()) {
     return {};
   }
+  if (it->second == nullptr) {
+    return {};
+  }
   return it->second->eventIds;
 }
 
@@ -551,7 +557,7 @@ void Solver::forgetSyncedPair(OperationBase *scopeOp,
                               ConflictPair *conflictPair) {
   assert(scopeOp != nullptr && conflictPair != nullptr);
   syncedPairs[{scopeOp, conflictPair->op1, conflictPair->op2,
-               conflictPair->setPipe, conflictPair->waitPipe}] = conflictPair;
+               conflictPair->setPipe, conflictPair->waitPipe}] = nullptr;
 }
 
 void Solver::memorizeReusedSyncedPair(OperationBase *scopeOp,
@@ -856,8 +862,10 @@ ConflictPair *Solver::getReusableConflictPair(
     if (!checkIntersect(conflictPair, curConflictPair)) {
       continue;
     }
-    assert(curConflictPair->endIndex <= conflictPair->endIndex);
-    assert(curConflictPair->startIndex < conflictPair->startIndex);
+    if (curConflictPair->startIndex >= conflictPair->startIndex) {
+      continue;
+    }
+    assert(conflictPair->startIndex <= curConflictPair->endIndex);
     if (ret == nullptr || ret->startIndex < curConflictPair->startIndex) {
       ret = curConflictPair;
     }
@@ -868,6 +876,10 @@ ConflictPair *Solver::getReusableConflictPair(
 bool Solver::reuseConflictPair(ConflictPair *conflictPair,
                                Occurrence *scopeOcc1, Occurrence *scopeOcc2) {
   if (conflictPair->isBarrier()) {
+    return false;
+  }
+
+  if (scopeOcc1->op != scopeOcc2->op) {
     return false;
   }
 
@@ -884,7 +896,19 @@ bool Solver::reuseConflictPair(ConflictPair *conflictPair,
     }
   }
 
-  if (oldReusedConflictPair == nullptr && reusePairs[{setPipe, waitPipe}] < 1) {
+  if (!conflictPair->isUseless) {
+    auto it = replacedWithReusableSyncedPairs.find(
+        {scopeOcc1->op, conflictPair->op1, conflictPair->op2,
+         conflictPair->setPipe, conflictPair->waitPipe});
+    assert(it == replacedWithReusableSyncedPairs.end());
+  }
+
+  if (conflictPair->isUseless && oldReusedConflictPair == nullptr) {
+    return false;
+  }
+
+  if (oldReusedConflictPair == nullptr &&
+      reusePairs[{setPipe, waitPipe}] <= reusedPairs[{setPipe, waitPipe}]) {
     return false;
   }
 
@@ -908,9 +932,11 @@ bool Solver::reuseConflictPair(ConflictPair *conflictPair,
 
   ConflictPair *reusableConflictPair = nullptr;
   for (auto *opt : {opt1, opt2, opt3}) {
-    if (reusableConflictPair == nullptr ||
-        reusableConflictPair->startIndex < opt->startIndex) {
-      reusableConflictPair = opt;
+    if (opt != nullptr) {
+      if (reusableConflictPair == nullptr ||
+          reusableConflictPair->startIndex < opt->startIndex) {
+        reusableConflictPair = opt;
+      }
     }
   }
 
@@ -921,7 +947,6 @@ bool Solver::reuseConflictPair(ConflictPair *conflictPair,
   assert(reusableConflictPair->startIndex < conflictPair->startIndex);
   assert(reusableConflictPair->endIndex <= conflictPair->endIndex);
   forgetSyncedPair(scopeOcc1->op, reusableConflictPair);
-  reusableConflictPair->op1 = conflictPair->op1;
   reusableConflictPair->opSet = conflictPair->opSet;
   reusableConflictPair->startIndex = conflictPair->startIndex;
   memorizeSyncedPair(scopeOcc1->op, reusableConflictPair);
@@ -933,11 +958,13 @@ bool Solver::reuseConflictPair(ConflictPair *conflictPair,
   if (oldReusedConflictPair != nullptr) {
     assert(oldReusedConflictPair->op1 == reusableConflictPair->op1);
     assert(oldReusedConflictPair->op2 == reusableConflictPair->op2);
-    assert(oldReusedConflictPair->opSet == reusableConflictPair->opSet);
     assert(oldReusedConflictPair->opWait == reusableConflictPair->opWait);
   }
 
-  reusePairs[{setPipe, waitPipe}] -= 1;
+  if (!conflictPair->isUseless) {
+    reusedPairs[{setPipe, waitPipe}] += 1;
+  }
+
   return true;
 }
 
@@ -1286,13 +1313,36 @@ void Solver::pickAndInsertABarrierAll() {
 
 // High-level solve orchestration with multiple passes and optional merging
 // iterations.
-void Solver::solve(int runNum) {
+void Solver::solve(uint64_t runNum, uint64_t flag) {
   LLVM_DEBUG(llvm::dbgs() << "runNum: " << runNum << '\n');
   processOrders();
-  if (disableMultiEventIdForBarrierAllPairs) {
-    if (!barrierAllPairs.empty()) {
+  if (considerMergedBackwardSyncEventIds) {
+    getBeforeAfterSyncMaps();
+    backwardSyncEventsAfterMerge = backwardSyncEvents;
+    reset();
+    processOrders();
+  }
+  if (reuseSyncPairToSaveEventIds) {
+    if (!barrierAllPairs.empty() && flag == 0) {
+      bool limitReached = true;
+      for (auto [pipeSrc, pipeDst] : barrierAllPairs) {
+        if (reusePairs[{pipeSrc, pipeDst}] < maxReuseNum) {
+          reusePairs[{pipeSrc, pipeDst}] += 1;
+          limitReached = false;
+        }
+      }
       reset();
-      insertedBarrierAllBefore.clear();
+      disabledMultiEventIdPairs.clear();
+      backwardSyncEventsAfterMerge.clear();
+      solve(runNum + 1, /*flag=*/limitReached);
+      return;
+    }
+  }
+  if (disableMultiEventIdForBarrierAllPairs) {
+    if (!barrierAllPairs.empty() && flag != 0) {
+      disabledMultiEventIdPairs = barrierAllPairs;
+      reset();
+      backwardSyncEventsAfterMerge.clear();
       processOrders();
     }
   }
@@ -1300,15 +1350,14 @@ void Solver::solve(int runNum) {
     getBeforeAfterSyncMaps();
     backwardSyncEventsAfterMerge = backwardSyncEvents;
     reset();
-    insertedBarrierAllBefore.clear();
     processOrders();
   }
-  if (!insertedBarrierAllBefore.empty() && runNum < 99) {
-    reset();
+  if (!barrierAllPairs.empty() && runNum <= maxRunNum) {
     pickAndInsertABarrierAll();
-    insertedBarrierAllBefore.clear();
+    reset();
+    reusePairs.clear();
+    disabledMultiEventIdPairs.clear();
     backwardSyncEventsAfterMerge.clear();
-    barrierAllPairs.clear();
-    solve(runNum + 1);
+    solve(runNum + 1, /*flag=*/0);
   }
 }
