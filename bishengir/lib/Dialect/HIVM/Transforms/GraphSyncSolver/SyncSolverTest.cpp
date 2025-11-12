@@ -35,7 +35,8 @@
 using namespace mlir;
 using namespace hivm::syncsolver;
 
-// Lightweight memory-conflict checker used by the test harness (integer ptr model).
+// Lightweight memory-conflict checker used by the test harness (integer ptr
+// model).
 bool Solver::checkTestRWMemoryConflicts(
     const llvm::SmallVector<llvm::SmallVector<int>> &memValsList1,
     const llvm::SmallVector<llvm::SmallVector<int>> &memValsList2) {
@@ -182,7 +183,8 @@ uint32_t Solver::getTestEventIdNum(Occurrence *occ1, Occurrence *occ2,
   return getTestEventIdNum(rwOp1, rwOp2);
 }
 
-// Process the processing orders in test mode, discover conflicts and call the handler.
+// Process the processing orders in test mode, discover conflicts and call the
+// handler.
 void Solver::processOrdersTest() {
   for (auto &[curOcc, start, end, reverseOrder, isUseless, skip] :
        processingOrders) {
@@ -258,25 +260,19 @@ void Solver::processOrdersTest() {
 }
 
 // Orchestrate iterative test-mode solving passes and optional merging behavior.
-void Solver::solveTest(int runNum) {
+void Solver::solveTest(uint64_t runNum, uint64_t flag) {
   LLVM_DEBUG(llvm::dbgs() << "runNum: " << runNum << '\n');
   processOrdersTest();
-  if (reuseSyncPairToSaveEventIds) {
-    if (!barrierAllPairs.empty()) {
-      reusePairs.clear();
-      for (auto [pipeSrc, pipeDst] : barrierAllPairs) {
-        reusePairs[{pipeSrc, pipeDst}] = 1;
-      }
-      barrierAllPairs.clear();
-      reset();
-      insertedBarrierAllBefore.clear();
-      processOrdersTest();
-    }
+  if (considerMergedBackwardSyncEventIds) {
+    getBeforeAfterSyncMaps();
+    backwardSyncEventsAfterMerge = backwardSyncEvents;
+    reset();
+    processOrdersTest();
   }
   if (disableMultiEventIdForBarrierAllPairs) {
-    if (!barrierAllPairs.empty()) {
+    if (!barrierAllPairs.empty() && flag != 0) {
+      disabledMultiEventIdPairs = barrierAllPairs;
       reset();
-      insertedBarrierAllBefore.clear();
       processOrdersTest();
     }
   }
@@ -284,16 +280,31 @@ void Solver::solveTest(int runNum) {
     getBeforeAfterSyncMaps();
     backwardSyncEventsAfterMerge = backwardSyncEvents;
     reset();
-    insertedBarrierAllBefore.clear();
     processOrdersTest();
   }
-  if (!insertedBarrierAllBefore.empty() && runNum < 99) {
-    reset();
+  if (reuseSyncPairToSaveEventIds) {
+    if (!barrierAllPairs.empty() && flag == 0) {
+      bool limitReached = true;
+      for (auto [pipeSrc, pipeDst] : barrierAllPairs) {
+        if (reusePairs[{pipeSrc, pipeDst}] < 9) {
+          reusePairs[{pipeSrc, pipeDst}] += 1;
+          limitReached = false;
+        }
+      }
+      reset();
+      disabledMultiEventIdPairs.clear();
+      backwardSyncEventsAfterMerge.clear();
+      solveTest(runNum + 1, /*flag=*/limitReached);
+      return;
+    }
+  }
+  if (!barrierAllPairs.empty() && runNum <= maxRunNum) {
     pickAndInsertABarrierAll();
-    insertedBarrierAllBefore.clear();
+    reset();
+    reusePairs.clear();
+    disabledMultiEventIdPairs.clear();
     backwardSyncEventsAfterMerge.clear();
-    barrierAllPairs.clear();
-    solveTest(runNum + 1);
+    solveTest(runNum + 1, /*flag=*/0);
   }
 }
 
