@@ -45,6 +45,50 @@ void canonicalizationHIVMPipeline(OpPassManager &pm) {
 }
 
 static void
+hivmNormSyncPipeline(OpPassManager &pm,
+                     const HIVMPipelineOptions &hivmPipelineOptions) {
+  if (hivmPipelineOptions.enableHIVMGraphSyncSolver &&
+      !hivmPipelineOptions.enableHIVMInjectBarrierAllSync) {
+    GraphSyncSolverOptions gssOptions;
+    gssOptions.enableUnitFlag = hivmPipelineOptions.enableHIVMUnitFlagSync;
+    pm.nest<func::FuncOp>().addPass(createGraphSyncSolverPass(gssOptions));
+  } else if (!hivmPipelineOptions.disableHIVMAutoInjectSync) {
+    InjectSyncOptions syncOptions;
+    syncOptions.enableUnitFlag = hivmPipelineOptions.enableHIVMUnitFlagSync;
+    syncOptions.assumeAliveLoops =
+        hivmPipelineOptions.enableHIVMAssumeAliveLoops;
+    if (hivmPipelineOptions.enableHIVMInjectBarrierAllSync) {
+      syncOptions.syncMode = SyncMode::BARRIERALL;
+    }
+    pm.nest<func::FuncOp>().addPass(createInjectSyncPass(syncOptions));
+  }
+}
+
+static void
+hivmCrossCoreSyncPipeline(OpPassManager &pm,
+                          const HIVMPipelineOptions &hivmPipelineOptions) {
+  // Mark load/store scalar operations with core-type attributes so block
+  // synchronization passes recognize cross-core scalar-pipeline conflicts and
+  // insert needed sync operations.
+  pm.addPass(createMarkRealCoreTypePass());
+  InjectBlockSyncOptions blockSyncOption;
+  blockSyncOption.blockAllSync =
+      hivmPipelineOptions.enableHIVMInjectBlockAllSync;
+  blockSyncOption.assumeAliveLoops =
+      hivmPipelineOptions.enableHIVMAssumeAliveLoops;
+  blockSyncOption.disableAutoInjectBlockSync =
+      hivmPipelineOptions.disableAutoInjectBlockSync;
+  pm.nest<func::FuncOp>().addPass(createInjectBlockSyncPass(blockSyncOption));
+  // Clear inserted core-type attributes as they are not needed for other
+  // passes. Note that they are only inserted by mark-real-core-type pass so
+  // it's safe to remove them. And after split-mix-kernel pass, they are not
+  // needed.
+  MarkRealCoreTypeOptions markRealCoreTypeOptions;
+  markRealCoreTypeOptions.removeCoreTypeAttrs = true;
+  pm.addPass(createMarkRealCoreTypePass(markRealCoreTypeOptions));
+}
+
+static void
 bufferizationPipeline(OpPassManager &pm,
                       const HIVMPipelineOptions &hivmPipelineOptions) {
   if (hivmPipelineOptions.enableTritonKernelCompile) {
@@ -157,22 +201,13 @@ static void hivmPreBufferizationOptimizationPipeline(
         hivmPipelineOptions.enableHIVMGlobalWorkspaceReuse;
     pm.nest<func::FuncOp>().addPass(createPlanMemoryPass(planMemoryOption));
   }
-  pm.addPass(createMarkRealCoreTypePass());
-  InjectBlockSyncOptions blockSyncOption;
-  blockSyncOption.blockAllSync =
-      hivmPipelineOptions.enableHIVMInjectBlockAllSync;
-  blockSyncOption.assumeAliveLoops =
-      hivmPipelineOptions.enableHIVMAssumeAliveLoops;
-  blockSyncOption.disableAutoInjectBlockSync =
-      hivmPipelineOptions.disableAutoInjectBlockSync;
-  pm.nest<func::FuncOp>().addPass(createInjectBlockSyncPass(blockSyncOption));
-  MarkRealCoreTypeOptions markRealCoreTypeOptions;
-  markRealCoreTypeOptions.removeCoreTypeAttrs = true;
-  pm.addPass(createMarkRealCoreTypePass(markRealCoreTypeOptions));
+  // cross-core sync (inject-block-sync) passes.
+  hivmCrossCoreSyncPipeline(pm, hivmPipelineOptions);
   if (hivmPipelineOptions.enableTritonKernelCompile &&
-      !hivmPipelineOptions.disableAutoCVWorkSpaceManage)
+      !hivmPipelineOptions.disableAutoCVWorkSpaceManage) {
     // Must place after plan-workspace-memory
     pm.nest<func::FuncOp>().addPass(createInsertInferWorkSpaceSizeFuncPass());
+  }
   pm.addPass(mlir::createMemrefExtLoweringPass());
   // Split mix kernel is done before bufferization because it depends on
   // tensor SSA property.
@@ -292,21 +327,8 @@ static void hivmPostBufferizationOptimizationPipeline(
   pm.nest<func::FuncOp>().addPass(createHIVMLowerToLoopsPass());
   // TODO: move DecomposeI32ScalarExtOp etc. to interface
   pm.nest<func::FuncOp>().addPass(createHIVMDecomposeOpPass());
-  if (hivmPipelineOptions.enableHIVMGraphSyncSolver &&
-      !hivmPipelineOptions.enableHIVMInjectBarrierAllSync) {
-    GraphSyncSolverOptions gssOptions;
-    gssOptions.enableUnitFlag = hivmPipelineOptions.enableHIVMUnitFlagSync;
-    pm.nest<func::FuncOp>().addPass(createGraphSyncSolverPass(gssOptions));
-  } else if (!hivmPipelineOptions.disableHIVMAutoInjectSync) {
-    InjectSyncOptions syncOptions;
-    syncOptions.enableUnitFlag = hivmPipelineOptions.enableHIVMUnitFlagSync;
-    syncOptions.assumeAliveLoops =
-        hivmPipelineOptions.enableHIVMAssumeAliveLoops;
-    if (hivmPipelineOptions.enableHIVMInjectBarrierAllSync) {
-      syncOptions.syncMode = SyncMode::BARRIERALL;
-    }
-    pm.nest<func::FuncOp>().addPass(createInjectSyncPass(syncOptions));
-  }
+  // Normal sync (inject-sync, graph-sync-solver) passes.
+  hivmNormSyncPipeline(pm, hivmPipelineOptions);
   pm.nest<func::FuncOp>().addPass(createAddFFTSToSyncBlockSetOpPass());
   pm.nest<func::FuncOp>().addPass(createEnableMultiBufferPass());
   pm.nest<func::FuncOp>().addPass(createLiftLowestStridePass());
