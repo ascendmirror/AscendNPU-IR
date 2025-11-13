@@ -53,6 +53,7 @@ add_bishengir_dialect_library(BiShengIRHIVMTransforms
   LiftLowestStride.cpp
   LiftZeroRank.cpp
   LowerCreateSyncBlockLock.cpp
+  MarkLoadDev.cpp
   MarkMultiBuffer.cpp
   NormalizeLoopIterator.cpp
   NormalizeMatmul.cpp

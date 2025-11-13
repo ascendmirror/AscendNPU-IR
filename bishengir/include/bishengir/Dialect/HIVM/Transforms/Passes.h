@@ -215,6 +215,9 @@ std::unique_ptr<Pass> createHIVMBubbleUpExtractSlicePass();
 // Create a pass to insert init and finish for debug.
 std::unique_ptr<Pass> createInsertInitAndFinishForDebugPass();
 
+// Create a pass to mark memref.loads that need load_dev impls.
+std::unique_ptr<Pass> createMarkLoadDevPass();
+
 // Create a pass to insert nz2nd for debug.
 std::unique_ptr<Pass> createInsertNZ2NDForDebugPass();
 

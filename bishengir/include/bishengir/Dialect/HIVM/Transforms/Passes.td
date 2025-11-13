@@ -574,6 +574,12 @@ def InsertInitAndFinishForDebug : Pass<"hivm-insert-init-and-finish-for-debug"> 
   let dependentDialects = ["hivm::HIVMDialect"];
 }
 
+def MarkLoadDev : Pass<"hivm-mark-load-dev"> {
+  let summary = "mark the memref.loads that need load_dev impls";
+  let constructor = "mlir::hivm::createMarkLoadDevPass()";
+  let dependentDialects = ["hivm::HIVMDialect", "memref::MemRefDialect"];
+}
+
 def InsertNZ2NDForDebug : Pass<"hivm-insert-nz2nd-for-debug"> {
   let summary = "insert nz2nd for debug";
   let constructor = "mlir::hivm::createInsertNZ2NDForDebugPass()";
