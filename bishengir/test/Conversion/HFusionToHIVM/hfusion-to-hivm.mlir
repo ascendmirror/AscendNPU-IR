@@ -549,7 +549,7 @@ func.func @transpose_2d() -> tensor<8x32xf32> {
   %dst = memref.alloc() : memref<8x32xf32>
   linalg.transpose ins(%src : memref<32x8xf32>) outs(%dst : memref<8x32xf32>) permutation = [1, 0]
   annotation.mark %dst {transpose_without_align} : memref<8x32xf32>
-
+  
   return %transposed : tensor<8x32xf32>
 }
 
