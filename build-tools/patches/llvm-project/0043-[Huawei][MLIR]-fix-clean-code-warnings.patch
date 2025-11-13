@@ -13,39 +13,6 @@ index 3cfa734bf91f..e48ad02dab49 100644
      SmallVector<int64_t> newExpandShape;
      Value mainOpSrcVal = mainOp.getSrc();
      auto sourceOp = mainOpSrcVal.getDefiningOp<SourceOpTy>();
-diff --git a/mlir/lib/Dialect/Linalg/IR/LinalgOps.cpp b/mlir/lib/Dialect/Linalg/IR/LinalgOps.cpp
-index fec04da25da7..44cc4b09757b 100644
---- a/mlir/lib/Dialect/Linalg/IR/LinalgOps.cpp
-+++ b/mlir/lib/Dialect/Linalg/IR/LinalgOps.cpp
-@@ -2154,8 +2154,8 @@ struct FoldTransposeWithExpand : OpRewritePattern<linalg::TransposeOp> {
-       if (reassociation.size() == 1) {
-         continue;
-       }
--      // FIXME: If expand like [1] -> [1, 1], we cannot easily detect which dim
--      // should be chosen to push_back expandShapes, so here just drop the last.
-+      // If expand like [1] -> [1, 1], we cannot easily detect which dim should
-+      // be chosen to push_back expandShapes, so here just drop the last.
-       if (inputShape[i] == 1) {
-         expandShapes.append(reassociation.begin(), reassociation.end() - 1);
-         continue;
-@@ -2182,7 +2182,7 @@ struct FoldTransposeWithExpand : OpRewritePattern<linalg::TransposeOp> {
- 
-   bool canFold(tensor::ExpandShapeOp defExpandOp,
-                linalg::TransposeOp transposeOp) const {
--    // FIXME: Not support dynamic now.
-+    // Not support dynamic now.
-     if (hasDynamicDim(defExpandOp)) {
-       return false;
-     }
-@@ -2192,7 +2192,7 @@ struct FoldTransposeWithExpand : OpRewritePattern<linalg::TransposeOp> {
-     }
- 
-     auto expandUnitDims = getExpandUnitDims(defExpandOp);
--    // FIXME: Support more than one expand dim
-+    // Not support more than one expand dim now
-     if (expandUnitDims.size() > 1) {
-       return false;
-     }
 diff --git a/mlir/lib/Dialect/Linalg/TransformOps/LinalgTransformOps.cpp b/mlir/lib/Dialect/Linalg/TransformOps/LinalgTransformOps.cpp
 index 411e190ab542..2c463649b0d2 100644
 --- a/mlir/lib/Dialect/Linalg/TransformOps/LinalgTransformOps.cpp
