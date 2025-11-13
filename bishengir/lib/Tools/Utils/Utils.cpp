@@ -160,7 +160,7 @@ bishengir::getTempFile(const std::string &outputFile,
 }
 
 LogicalResult bishengir::execute(StringRef binName, StringRef installPath,
-                                 SmallVectorImpl<StringRef> &arguments
+                                 SmallVectorImpl<StringRef> &arguments,
                                  bool debugPrint) {
   std::string binPath;
   if (!installPath.empty()) {
