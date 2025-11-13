@@ -494,4 +494,10 @@ def Decompose : Pass<"hfusion-decompose", "func::FuncOp">{
   ];
 }
 
+def DimensionBasedCSE : Pass<"hfusion-dim-cse", "func::FuncOp"> {
+  let summary = "Eliminate common subexpressions based on dimension analyzer.";
+  let constructor = "mlir::hfusion::createDimensionBasedCSEPass()";
+}
+
+
 #endif // BISHENGIR_DIALECT_HFUSION_TRANSFORMS_PASSES

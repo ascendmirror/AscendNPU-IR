@@ -207,6 +207,10 @@ std::unique_ptr<Pass> createDecomposePass(const DecomposeOptions &options = {});
 /// Create a pass to eliminate duplicate functions.
 std::unique_ptr<Pass> createEliminateDuplicateFuncsPass();
 
+/// Create a pass to eliminate common subexpressions based on dimension
+/// analysis.
+std::unique_ptr<Pass> createDimensionBasedCSEPass();
+
 //===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//
