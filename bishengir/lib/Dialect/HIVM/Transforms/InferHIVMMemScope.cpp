@@ -53,7 +53,8 @@ bool isSingleResultPropagatableMemrefOp(Operation *op) {
   return false;
 }
 
-static BlockArgument getTiedWhileBodyIterArg(scf::WhileOp op, OpOperand *opOperand) {
+static BlockArgument getTiedWhileBodyIterArg(scf::WhileOp op,
+                                             OpOperand *opOperand) {
   auto argsMutable = op.getInitsMutable();
   auto *it = llvm::find(argsMutable, *opOperand);
   if (it == argsMutable.end())
@@ -170,6 +171,7 @@ struct InferHIVMMemScopePass
 
 private:
   LogicalResult fixDeviceCallSite(func::FuncOp op);
+  LogicalResult fixDeviceLoads(func::FuncOp op);
   LogicalResult fixHostFuncSignature(func::FuncOp op);
 };
 } // namespace
@@ -295,6 +297,34 @@ LogicalResult InferHIVMMemScopePass::fixDeviceCallSite(func::FuncOp op) {
       }
     }
   }
+  return success();
+}
+
+LogicalResult InferHIVMMemScopePass::fixDeviceLoads(func::FuncOp op) {
+  LDBG("Begin fixing loads for " << op.getSymName());
+
+  auto coreTypeAttr = dyn_cast_if_present<hivm::TFuncCoreTypeAttr>(
+      op->getAttr(hivm::TFuncCoreTypeAttr::name));
+
+  if (coreTypeAttr.getFuncCoreType() != hivm::TFuncCoreType::AIC) {
+    return success();
+  }
+
+  op.walk<WalkOrder::PostOrder>([&](Operation *op) {
+    FailureOr<bool> res = hivm::util::isCoreTypeOp(op, TCoreType::VECTOR);
+    if (failed(res)) {
+      return;
+    }
+    if (!isa<DestinationStyleOpInterface>(op)) {
+      return;
+    }
+    // If core type does not match, erase the operation
+    if (res.value()) {
+      mlir::hivm::util::replaceResultWithInitOperand(op);
+      op->erase();
+    }
+  });
+  
   return success();
 }
 
@@ -468,6 +498,11 @@ void InferHIVMMemScopePass::runOnOperation() {
 
   for (auto func : deviceFuncList) {
     if (failed(fixDeviceCallSite(func)))
+      signalPassFailure();
+  }
+
+  for (auto func : deviceFuncList) {
+    if (failed(fixDeviceLoads(func)))
       signalPassFailure();
   }
 
