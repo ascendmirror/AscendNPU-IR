@@ -1,5 +1,4 @@
 add_subdirectory(bishengir-compile)
-add_subdirectory(bishengir-hivm-compile)
 add_subdirectory(ConfigOptions)
 add_subdirectory(Utils)
 add_subdirectory(Version)
