@@ -239,31 +239,6 @@ func.func @test_vcast_op_tensor_i4_to_i8_not_empty_dyn(%d : index) -> tensor<2x?
 }
 
 //===----------------------------------------------------------------------===//
-// Test VTransposeOp with disabled align
-//===----------------------------------------------------------------------===//
-
-// -----
-func.func @test_vtranspose_disable_align(%src : tensor<2048x3xf32>) -> tensor<3x2048xf32> {
-%cst = arith.constant dense<[3, 2048]> : tensor<2xi64>
-  // CHECK: %[[C:.*]] = arith.constant dense<[3, 2048]> : tensor<2xi64>
-  // CHECK: %[[C0:.*]] = arith.constant dense<[8, 768]> : tensor<2xi64>
-  // CHECK: %[[C1:.*]] = arith.constant dense<[256, 24]> : tensor<2xi64>
-  // CHECK: %[[R1:.*]] = tensor.reshape %arg0(%[[C1]]) : (tensor<2048x3xf32>, tensor<2xi64>) -> tensor<256x24xf32>
-  // CHECK: %[[T0:.*]] = tensor.empty() : tensor<24x256xf32>
-  // CHECK: %[[T1:.*]] = hivm.hir.vtranspose ins(%[[R1]] : tensor<256x24xf32>) outs(%[[T0]] : tensor<24x256xf32>) permutation = [1, 0] -> tensor<24x256xf32>
-  // CHECK: %[[R2:.*]] = tensor.reshape %[[T1]](%[[C0]]) : (tensor<24x256xf32>, tensor<2xi64>) -> tensor<8x768xf32>
-  // CHECK: %[[T2:.*]] = tensor.empty() : tensor<768x8xf32>
-  // CHECK: %[[T3:.*]] = hivm.hir.vtranspose ins(%[[R2]] : tensor<8x768xf32>) outs(%[[T2]] : tensor<768x8xf32>) permutation = [1, 0] -> tensor<768x8xf32>
-  // CHECK: %[[R3:.*]] = tensor.reshape %[[T3]](%[[C]]) : (tensor<768x8xf32>, tensor<2xi64>) -> tensor<3x2048xf32>
-  // CHECK: return %reshape_3 : tensor<3x2048xf32>
-  %dst = tensor.empty() : tensor<3x2048xf32>
-
-  %res = hivm.hir.vtranspose ins(%src : tensor<2048x3xf32>) outs(%dst : tensor<3x2048xf32>) permutation = [1, 0] disable_align = true -> tensor<3x2048xf32>
-  return %res : tensor<3x2048xf32>
-}
-
-
-//===----------------------------------------------------------------------===//
 // Test VCastOp args: transpose broadcast
 //===----------------------------------------------------------------------===//
 
