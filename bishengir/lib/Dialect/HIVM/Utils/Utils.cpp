@@ -1277,6 +1277,66 @@ bool isArgminOrArgmax(ReduceOperation op) {
          op == ReduceOperation::max_with_index_right;
 }
 
+SmallVector<Value> getOutOperands(Operation *op) {
+  if (op->getResults().empty()) {
+    return {};
+  }
+
+  if (auto dpsOp = dyn_cast<DestinationStyleOpInterface>(op)) {
+    return dpsOp.getDpsInits();
+  }
+  if (auto callOp = dyn_cast<func::CallOp>(op)) {
+    SmallVector<Value> outOperands;
+    auto funcOp =
+        mlir::utils::getCalledFunction<hacc::HACCFunction, func::CallOp>(
+            callOp);
+    assert(funcOp && "callee func not found!");
+
+#ifndef NDEBUG
+    auto funcArgAttrs = funcOp.getArgAttrsAttr();
+    assert(funcArgAttrs && "called func must has arg attr");
+#endif
+
+    auto funcParamSize = funcOp.getNumArguments();
+    for (size_t i = 0; i < funcParamSize; i++) {
+      if (funcOp.isKernelArg(i, hacc::KernelArgType::kOutput))
+        outOperands.push_back(op->getOperand(i));
+    }
+
+    return outOperands;
+  }
+
+  // TODO: should we get the last operands as out operands by default?
+  llvm_unreachable("unsupported op to get out operands");
+}
+
+void replaceResultWithInitOperand(Operation *op) {
+  // replace uses of op result with out operand
+  auto numResults = op->getNumResults();
+  if (numResults == 0 || isa<tensor::EmptyOp, memref::AllocOp>(op)) {
+    return;
+  }
+  auto numOperands = op->getNumOperands();
+  if (numResults > numOperands)
+    op->emitError("invalid element type");
+
+  SmallVector<Value> outOperands = getOutOperands(op);
+  assert(outOperands.size() == numResults &&
+         "out operands and numResults mismatch");
+
+  for (size_t i = 0; i < numResults; i++) {
+    OpResult res = op->getResult(i);
+    res.replaceAllUsesWith(outOperands[i]);
+  }
+}
+
+FailureOr<bool> isCoreTypeOp(Operation *op, enum TCoreType coreType) {
+  auto res = getCoreType(op);
+  if (failed(res))
+    return {};
+  return res == coreType;
+}
+
 } // namespace util
 } // namespace hivm
 } // namespace mlir
