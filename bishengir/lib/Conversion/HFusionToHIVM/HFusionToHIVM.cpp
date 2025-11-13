@@ -555,7 +555,7 @@ struct LinalgToHIVMTransposeOp : public OpRewritePattern<linalg::TransposeOp> {
           "linalg::TansposeOp should have pure buffer or tensor Semantics!");
     }
     Value outputValue = op.hasPureBufferSemantics() ? op.getInit() : op.getResult().getBase();
-
+      
     Operation *withoutAlignMarkOp = nullptr;
     for (auto *user : outputValue.getUsers()) {
       if (auto markOp = dyn_cast<annotation::MarkOp>(user)) {
