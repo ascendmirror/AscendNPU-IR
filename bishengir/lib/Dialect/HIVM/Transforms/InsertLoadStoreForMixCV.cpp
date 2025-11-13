@@ -501,8 +501,8 @@ struct DuplicateTensorExtractForCube
                     TCoreType tCoreType) const {
     auto markOp = rewriter.create<annotation::MarkOp>(location, value);
     markOp->setAttr(
-        mlir::hivm::TCoreTypeAttr::name,
-        mlir::hivm::TCoreTypeAttr::get(markOp->getContext(), tCoreType));
+        mlir::hivm::TCoreTypeMarkerAttr::name,
+        mlir::hivm::TCoreTypeMarkerAttr::get(markOp->getContext(), tCoreType));
   }
 
   LogicalResult matchAndRewrite(tensor::ExtractOp extractOp,
