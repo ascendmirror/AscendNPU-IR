@@ -361,6 +361,12 @@ bool isGMPointerCastOp(Operation *op);
 
 bool isArgminOrArgmax(ReduceOperation op);
 
+SmallVector<Value> getOutOperands(Operation *op);
+
+void replaceResultWithInitOperand(Operation *op);
+
+FailureOr<bool> isCoreTypeOp(Operation *op, enum TCoreType coreType);
+
 } // namespace util
 } // namespace hivm
 } // namespace mlir
