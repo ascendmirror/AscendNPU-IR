@@ -44,8 +44,8 @@ public:
   /// Create a new config with the default set from the CL options.
   static BiShengIRCompileMainConfig createFromCLOptions();
 
-  /// Collect compile arguments that will be passed to bishengir-hivm-compile.
-  static void collectHIVMCompileArgs();
+  /// Collect compile arguments that will be passed to hivmc.
+  static void collectHIVMCArgs();
 
 #include "bishengir/Tools/bishengir-compile/CompileConfigs.cpp.inc"
 
@@ -55,9 +55,9 @@ public:
     return *this;
   }
 
-  std::vector<std::string> getHIVMCompileArgsDashDash() const {
+  std::vector<std::string> getHIVMCArgsDashDash() const {
     std::vector<std::string> args;
-    for (auto &arg : getHivmCompileArgs()) {
+    for (auto &arg : getHIVMCArgs()) {
       args.push_back("--" + arg);
     }
     return args;

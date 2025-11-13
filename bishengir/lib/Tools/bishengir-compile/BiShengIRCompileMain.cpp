@@ -33,80 +33,33 @@ using namespace mlir;
 
 namespace {
 
-/// Get the BiShengIR HIVM Compiler binary name.
-StringRef getBiShengIRHIVMCompilerName() {
-  const char *kBiShengIRHIVMBinaryName = "bishengir-hivm-compile";
+/// Get the HIVMC binary name.
+StringRef getHIVMCName() {
+  const char *kBiShengIRHIVMBinaryName = "hivmc";
   return kBiShengIRHIVMBinaryName;
 }
 
-/// Calls `bishengir-hivm-compile` to run HIVM optimization passes.
-FailureOr<OwningModuleRef> runExternalHIVMOptimizationPipeline(
-    ModuleOp module, const bishengir::BiShengIRCompileMainConfig &config) {
-  TempDirectoriesStore tempDirsStore;
-  std::string inputFile = "module.hivm.mlir";
-  std::string outputFile = "module.hivm.opt.mlir";
-  auto inputFileHandler = getTempFile(inputFile, tempDirsStore);
-  auto outputFileHandler = getTempFile(outputFile, tempDirsStore);
-  if (!inputFileHandler || !outputFileHandler) {
-    llvm::dbgs()
-        << "[ERROR] Failed to create temporary input/output files needed "
-           "to run hivm pipeline.\n";
-    return failure();
+#ifndef BISHENGIR_PUBLISH
+std::vector<std::string>
+getCompatibleOptions(const std::vector<std::string> &arguments) {
+  std::vector<std::string> result;
+  DenseSet<std::string> skipArgs = {"debug", "debug-only",
+                                    "mlir-print-ir-before-all",
+                                    "mlir-print-ir-after-all"};
+  for (const std::string &arg : arguments) {
+    StringRef argRef = arg;
+    std::string trimArg = argRef.trim().ltrim('-').str();
+    if (skipArgs.contains(trimArg)) {
+      continue;
+    }
+    result.push_back(arg);
   }
-
-  inputFile = inputFileHandler->outputFilename();
-  outputFile = outputFileHandler->outputFilename();
-
-  module.print(inputFileHandler->os(),
-               mlir::OpPrintingFlags().enableDebugInfo(
-                   config.getEnableSanitizer() || config.getEnableDebugInfo()));
-  inputFileHandler->os().flush();
-
-  std::vector<std::string> arguments;
-  arguments.emplace_back("");
-  arguments.push_back(inputFile);
-
-  auto hivmCompileArgs = config.getHIVMCompileArgsDashDash();
-  arguments.insert(arguments.end(), hivmCompileArgs.begin(),
-                   hivmCompileArgs.end());
-
-  arguments.emplace_back("-o");
-  arguments.push_back(outputFile);
-  std::string enableHIVMOpt = "--enable-hivm-compile=";
-  enableHIVMOpt += config.getEnableHIVMCompile() ? "true" : "false";
-  arguments.emplace_back(enableHIVMOpt);
-  arguments.emplace_back("--convert-hir-to-lir=false");
-
-  SmallVector<StringRef> argumentsRef(arguments.begin(), arguments.end());
-  if (failed(execute(getBiShengIRHIVMCompilerName(), getBiShengInstallPath(),
-                     argumentsRef))) {
-    return failure();
-  }
-
-  std::string errorMessage;
-  auto file = mlir::openInputFile(outputFile, &errorMessage);
-  if (!file) {
-    llvm::errs() << "[ERROR] Failed to open: " << outputFile
-                 << " error message: " << errorMessage << '\n';
-    return failure();
-  }
-
-  llvm::SourceMgr sourceMgr;
-  sourceMgr.AddNewSourceBuffer(std::move(file), mlir::SMLoc());
-  mlir::OwningOpRef<mlir::ModuleOp> moduleRef =
-      mlir::parseSourceFile<mlir::ModuleOp>(sourceMgr, module->getContext());
-  if (!moduleRef) {
-    llvm::errs() << "[ERROR] Failed to open: " << outputFile << '\n';
-    return failure();
-  }
-  module.erase();
-  auto parsedModule = moduleRef.release();
-  return OwningModuleRef(parsedModule);
+  return result;
 }
+#endif
 
-/// Calls `bishengir-hivm-compile` to lower HIVM IR with minimum op set.
-LogicalResult runExternalHIVMLoweringPipeline(
-    ModuleOp module, const bishengir::BiShengIRCompileMainConfig &config) {
+LogicalResult runExternalHIVMC(ModuleOp module,
+                               const BiShengIRCompileMainConfig &config) {
   TempDirectoriesStore tempDirsStore;
   std::string inputFile = "module.hivm.opt.mlir";
   std::string outputFile = config.getOutputFile();
@@ -128,18 +81,18 @@ LogicalResult runExternalHIVMLoweringPipeline(
   arguments.emplace_back("");
   arguments.push_back(inputFile);
 
-  auto hivmCompileArgs = config.getHIVMCompileArgsDashDash();
-  arguments.insert(arguments.end(), hivmCompileArgs.begin(),
-                   hivmCompileArgs.end());
+  auto hivmcArgs = config.getHIVMCArgsDashDash();
+  arguments.insert(arguments.end(), hivmcArgs.begin(), hivmcArgs.end());
 
   arguments.emplace_back("-o");
   arguments.push_back(outputFile);
-  arguments.emplace_back("--enable-hivm-compile=false");
-  arguments.emplace_back("--convert-hir-to-lir=true");
+
+#ifndef BISHENGIR_PUBLISH
+  arguments = getCompatibleOptions(arguments);
+#endif
 
   SmallVector<StringRef> argumentsRef(arguments.begin(), arguments.end());
-  if (failed(execute(getBiShengIRHIVMCompilerName(), getBiShengInstallPath(),
-                     argumentsRef))) {
+  if (failed(execute(getHIVMCName(), getBiShengInstallPath(), argumentsRef))) {
     return failure();
   }
 
@@ -169,18 +122,8 @@ bishengir::runBiShengIRPipeline(ModuleOp mod,
     ModuleOp hirCompileModule = cast<ModuleOp>(mod->clone());
     auto buildPipeline =
         std::bind(buildBiShengHIRPipeline, std::placeholders::_1, config);
-    bool step1 = succeeded(
-        runPipeline(hirCompileModule, buildPipeline, config, "BiShengHIR"));
-    bool step2 = false;
-    if (step1) {
-      auto runExternalResult =
-          runExternalHIVMOptimizationPipeline(hirCompileModule, config);
-      if (!failed(runExternalResult)) {
-        hirCompileModule = runExternalResult->release();
-        step2 = true;
-      }
-    }
-    if (step1 && step2) {
+    if (succeeded(runPipeline(hirCompileModule, buildPipeline, config,
+                              "BiShengHIR"))) {
       hirCompileSuccess = true;
       mod.erase();
       mod = hirCompileModule;
@@ -206,26 +149,27 @@ bishengir::runBiShengIRPipeline(ModuleOp mod,
   }
 
   if (config.shouldEnableCPURunner()) {
+    auto outputFile = config.getOutputFile();
     std::string errorMessage;
-    auto fileHandle =
-        mlir::openOutputFile(config.getOutputFile(), &errorMessage);
+    std::unique_ptr<llvm::ToolOutputFile> fileHandle =
+        mlir::openOutputFile(outputFile, &errorMessage);
     if (!fileHandle) {
-      llvm::errs() << "[ERROR] " << errorMessage << "\n";
+      llvm::errs() << "[ERROR] Failed to open: " << outputFile
+                   << " error message: " << errorMessage << "\n";
       return failure();
     }
-    fileHandle->os() << mod << '\n';
+    mod.print(fileHandle->os(),
+              mlir::OpPrintingFlags().enableDebugInfo(
+                  config.getEnableSanitizer() || config.getEnableDebugInfo()));
     fileHandle->keep();
+
     return OwningModuleRef(mod);
   }
 
-  // After the above procedure, we should have lower util the minimum HIVM op
-  // set. So set -enable-hivm-compile to false.
-  config.setEnableHIVMCompile(false);
-  auto res = runExternalHIVMLoweringPipeline(mod, config);
+  auto res = runExternalHIVMC(mod, config);
   if (res.failed())
-    mod.emitWarning(
-        "External bishengir-hivm-compile run fails, returning module before "
-        "running external compiler");
+    mod.emitWarning("External hivmc run fails, returning module before running "
+                    "external compiler");
 
   return OwningModuleRef(mod);
 }

@@ -58,8 +58,7 @@ def EnableTritonKernelCompile : FeatureControlOptions<
   "bool",
   "false"
 > {
-  let passGroup = ["HFUSION", "HFUSION_TO_HIVM"];
-  bit isSharedWithDownstreamToolchain = 1;
+  let passGroup = ["HFUSION", "HIVM", "HFUSION_TO_HIVM"];
 }
 
 #ifdef BISHENGIR_ENABLE_TORCH_CONVERSIONS
@@ -127,6 +126,19 @@ def EnableBinRelocation : FeatureControlOptions<
   bit isSharedWithDownstreamToolchain = 1;
 }
 
+def ConvertHIRToLIR : FeatureControlOptions<
+  "Enable converting from BiShengHIR to BiShengLIR.",
+  "bool",
+  "false"
+> {
+  // This option is still registered in the command line becuase
+  // `bishengir-hivm-compile` relies on it.
+  // However, it's hidden.
+  let additionalOptFlags = [{
+    llvm::cl::Hidden
+  }];
+}
+
 #ifdef BISHENGIR_ENABLE_TORCH_CONVERSIONS
 def EnsureNoImplicitBroadcast : FeatureControlOptions<
   "Whether to ensure that there is no implicit broadcast "
@@ -155,7 +167,7 @@ def DisableAutoInjectBlockSync : FeatureControlOptions<
   "bool",
   "false"
 > {
-  bit isSharedWithDownstreamToolchain = 1;
+  let passGroup = ["HFUSION", "HIVM"];
 }
 
 def DisableAutoCVWorkSpaceManage : FeatureControlOptions<
@@ -170,7 +182,15 @@ def EnableHIVMGraphSyncSolver : FeatureControlOptions<
   "bool",
   "false"
 > {
-  bit isSharedWithDownstreamToolchain = 1;
+  let passGroup = ["HFUSION", "HIVM"];
+}
+
+def DisableAutoCVWorkSpaceManage : FeatureControlOptions<
+  "In combination with the disableAutoInjectBlockSync option.",
+  "bool",
+  "false"
+> {
+  let passGroup = ["HFUSION", "HIVM"];
 }
 
 def DisableHIVMAutoInjectSync : FeatureControlOptions<
@@ -178,7 +198,7 @@ def DisableHIVMAutoInjectSync : FeatureControlOptions<
   "bool",
   "false"
 > {
-  bit isSharedWithDownstreamToolchain = 1;
+  let passGroup = ["HFUSION", "HIVM"];
 }
 
 def DisableHIVMTensorCompile : FeatureControlOptions<
@@ -186,7 +206,7 @@ def DisableHIVMTensorCompile : FeatureControlOptions<
   "bool",
   "false"
 > {
-  bit isSharedWithDownstreamToolchain = 1;
+  let passGroup = ["HFUSION", "HIVM"];
 }
 
 //===----------------------------------------------------------------------===//
@@ -199,6 +219,7 @@ class DFXControlOptions<
   string defaultVal
 > : BiShengIRCompileOpt<desc, ty, defaultVal> {
   let compileOptionCategories = ["dfxCtrlCategory"];
+  let passGroup = ["HFUSION", "HIVM"];
   bit isSharedWithDownstreamToolchain = 1;
 }
 
@@ -239,8 +260,7 @@ def EnableAutoMultiBuffer : GeneralOptimizationControlOptions<
   "bool",
   "false"
 > {
-  let passGroup = ["HFUSION"];
-  bit isSharedWithDownstreamToolchain = 1;
+  let passGroup = ["HFUSION", "HIVM"];
 }
 
 def LimitAutoMultiBufferOnlyForLocalBuffer : GeneralOptimizationControlOptions<
@@ -248,8 +268,7 @@ def LimitAutoMultiBufferOnlyForLocalBuffer : GeneralOptimizationControlOptions<
   "bool",
   "true"
 > {
-  let emitGetterSetter = 0;
-  bit isSharedWithDownstreamToolchain = 1;
+  let passGroup = ["HFUSION", "HIVM"];
 }
 
 def EnableTuningMode : GeneralOptimizationControlOptions<
@@ -331,8 +350,7 @@ class HIVMOptimizationControlOptions<
   string defaultVal
 > : BiShengIRCompileOpt<desc, ty, defaultVal> {
   let compileOptionCategories = ["hivmOptCategory"];
-  let emitGetterSetter = 0;
-  bit isSharedWithDownstreamToolchain = 1;
+  let passGroup = ["HIVM"];
 }
 
 def LimitAutoMultiBufferOfLocalBuffer : HIVMOptimizationControlOptions<
@@ -378,7 +396,9 @@ def EnableHIVMInjectBarrierAllSync : HIVMOptimizationControlOptions<
   "Enable barrier all mode for HIVM inject sync.",
   "bool",
   "false"
->;
+> {
+  bit isSharedWithDownstreamToolchain = 1;
+}
 
 def EnableHIVMUnitFlagSync : HIVMOptimizationControlOptions<
   "Enable inject sync pass to use unit-flag modes for synchronization.",
@@ -488,12 +508,10 @@ def AllowUnregisteredDialects : BiShengIRCompileOpt<
   "Allow operation with unregistered dialects.",
   "bool",
   "false"
-> {
-  bit isSharedWithDownstreamToolchain = 1;
-}
+>;
 
-def HivmCompileArgs : BiShengIRCompileListOpt<
-  "List of arguments passed to bishengir-hivm-compile.",
+def HIVMCArgs : BiShengIRCompileListOpt<
+  "List of arguments passed to hivmc.",
   "std::string"
 >;
 
