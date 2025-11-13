@@ -188,7 +188,7 @@ LogicalResult bishengir::execute(StringRef binName, StringRef installPath,
       arguments, stream, [&stream](const StringRef &arg) { stream << arg; }, 
       " ");
     stream << "\n";
-  }
+  };
 
   if (debugPrint) {
     llvm::dbgs() << "[DEBUG] Executing: ";
