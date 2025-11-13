@@ -154,3 +154,38 @@ func.func @inline_brc_with_splat_dense(%arg0: tensor<1x4x2047x2047xf32>) -> tens
                                                              outs(%3 : tensor<1x4x2047x2047xf32>) -> tensor<1x4x2047x2047xf32>
   return %5 : tensor<1x4x2047x2047xf32>
 }
+
+
+// -----
+
+
+// CHECK-LABEL: func.func @inline_fill_compare(
+// CHECK-NOT: tensor.extract
+// CHECK: hfusion.compare {{.*}} f16, tensor<8x4x1xf16>
+func.func @inline_fill_compare(%arg0: tensor<8x4x1xf16>) -> tensor<8x4x1xi1> {
+    %0 = tensor.empty() : tensor<8x4x1xi1>
+    %init = tensor.empty() : tensor<8x4x1xf16>
+    %cst = arith.constant 1.000000e+00 : f16
+    %filled = linalg.fill ins(%cst : f16) outs(%init : tensor<8x4x1xf16>) -> tensor<8x4x1xf16>
+    %1 = hfusion.compare {compare_fn = #hfusion.compare_fn<veq>} 
+                                ins(%filled, %arg0 : tensor<8x4x1xf16>, tensor<8x4x1xf16>) 
+                                outs(%0 : tensor<8x4x1xi1>) -> tensor<8x4x1xi1>
+    return %1 : tensor<8x4x1xi1>
+}
+
+
+
+// -----
+
+
+// CHECK-LABEL: func.func @inline_fill_select(
+// CHECK-NOT: tensor.extract
+// CHECK: hfusion.select {{.*}}  tensor<8x4x1xi1>, f16, tensor<8x4x1xf16>
+func.func @inline_fill_select(%arg0: tensor<8x4x1xi1>, %arg1: tensor<8x4x1xf16>) -> tensor<8x4x1xf16> {
+    %0 = tensor.empty() : tensor<8x4x1xf16>
+    %cst = arith.constant 1.000000e+00 : f16
+    %filled = linalg.fill ins(%cst : f16) outs(%0 : tensor<8x4x1xf16>) -> tensor<8x4x1xf16>
+    %1 = hfusion.select ins(%arg0, %filled, %arg1 : tensor<8x4x1xi1>, tensor<8x4x1xf16>, tensor<8x4x1xf16>) 
+                        outs(%0 : tensor<8x4x1xf16>) -> tensor<8x4x1xf16>
+    return %1 : tensor<8x4x1xf16>
+}
