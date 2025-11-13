@@ -524,36 +524,6 @@ func.func @transpose_2d() -> tensor<8x32xf32> {
 }
 
 // -----
-// CHECK: func.func @transpose_2d() -> tensor<8x32xf32> {
-func.func @transpose_2d() -> tensor<8x32xf32> {
-// CHECK: %[[VAL_2:.*]] = arith.constant dense<[32, 8]> : tensor<2xi64>
-// CHECK: %[[VAL_0:.*]] = memref.alloc() : memref<256xf32>
-// CHECK: %[[VAL_1:.*]] = bufferization.to_tensor %[[VAL_0]] restrict writable : memref<256xf32>
-// CHECK: %[[VAL_3:.*]] = tensor.reshape %[[VAL_1]](%[[VAL_2]]) : (tensor<256xf32>, tensor<2xi64>) -> tensor<32x8xf32>
-// CHECK: %[[VAL_4:.*]] = tensor.empty() : tensor<8x32xf32>
-// CHECK: %[[VAL_5:.*]] = hivm.hir.vtranspose ins(%[[VAL_3]] : tensor<32x8xf32>) outs(%[[VAL_4]] : tensor<8x32xf32>) permutation = [1, 0] disable_align = true -> tensor<8x32xf32>
-// CHECK: %[[VAL_6:.*]] = memref.alloc() : memref<32x8xf32>
-// CHECK: %[[VAL_7:.*]] = memref.alloc() : memref<8x32xf32>
-// CHECK: hivm.hir.vtranspose ins(%[[VAL_6]] : memref<32x8xf32>) outs(%[[VAL_7]] : memref<8x32xf32>) permutation = [1, 0] disable_align = true
-// CHECK: return %[[VAL_5]] : tensor<8x32xf32>
-
-  %cst = arith.constant dense<[32, 8]> : tensor<2xi64>
-  %alloc = memref.alloc() : memref<256xf32>
-  %0 = bufferization.to_tensor %alloc restrict writable : memref<256xf32>
-  %reshape = tensor.reshape %0(%cst) : (tensor<256xf32>, tensor<2xi64>) -> tensor<32x8xf32>
-  %1 = tensor.empty() : tensor<8x32xf32>
-  %transposed = linalg.transpose ins(%reshape : tensor<32x8xf32>) outs(%1 : tensor<8x32xf32>) permutation = [1, 0]
-  annotation.mark %transposed {transpose_without_align} : tensor<8x32xf32>
-
-  %src = memref.alloc() : memref<32x8xf32>
-  %dst = memref.alloc() : memref<8x32xf32>
-  linalg.transpose ins(%src : memref<32x8xf32>) outs(%dst : memref<8x32xf32>) permutation = [1, 0]
-  annotation.mark %dst {transpose_without_align} : memref<8x32xf32>
-
-  return %transposed : tensor<8x32xf32>
-}
-
-// -----
 
 // CHECK-LABEL: func.func @test_hfusion_comparei_ops
 func.func @test_hfusion_comparei_ops(
