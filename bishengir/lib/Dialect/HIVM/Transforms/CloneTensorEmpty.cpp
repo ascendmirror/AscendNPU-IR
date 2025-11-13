@@ -115,6 +115,7 @@ void populateCloneTensorEmptyPattern(RewritePatternSet &patterns) {
   patterns.add<CloneTensorEmptyHIVMStructuredOpPattern<hivm::CopyOp>,
                CloneTensorEmptyHIVMStructuredOpPattern<hivm::LoadOp>,
                CloneTensorEmptyHIVMStructuredOpPattern<hivm::StoreOp>,
+               CloneTensorEmptyHIVMStructuredOpPattern<hivm::FixpipeOp>,
                CloneTensorEmptyHIVMStructuredOpPattern<hivm::MmadL1Op>,
                CloneTensorEmptySCFForPattern>(patterns.getContext());
   registerAll<
