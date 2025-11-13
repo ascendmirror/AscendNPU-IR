@@ -30,10 +30,8 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/IR/DerivedTypes.h"
 #include "llvm/Support/RWMutex.h"
 
 namespace mlir {
@@ -467,152 +465,6 @@ struct VCmpOpLowering : OpRewritePattern<VCmpOp> {
     rewriter.modifyOpInPlace(
         op, [&]() { op.getDpsInitsMutable()[0].assign(tmpAlloc); });
     return success();
-  }
-};
-
-struct VTransposeOpLowering : OpRewritePattern<VTransposeOp> {
-  using OpRewritePattern<VTransposeOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(VTransposeOp op,
-                                PatternRewriter &rewriter) const final {
-    if (!op.getDisableAlign()) {
-      return failure();
-    }
-
-    if (op.getPermutation() != ArrayRef<int64_t>{1, 0}) {
-      op.emitOpError("linalg::transposeOp supports unaligned mode only for "
-                     "classic 2d transpose ");
-    }
-
-    assert(isa<ShapedType>(op.getSrc().getType()));
-    auto inputType = cast<ShapedType>(op.getSrc().getType());
-
-    auto inputShape = inputType.getShape();
-    auto reversedInputShape = llvm::to_vector(llvm::reverse(inputShape));
-    if (inputShape.size() != 2) {
-      op.emitOpError("linalg::transposeOp supports unaligned mode only for "
-                     "2-ranked inputs");
-    }
-
-    if (inputType.getElementTypeBitWidth() != 32) {
-      op.emitOpError("linalg::transposeOp supports unaligned mode only for "
-                     "tensors with 32-bit element type");
-    }
-
-    auto firstDim = inputShape[0];
-    auto lastDim = inputShape[1];
-
-    if (((firstDim % 8 == 0) && (lastDim % 16 == 0)) ||
-        ((firstDim % 16 == 0) && (lastDim % 8 == 0))) {
-      // Already aligned, skip
-      return failure();
-    }
-
-    if (firstDim % 128) {
-      op.emitOpError("linalg::transposeOp supports unaligned mode only for "
-                     "tensors with 128-aligned first axis tensors");
-    }
-
-    // (K * 8, lastDim) -> (K, 8 * lastDim) -> (8 * lastDim, K)
-    auto firstStepResult = reshapeAndTranspose2DStep(
-        rewriter, op.getLoc(), op.getSrc(), op.hasPureTensorSemantics(), 8);
-
-    // (8 * lastDim, K) -> (8, lastDim * K) -> (lastDim * K, 8)
-    auto secondStepResult =
-        reshapeAndTranspose2DStep(rewriter, op.getLoc(), firstStepResult,
-                                  op.hasPureTensorSemantics(), lastDim);
-
-    // (lastDim * K, 8) -> (lastDim, K * 8)
-    auto thirdStepResult = getReshapedValue(
-        rewriter, op.getLoc(), secondStepResult, reversedInputShape);
-
-    if (op.hasPureTensorSemantics()) {
-      rewriter.replaceOp(op, thirdStepResult);
-    } else {
-      rewriter.replaceAllUsesWith(op.getDst(), thirdStepResult);
-      rewriter.eraseOp(op);
-    }
-
-    return success();
-  }
-
-private:
-  Value reshapeAndTranspose2DStep(PatternRewriter &rewriter, Location loc,
-                                  Value v, bool isTensor,
-                                  int64_t reshapeCoef) const {
-    auto shapedType = cast<ShapedType>(v.getType());
-    auto elemType = shapedType.getElementType();
-
-    auto inputShape = shapedType.getShape();
-    assert(inputShape.size() == 2);
-
-    auto firstDim = inputShape[0];
-    assert((firstDim % reshapeCoef) == 0);
-
-    auto lastDim = inputShape[1];
-
-    // 1. (Y*C, X) reshape to (Y, C*X)
-    llvm::ArrayRef<int64_t> newShape = {firstDim / reshapeCoef,
-                                        lastDim * reshapeCoef};
-    auto reshapedValue = getReshapedValue(rewriter, loc, v, newShape);
-
-    auto reversedNewShape = llvm::to_vector(llvm::reverse(newShape));
-
-    // 2. (Y, C*X) transpsoe to (C*X, Y)
-    auto transposedBuffer = utils::createTmpBufferOrTensorWithTargetType(
-        rewriter, loc, reshapedValue, elemType, reversedNewShape);
-    auto defaultPerm = rewriter.getDenseI64ArrayAttr({1, 0});
-
-    TypeRange resultTypeRange;
-    if (isTensor) {
-      resultTypeRange = TypeRange(transposedBuffer.getType());
-    }
-    auto transposeOp = rewriter.create<hivm::VTransposeOp>(
-        loc, resultTypeRange, reshapedValue, transposedBuffer, defaultPerm);
-
-    return isTensor ? transposeOp.getResult().getBase() : transposeOp.getDst();
-  }
-
-  Value getReshapedValue(RewriterBase &rewriter, Location loc, Value v,
-                         llvm::ArrayRef<int64_t> newShape) const {
-    auto type = v.getType();
-
-    bool isTensor = isa<TensorType>(type);
-    auto elemType = cast<ShapedType>(type).getElementType();
-
-    Type newType;
-    if (isTensor) {
-      newType = mlir::RankedTensorType::get(newShape, elemType);
-    } else {
-      newType = mlir::MemRefType::get(newShape, elemType);
-    }
-
-    Value reshapedValue;
-    if (isTensor) {
-      auto idxsType = mlir::RankedTensorType::get(
-          ArrayRef<int64_t>(newShape.size()), rewriter.getI64Type());
-      auto denseIdxs = mlir::DenseElementsAttr::get(idxsType, newShape);
-      auto constantIdxs = rewriter.create<arith::ConstantOp>(loc, denseIdxs);
-      reshapedValue =
-          rewriter.create<tensor::ReshapeOp>(loc, newType, v, constantIdxs);
-    } else {
-      auto idxsType = mlir::MemRefType::get(ArrayRef<int64_t>(newShape.size()),
-                                            rewriter.getI64Type());
-      auto memrefIdxs = rewriter.create<memref::AllocOp>(loc, idxsType);
-      for (auto [idx, dim] : llvm::enumerate(newShape)) {
-        auto idxValue = rewriter.create<arith::ConstantIndexOp>(loc, idx);
-        auto dimValue = rewriter.create<arith::ConstantOp>(
-            loc, rewriter.getI64IntegerAttr(dim));
-
-        rewriter.create<memref::StoreOp>(loc, dimValue, memrefIdxs,
-                                         ValueRange{idxValue});
-      }
-
-      reshapedValue =
-          rewriter.create<memref::ReshapeOp>(loc, newType, v, memrefIdxs);
-    }
-
-    return reshapedValue;
   }
 };
 
@@ -1191,8 +1043,8 @@ class AtomicCasOpLowering : public OpRewritePattern<hivm::AtomicCasOp> {
     // step2: condition = vcmp(dst, expected_val)
     //        dst = vsel(condition, new_val, dst)
     // create condition alloc
-    auto condUB = createTmpBufferOrTensorWithTargetType(rewriter, loc, src0,
-                                                        rewriter.getI1Type());
+    auto condUB = createTmpBufferOrTensorWithTargetType(
+        rewriter, loc, src0, rewriter.getI1Type());
     auto compareAttr =
         rewriter.getAttr<hivm::CompareModeAttr>(hivm::CompareMode::EQ);
     rewriter.create<hivm::VCmpOp>(op.getLoc(), TypeRange(),
@@ -1267,7 +1119,7 @@ void HIVMDecomposeOpPass::runOnOperation() {
       .add<MultiAxesVBrcLowering, VCastLowering, VAbsIntegerLowering,
            VRecOpHighPrecisionLowering, VReduceAnyLowering, VReduceAllLowering,
            VReduceInitInitializing, SyncBlockOpLowering, VCmpOpLowering,
-           VTransposeOpLowering, DecomposeCastScalarToVecOp<arith::ExtFOp>,
+           DecomposeCastScalarToVecOp<arith::ExtFOp>,
            DecomposeCastScalarToVecOp<arith::ExtSIOp>,
            DecomposeCastScalarToVecOp<arith::ExtUIOp>,
            DecomposeCastScalarToVecOp<arith::FPToSIOp>,

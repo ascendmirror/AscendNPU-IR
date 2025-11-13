@@ -1214,22 +1214,18 @@ def VTransposeOp : HIVM_VectorOp<"vtranspose",
   let arguments = (ins TensorOrMemref:$src,
                        TensorOrMemref:$dst,
                        Optional<AnyMemRef>:$temp_buffer,
-                       DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$permutation,
-                       DefaultValuedAttr<BoolAttr, "false">:$disable_align
+                       DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$permutation
   );
   let results = (outs Variadic<AnyRankedTensor>:$result);
   let builders = [
     OpBuilder<(ins "TypeRange":$result, "Value":$src, "Value":$dst,
-                   CArg<"DenseI64ArrayAttr", "nullptr">:$permutation)>,
-    OpBuilder<(ins "TypeRange":$result, "Value":$src, "Value":$dst,
-                   CArg<"DenseI64ArrayAttr", "nullptr">:$permutation, CArg<"bool", "false">:$disable_align)>
+                   CArg<"DenseI64ArrayAttr", "nullptr">:$permutation)>
   ];
   let assemblyFormat = [{
       attr-dict `ins` `(` $src `:` type($src) `)`
       `outs` `(` $dst `:` type($dst) `)`
       (`temp_buffer` `(` $temp_buffer^ `:` type($temp_buffer) `)`)?
       (`permutation` `=` $permutation^)?
-      (`disable_align` `=` $disable_align^)?
       (`->` type($result)^)?
   }];
   let hasVerifier = 1;

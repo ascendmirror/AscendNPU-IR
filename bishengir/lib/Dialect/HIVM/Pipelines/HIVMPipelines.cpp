@@ -266,7 +266,6 @@ static void hivmPostBufferizationOptimizationPipeline(
   // Infer memory scope for newly allocated extra buffer
   pm.addPass(createInferHIVMMemScopePass());
   canonicalizationPipeline(pm);
-  pm.nest<func::FuncOp>().addPass(createInlineLoadCopyPass());
 
   if (!hivmPipelineOptions.disableAutoCVWorkSpaceManage) {
     MarkMultiBufferOptions multiBufferOptions;
