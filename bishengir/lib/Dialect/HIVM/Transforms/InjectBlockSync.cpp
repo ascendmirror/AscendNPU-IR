@@ -344,11 +344,10 @@ void SyncBlockIRTranslator::UpdateTensorExtractOpInform(
   auto pipe = hivm::PIPE::PIPE_S;
   auto coreType = getCoreType(op);
   assert(succeeded(coreType));
-  auto coreTypeVal = TCoreType::CUBE;
-  if (coreType.value() == TCoreType::CUBE ||
-      coreType.value() == TCoreType::VECTOR) {
-    coreTypeVal = coreType.value();
+  if (coreType.value() == TCoreType::CUBE_OR_VECTOR) {
+    return;
   }
+  auto coreTypeVal = coreType.value();
   SmallVector<const BaseMemInfo *> defVec;
   SmallVector<const BaseMemInfo *> useVec;
   UpdateDefUseVec({extractOp.getTensor()}, useVec);
