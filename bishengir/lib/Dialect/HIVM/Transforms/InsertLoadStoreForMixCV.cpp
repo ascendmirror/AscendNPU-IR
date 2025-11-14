@@ -115,7 +115,7 @@ Value inertLoadStoreOperation(PatternRewriter &rewriter, Location loc,
 
 LogicalResult
 insertLoadStoreOp(PatternRewriter &rewriter, Location loc,
-                  const llvm::SmallVector<OpOperand *> &consumerOperands,
+    const llvm::SmallVector<OpOperand *> &consumerOperands,
                   InsertMode insertMode,
                   std::optional<Value> insertInit = std::nullopt) {
   if (consumerOperands.empty()) {
@@ -510,22 +510,44 @@ struct DuplicateTensorExtractForCube
       }
     }
 
-    // only process cases with non-vector users
-    bool hasNonVectorUser = false;
+    // only process cases with cube users
+    bool hasCubeUser = false;
+    SmallVector<Operation *> worklist;
+    // Initialize worklist with immediate users
     for (Operation *userOp : extractOp.getResult().getUsers()) {
-      userOp->walk(
-          [&hasNonVectorUser](Operation *nestedOp) { // including this one
-            if (getCoreType(nestedOp) != TCoreType::VECTOR) {
-              hasNonVectorUser = true;
-              return WalkResult::interrupt();
-            }
-            return WalkResult::advance();
-          });
-      if (hasNonVectorUser) {
+      worklist.push_back(userOp);
+    }
+    // Process worklist
+    SmallPtrSet<Operation *, 16> visited;
+    while (!worklist.empty()) {
+      Operation *currentOp = worklist.pop_back_val();
+
+      // Skip if already visited
+      if (!visited.insert(currentOp).second) {
+        continue;
+      }
+
+      // Check this operation and all nested operations
+      currentOp->walk([&hasCubeUser](Operation *nestedOp) {
+        if (getCoreType(nestedOp) == TCoreType::CUBE) {
+          hasCubeUser = true;
+          return WalkResult::interrupt();
+        }
+        return WalkResult::advance();
+      });
+
+      if (hasCubeUser) {
         break;
       }
+
+      // Add users of this operation's results to worklist
+      for (Value result : currentOp->getResults()) {
+        for (Operation *userOp : result.getUsers()) {
+          worklist.push_back(userOp);
+        }
+      }
     }
-    if (!hasNonVectorUser) {
+    if (!hasCubeUser) {
       return failure();
     }
 
