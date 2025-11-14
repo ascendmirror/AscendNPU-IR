@@ -21,6 +21,7 @@
 #include "bishengir/Dialect/HIVM/Transforms/InjectSync/SyncCommon.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
+#include <cstdint>
 
 namespace mlir {
 namespace hivm {
@@ -31,7 +32,10 @@ constexpr const uint kBlockSyncAllCubeEventId = 14;
 
 constexpr const uint kBlockSyncAllVectorEventId = 15;
 
-constexpr const uint kBlockSyncSetWaitEventIdNum = 14;
+constexpr const uint kBlockSyncSetWaitEventIdNum = 16;
+
+// The maximum number of attempts to widen event IDs.
+constexpr const uint kMaxWidenTryNum = 99;
 
 /// Sync event id cycle pool
 struct EventCyclePool {
@@ -44,12 +48,15 @@ using SyncCycle = DenseMap<int, EventCyclePool>;
 class SyncEventIdAllocation {
 public:
   SyncEventIdAllocation(SyncIRs &syncIR, SyncOperations &syncOperations)
-      : syncIR(syncIR), syncOperations(syncOperations){};
+      : syncIR(syncIR), syncOperations(syncOperations) {
+    // Reserved eventIds for block-all operations if needed.
+    reserveBlockAllEventIds();
+  };
 
   ~SyncEventIdAllocation() = default;
 
   /// Allocate entrance, allocate sync event id.
-  void Allocate();
+  void Allocate(uint32_t runNum = 0);
 
 private:
   /// Allocate sync event id.
@@ -106,19 +113,25 @@ private:
   /// clear already insert reverse head tail sync.
   void ClearReallocatedBackwardMatchSync();
 
+  /// clear all allocated event ids.
+  void clearAllocatedEventId();
+
   /// Get unused event id.
   SmallVector<bool> GetEventIdIdleStatus(SyncOperation *sync,
                                          size_t eventIdNum);
 
   /// Change unassigned event_id sync to pipe_all.
-  void ChangeNoEventIdSyncToPipeAll();
+  llvm::LogicalResult ChangeNoEventIdSyncToPipeAll();
 
   /// Move the reassigned reallocated sync to head and tail.
   void MoveOutBackwardMatchSync(const SyncOperation *reallocatedSync);
 
   /// Check if there are sync of the same type that can be replaced and perform
   /// widen processing.
-  bool CanWidenByOtherSync(const SyncOperation *sync);
+  bool TryWidenByOtherSync(const SyncOperation *sync);
+
+  /// Try to widen on the first found relocatable sync pair.
+  bool tryWidenOnFirstFound();
 
   /// Find sync of the same type that can be widen.
   SyncOperation *FindWidenSync(const SyncOperation *setSync,
@@ -144,6 +157,9 @@ private:
   /// Ignore the insertion synchronization because of reverse.
   void IgnoreBackHeadAndTailSync();
 
+  /// Check wether block-all operations is used.
+  void reserveBlockAllEventIds();
+
 private:
   /// Save the Global syncIR.
   SyncIRs &syncIR;
@@ -154,10 +170,18 @@ private:
   /// map from scope pair to EventPool.
   SyncCycle eventCyclePool;
 
+  /// Record reallocated pipe pairs.
   llvm::SmallSet<int, 16> reallocatedPipePair;
 
+  // Record inserted backward sync pairs.
+  llvm::DenseSet<SyncOperation *> insertedBackwardSync;
+
+  /// Reserved event IDs used in the template library.
   static const llvm::DenseMap<std::pair<hivm::PIPE, hivm::PIPE>, uint64_t>
       reservedEventIdNum;
+
+  /// Number of reserved event IDs for block synchronization.
+  uint64_t reservedBlockSyncEventIdNum{0};
 };
 
 } // namespace hivm

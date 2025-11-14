@@ -79,6 +79,9 @@ private:
 
   /// Update the synchronization required for compound element to be inserted.
   void UpdateCompoundOpInsertSync(CompoundInstanceElement *nowCompound);
+  
+  /// Update the synchronization required for place-holder element to be inserted.
+  void updatePlaceHolderOpInsertSync(PlaceHolderInstanceElement *placeHolder);
 
   /// Update the synchronization required for for element to be inserted.
   void UpdateLoopOpInsertSync(LoopInstanceElement *nowElement);

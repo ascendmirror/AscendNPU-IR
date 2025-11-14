@@ -34,7 +34,8 @@ using namespace mlir;
 //===----------------------------------------------------------------------===//
 
 /// WhiListed passes that are allowed to print IR before/after execution.
-static std::set<std::string> kAllowedPassList = {"hivm-inject-sync"};
+static std::set<std::string> kAllowedPassList = {
+    "hivm-inject-sync", "hivm-inject-block-sync", "hivm-graph-sync-solver"};
 
 namespace {
 struct PassManagerOptions {
