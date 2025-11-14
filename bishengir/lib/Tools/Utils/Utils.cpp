@@ -114,7 +114,15 @@ void TempDirectoriesStore::assertInsideTmp(StringTmpPath path) const {
   }
 }
 
+void TempDirectoriesStore::save() {
+  keep = true;
+}
+
 TempDirectoriesStore::~TempDirectoriesStore() {
+  if (keep) {
+    return;
+  }
+
   for (auto &dir : dirs) {
     assertInsideTmp(dir);
     llvm::sys::fs::remove_directories(dir, true);
@@ -152,7 +160,8 @@ bishengir::getTempFile(const std::string &outputFile,
 }
 
 LogicalResult bishengir::execute(StringRef binName, StringRef installPath,
-                                 SmallVectorImpl<StringRef> &arguments) {
+                                 SmallVectorImpl<StringRef> &arguments,
+                                 bool debugPrint) {
   std::string binPath;
   if (!installPath.empty()) {
     if (auto binPathOrErr =
@@ -174,20 +183,21 @@ LogicalResult bishengir::execute(StringRef binName, StringRef installPath,
   }
   arguments[0] = binPath;
 
-  LLVM_DEBUG({
-    llvm::dbgs() << "[DEBUG] Executing: ";
+  auto printExecuting = [&arguments](raw_ostream &stream) {
     llvm::interleave(
-        arguments, llvm::dbgs(),
-        [](const StringRef &arg) { llvm::dbgs() << arg; }, " ");
-    llvm::dbgs() << "\n";
-  });
+      arguments, stream, [&stream](const StringRef &arg) { stream << arg; }, 
+      " ");
+    stream << "\n";
+  };
+
+  if (debugPrint) {
+    llvm::dbgs() << "[DEBUG] Executing: ";
+    printExecuting(llvm::dbgs());
+  }
 
   if (llvm::sys::ExecuteAndWait(binPath, arguments) != 0) {
     llvm::errs() << "[ERROR] Executing: ";
-    llvm::interleave(
-        arguments, llvm::errs(),
-        [](const StringRef &arg) { llvm::errs() << arg; }, " ");
-    llvm::errs() << "\n";
+    printExecuting(llvm::errs());
     return failure();
   }
   return success();

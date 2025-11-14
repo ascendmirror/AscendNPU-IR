@@ -513,4 +513,20 @@ def MlirPrintIrBeforeAll : BiShengIRCompileOpt<
   bit isSharedWithDownstreamToolchain = 1;
 }
 
+def SaveTemps : BiShengIRCompileOpt<
+  "Enable saving temporal files.",
+  "bool",
+  "false"
+> {
+  bit isSharedWithDownstreamToolchain = 1;
+}
+
+def PrintCommands : BiShengIRCompileOpt<
+  "Print the commands to run for this compilation.",
+  "bool",
+  "false"
+> {
+  bit isSharedWithDownstreamToolchain = 1;
+}
+
 #endif // BISHENGIR_TOOLS_BISHENGIR_COMPILE_OPTIONS_TD
