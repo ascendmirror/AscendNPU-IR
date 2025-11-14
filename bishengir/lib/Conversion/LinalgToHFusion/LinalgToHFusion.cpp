@@ -406,23 +406,124 @@ struct LinalgToHFusionReduceWithIndex : OpRewritePattern<linalg::ReduceOp> {
       return failure();
     }
 
-    ValueRange inits = op.getInits();
     ValueRange inputs = op.getInputs();
+    ValueRange inits = op.getInits();
+    if (inputs.size() < 1 || inits.size() < 2)
+      return failure();
+
+    Value valueInput = inputs[0];
+    Value indexInput = (inputs.size() > 1) ? inputs[1] : Value();
+    Value valueInit = inits[0];
+    Value indexInit = inits[1];
+
+    auto valueShaped = valueInput.getType().dyn_cast<ShapedType>();
+    auto initShaped = valueInit.getType().dyn_cast<ShapedType>();
+    if (!valueShaped || !initShaped)
+      return failure();
+
+    Type elemTy = valueShaped.getElementType();
+
     auto reduceKindAttr =
         ReduceWithIndexKindAttr::get(rewriter.getContext(), reduceKind);
-    auto tieBreakLeftAttr = BoolAttr::get(rewriter.getContext(), tieBreakLeft);
-    std::optional<Operation *> isIndexInputUnused = utils::getAnnotateOpWithAttr(inputs[1], "UseIndexInput");
-    if (isIndexInputUnused.has_value()) {
+    auto tieBreakLeft = 
+        BoolAttr::get(rewriter.getContext(), tieBreakLeft);
+    
+    Location loc = op.getLoc();
+
+    // -----------------------------------------------------------------
+    // Case 1: uint8 max_with_index / min_with_index
+    //          -> widen to i32 (unsigned), reduce, then truncate
+    // -----------------------------------------------------------------
+    bool isUint8MinOrMax = 
+        elemTy.isInteger(8) &&
+        (reduceKind == hfusion::ReduceWithIndexKind::MAX ||
+         reduceKind == hfusion::ReduceWithIndexKind::MIN);
+    
+    if (isUint8MinOrMax) {
+      Type i32Ty = rewriter.getIntegerType(32);
+
+      // 1) Zero-extend value input and value init to i32
+      auto extValueType = valueShaped.clone(i32Ty);
+      auto extInitType = initShaped.clone(i32Ty);
+
+      Value extValueInput =
+          rewriter.create<arith::ExtUIOp>(loc, extValueType, valueInput);
+      Value extValueInit = 
+          rewriter.create<arith::ExtUIOp>(loc, extInitType, valueInit);
+      
+      // 2) Build result types for hfusion.reduce_with_index in i32 space
+      SmallVector<Type, 2> resultTypes;
+      resultTypes.push_back(extInitType); // value result: tensor<...xi32>
+      resultTypes.push_back(indexInit.getType()); // index result: tensor<...xi32>
+
+      // Decide whether to pass indexInput explicitly
+      std::optional<Operation*> isIndexInputUnused =
+          (indexInput ? utils::getAnnotateOpWithAttr(indexInput, "UseIndexInput")
+                      : std::nullopt);
+      
+      SmallVector<Value, 2> reduceInputs;
+      if (isIndexInputUnused.has_value()) {
+        // keep original behavior: value + index inputs
+        reduceInputs.push_back(extValueInput);
+        reduceInputs.push_back(indexInput);
+      } else {
+        // only the value input participates
+        reduceInputs.push_back(extValueInput);
+      }
+
+      SmallVector<Value, 2> reduceOuts = { extValueInit, indexInit };
+
+      auto reduceOp =
+          rewriter.create<hfusion::ReduceWithIndexOp>(
+            loc,
+            resultTypes,
+            ValueRange(reduceInputs),
+            ValueRange(reduceOuts),
+            reduceKindAttr,
+            tieBreakLeftAttr,
+            op.getDimensionsAttr();
+          )
+      
+      Value reducedExtVal = reduceOp->getResult(0);
+      Value reducedIdx = reduceOp->getResult(1);
+
+      // 3) Truncate reduced value back to original i8 type
+      Value truncatedVal =
+          rewriter.create<arith::TruncIOp>(
+            loc, valueInit.getType(), reducedExtVal
+          );
+      
+      // Replace original linalg.reduce
+      rewriter.replaceOp(op, ValueRange{truncatedVal, reducedIdx});
+      return success();
+    }
+
+    // -----------------------------------------------------------------
+    // Case 2: all other types
+    // -----------------------------------------------------------------
+
+    std::optional<Operation *> isIndexInputUnused2 = 
+        (inputs.size() > 1
+            ? utils::getAnnotateOpWithAttr(inputs[1], "UseIndexInput")
+            : std::nullopt
+        );
+    
+    if (isIndexInputUnused2.has_value()) {
       rewriter.replaceOpWithNewOp<hfusion::ReduceWithIndexOp>(
         op, TypeRange{inits[0].getType(), inits[1].getType()},
-        /*input*/ op.getInputs(), /*outputValue&Index*/ inits, reduceKindAttr,
-        tieBreakLeftAttr, op.getDimensionsAttr());
+        /*input*/ inputs,
+        /*outputValue & Index*/ inits,
+        reduceKindAttr, tieBreakLeftAttr, op.getDimensionsAttr()
+      );
     } else {
       rewriter.replaceOpWithNewOp<hfusion::ReduceWithIndexOp>(
-          op, TypeRange{inits[0].getType(), inits[1].getType()},
-          /*input*/ ValueRange{op.getInputs()[0]}, /*outputValue&Index*/ inits, reduceKindAttr,
-          tieBreakLeftAttr, op.getDimensionsAttr());
+        op, TypeRange{inits[0].getType(), inits[1].getType()},
+        /*input*/ ValueRange{inputs[0]},
+        /*outputValue & Index*/ inits,
+        reduceKindAttr, tieBreakLeftAttr, op.getDimensionsAttr()
+      )
     }
+
     return success();
   }
 };
