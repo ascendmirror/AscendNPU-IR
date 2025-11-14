@@ -313,8 +313,10 @@ static Value tayler(PatternRewriter &rewriter, Location loc, Value x,
 }
 
 namespace mlir::hfusion {
-// normalize sin(x) to sinTayler(norm(x,x_round,0.0))*sign(x_round), where
-// round_x=round(input_x*(1/pi))
+/// normalize sin(x) implementation
+/// Sin value precision is improved by using various precision levels of PI
+/// Using an assortment of arithmetic operations, the Taylor expansion is
+/// mimicked to calculate the value of Sin(X) where X is in radians.
 struct NormalizeSinOp : public OpRewritePattern<hfusion::ElemwiseUnaryOp> {
 public:
   using OpRewritePattern<hfusion::ElemwiseUnaryOp>::OpRewritePattern;
@@ -333,8 +335,6 @@ public:
     assert((inType.isF16() || inType.isF32()) &&
            "only support input Type is f16 or f32");
 
-    // round_x=round(input_x*(1/pi))
-    // 1/pi=0.3183098733425140380859375
     Value input = op.getDpsInputs()[0];
     if (inType.isF16()) {
       // for high precision, cast src to fp32 and compute and then cast it back
@@ -343,145 +343,478 @@ public:
                               hfusion::RoundMode::ROUND);
     }
     auto loc = op->getLoc();
+
+    const llvm::SmallVector<double> Params = {
+        3.1830987334251404e-01f,  4.8828125000000000e-04f,
+        2.0480000000000000e+03f,  3.1416015625000000e+00f,
+        -8.9071691036224365e-06f, -1.7412276065442711e-09f,
+        1.2446743939339977e-13f,  2.6049265215988271e-06f,
+        -1.9808944489341229e-04f, 8.3330497145652771e-03f,
+        -1.6666658222675323e-01f, 5.0000000000000000e-01f,
+        4.0000000000000000e+00f,  -2.0000000000000000e+00f,
+        1.0000000000000000e+00f};
+
     auto emptyOp = utils::createEmptyOp(rewriter, loc, input);
-    auto elementType = getElementTypeOrSelf(input.getType());
-    auto piRecOp = rewriter.create<arith::ConstantOp>(
-        loc, elementType, rewriter.getFloatAttr(elementType, 1 / (double)M_PI));
-    auto inputDivPi =
-        hfusion::createBinaryOp<linalg::ElemwiseBinaryOp, linalg::BinaryFn,
-                                linalg::BinaryFnAttr>(
-            rewriter, loc, linalg::BinaryFn::mul, ValueRange{input, piRecOp},
-            ValueRange(emptyOp))
-            ->getResult(0);
 
-    auto xRound = hfusion::castTo(rewriter, inputDivPi, rewriter.getF32Type(),
-                                  hfusion::RoundMode::ROUND);
+    SmallVector<Value> RoundInputs =
+        PrepRoundInput(rewriter, loc, Params, input, emptyOp);
 
-    // norm_x = x-round(x/pi)*(pi1+pi2+pi3+pi4+pi5)+offset
-    // (pi1+pi2+pi3+pi4+pi5) approximates pi
-    const llvm::SmallVector<double> piApproParams = {
-        3.140625, 0.0009670257568359375, 6.2771141529083251953125e-7,
-        1.21644916362129151821136474609375e-10,
-        -1.0290623200529979163359041220560e-13};
-    auto normInput = norm(rewriter, loc, input, xRound, piApproParams, 0.0);
+    auto xFixed =
+        CalculateXFixed(rewriter, loc, Params, input, RoundInputs, emptyOp);
 
-    // x_res = sinTayler(norm_x)
+    auto sign = CalculateSign(rewriter, loc, Params, RoundInputs[0], emptyOp);
 
-    auto sinTaylerNorm =
-        tayler<hfusion::TaylerMode::SIN>(rewriter, loc, normInput, 5);
-
-    // sign(round_x)=floor(x_round/2)*4- x_round*(2)+1
-    auto signX = sign<hfusion::TaylerMode::SIN>(rewriter, loc, xRound);
-
-    Value res = hfusion::createBinaryOp<linalg::ElemwiseBinaryOp,
-                                        linalg::BinaryFn, linalg::BinaryFnAttr>(
-                    rewriter, loc, linalg::BinaryFn::mul,
-                    ValueRange{sinTaylerNorm, signX}, ValueRange(emptyOp))
-                    ->getResult(0);
+    auto res = CalculateResult(rewriter, loc, Params, sign, xFixed, emptyOp);
 
     if (inType.isF16()) {
-      // TODO: remove cast after enable automatical high precision computing
       res = hfusion::castTo(rewriter, res, rewriter.getF16Type(),
                             hfusion::RoundMode::ROUND);
     }
     rewriter.replaceOp(op, res);
     return success();
   }
+
+private:
+  template <mlir::linalg::BinaryFn T>
+  Operation *createLinalgBinOp(PatternRewriter &rewriter, Location loc,
+                               Value inp1, Value inp2, Value out) const {
+    return hfusion::createBinaryOp<linalg::ElemwiseBinaryOp, linalg::BinaryFn,
+                                   linalg::BinaryFnAttr>(
+        rewriter, loc, T, ValueRange({inp1, inp2}), out);
+  }
+  // -------------------------------Phase1----------------------------------
+  // Multiply the input by a set of constants (π, 1/2048, 2048), round the
+  // intermediate results, and produce three values (roundPiDiv, roundPiDiv0,
+  // roundPiDiv1). These values are later used for angle reduction and sign
+  // determination in the subsequent phases.
+  SmallVector<Value> PrepRoundInput(PatternRewriter &rewriter, Location loc,
+                                    const llvm::SmallVector<double> Params,
+                                    const Value &input, Value &emptyOp) const {
+    Type castType = rewriter.getF32Type();
+    // vmul = input * PI_FOR_X_TODIV
+    auto piForXDiv = rewriter.create<arith::ConstantOp>( // PI_FOR_X_TODIV
+        loc, castType, rewriter.getFloatAttr(castType, Params[0]));
+    auto vmul = createLinalgBinOp<linalg::BinaryFn::mul>(
+                    rewriter, loc, input, piForXDiv->getResults()[0], emptyOp)
+                    ->getResult(0);
+    // vmul0 = vmul / 2048
+    auto oneOver2048 = rewriter.create<arith::ConstantOp>( // ONE_OVER_2048
+        loc, castType, rewriter.getFloatAttr(castType, Params[1]));
+    auto vmul0 = createLinalgBinOp<linalg::BinaryFn::mul>(
+                     rewriter, loc, vmul, oneOver2048->getResults()[0], emptyOp)
+                     ->getResult(0);
+    // rouding
+    auto roundPiDiv = hfusion::castTo(rewriter, vmul, rewriter.getF32Type(),
+                                      hfusion::RoundMode::ROUND);
+    auto roundPiDiv0 = hfusion::castTo(rewriter, vmul0, rewriter.getF32Type(),
+                                       hfusion::RoundMode::ROUND);
+    // roundPiDiv1 = roundPiDiv - roundPiDiv0 * 2048
+    auto const2048 = rewriter.create<arith::ConstantOp>( // 2048
+        loc, castType, rewriter.getFloatAttr(castType, Params[2]));
+    roundPiDiv0 =
+        createLinalgBinOp<linalg::BinaryFn::mul>(
+            rewriter, loc, roundPiDiv0, const2048->getResults()[0], emptyOp)
+            ->getResult(0);
+    auto roundPiDiv1 = createLinalgBinOp<linalg::BinaryFn::sub>(
+                           rewriter, loc, roundPiDiv, roundPiDiv0, emptyOp)
+                           ->getResult(0);
+
+    SmallVector<Value> roundInputs{roundPiDiv, roundPiDiv0, roundPiDiv1};
+    return roundInputs;
+  }
+  // ---------------------------------Phase2------------------------------------
+  // Using the outputs from Phase 1 (roundPiDiv0 / roundPiDiv1) and a series of
+  // π‑scaled constants, iteratively apply multiply‑subtract operations three
+  // times to obtain a reduced angle `xFixed` that lies within [‑π/2, π/2]. This
+  // reduced angle is the argument for the polynomial approximation of sin(x).
+  Value CalculateXFixed(PatternRewriter &rewriter, Location loc,
+                        const llvm::SmallVector<double> Params, Value &input,
+                        SmallVector<Value> RoundInputs, Value &emptyOp) const {
+    Type castType = rewriter.getF32Type();
+    Value xFixed = input, fix = Value{};
+    for (int i = 0; i < 3; i++) {
+      auto piX = rewriter.create<arith::ConstantOp>(
+          loc, castType, rewriter.getFloatAttr(castType, Params[i + 3]));
+      fix = createLinalgBinOp<linalg::BinaryFn::mul>(
+                rewriter, loc, RoundInputs[1], piX->getResults()[0], emptyOp)
+                ->getResult(0);
+      xFixed = createLinalgBinOp<linalg::BinaryFn::sub>(rewriter, loc, xFixed,
+                                                        fix, emptyOp)
+                   ->getResult(0);
+      fix = createLinalgBinOp<linalg::BinaryFn::mul>(
+                rewriter, loc, RoundInputs[2], piX->getResults()[0], emptyOp)
+                ->getResult(0);
+      xFixed = createLinalgBinOp<linalg::BinaryFn::sub>(rewriter, loc, xFixed,
+                                                        fix, emptyOp)
+                   ->getResult(0);
+    }
+    return xFixed;
+  }
+
+  // ----------------------------------Phase3------------------------------------
+  // Derive the sign factor for the final result. Starting from `roundPiDiv0`
+  // (which represents k/2), compute the integer part’s parity via a sequence of
+  // multiply‑add‑floor‑multiply‑add‑add operations, yielding the scalar `sign`
+  // that will later flip the polynomial output when necessary.
+  Value CalculateSign(PatternRewriter &rewriter, Location loc,
+                      const llvm::SmallVector<double> Params,
+                      const Value &roundInput, Value &emptyOp) const {
+    Type castType = rewriter.getF32Type();
+    auto half = rewriter.create<arith::ConstantOp>( // 0.5
+        loc, castType, rewriter.getFloatAttr(castType, Params[11]));
+    auto four = rewriter.create<arith::ConstantOp>( // 4.0
+        loc, castType, rewriter.getFloatAttr(castType, Params[12]));
+    auto neg2 = rewriter.create<arith::ConstantOp>( //-2.0
+        loc, castType, rewriter.getFloatAttr(castType, Params[13]));
+    auto one = rewriter.create<arith::ConstantOp>( // 1.0
+        loc, castType, rewriter.getFloatAttr(castType, Params[14]));
+    // kover2 = roundInput * 0.5
+    auto kover2 = createLinalgBinOp<linalg::BinaryFn::mul>(
+                      rewriter, loc, roundInput, half->getResults()[0], emptyOp)
+                      ->getResult(0);
+    // floor(kover2)
+    auto kover2floor = hfusion::castTo(rewriter, kover2, rewriter.getF32Type(),
+                                       hfusion::RoundMode::FLOOR);
+    // koverFloorM4 = koverFloor * 4.0
+    auto kover2floorm4 =
+        createLinalgBinOp<linalg::BinaryFn::mul>(rewriter, loc, kover2floor,
+                                                 four->getResults()[0], emptyOp)
+            ->getResult(0);
+    // k2 = roundInput * -2.0
+    auto k2 = createLinalgBinOp<linalg::BinaryFn::mul>(
+                  rewriter, loc, roundInput, neg2->getResults()[0], emptyOp)
+                  ->getResult(0);
+    // sign = koverFloorM4 + k2 + 1.0
+    auto _sign = createLinalgBinOp<linalg::BinaryFn::add>(
+                     rewriter, loc, kover2floorm4, k2, emptyOp)
+                     ->getResult(0);
+    auto sign = createLinalgBinOp<linalg::BinaryFn::add>(
+                    rewriter, loc, _sign, one->getResults()[0], emptyOp)
+                    ->getResult(0);
+    return sign;
+  }
+  // -----------------------------------Phase4----------------------------------
+  // Perform a polynomial (Taylor‑like) approximation of sin(x) using the
+  // reduced angle `xFixed` and pre‑computed coefficients. The computation
+  // proceeds through a cascade of multiply‑add steps to build the series
+  // expansion. Finally, multiply `resUp` by the `sign` from Phase 3 to obtain
+  // the correctly signed sine value.
+  Value CalculateResult(PatternRewriter &rewriter, Location loc,
+                        const llvm::SmallVector<double> Params,
+                        const Value &sign, const Value &xFixed,
+                        Value &emptyOp) const {
+    Type castType = rewriter.getF32Type();
+
+    auto sinResMulSca = rewriter.create<arith::ConstantOp>( // SIN_RES_MULIT_SCA
+        loc, castType, rewriter.getFloatAttr(castType, Params[7]));
+    auto sinResAddUp = rewriter.create<arith::ConstantOp>( // SIN_RES_ADDICT_UP
+        loc, castType, rewriter.getFloatAttr(castType, Params[8]));
+    auto xPow = createLinalgBinOp<linalg::BinaryFn::mul>(rewriter, loc, xFixed,
+                                                         xFixed, emptyOp)
+                    ->getResult(0);
+    // resUp = xPow * SIN_RES_MULIT_SCA
+    auto resUp =
+        createLinalgBinOp<linalg::BinaryFn::mul>(
+            rewriter, loc, xPow, sinResMulSca->getResults()[0], emptyOp)
+            ->getResult(0);
+    // resUp = resUp + SIN_RES_ADDICT_UP
+    resUp = createLinalgBinOp<linalg::BinaryFn::add>(
+                rewriter, loc, resUp, sinResAddUp->getResults()[0], emptyOp)
+                ->getResult(0);
+    // lambda: resUp = (resUp * xPow) + coeff
+    auto mulAdd = [this, &rewriter, loc, castType, emptyOp, &resUp,
+                   xPow](float coeff) {
+      auto constVal = rewriter.create<arith::ConstantOp>(
+          loc, castType, rewriter.getFloatAttr(castType, coeff));
+      auto term = createLinalgBinOp<linalg::BinaryFn::mul>(rewriter, loc, resUp,
+                                                           xPow, emptyOp)
+                      ->getResult(0);
+      resUp = createLinalgBinOp<linalg::BinaryFn::add>(
+                  rewriter, loc, term, constVal->getResults()[0], emptyOp)
+                  ->getResult(0);
+    };
+
+    mulAdd(Params[9]);  // SIN_2ADDS
+    mulAdd(Params[10]); // SIN_3ADDS
+    mulAdd(Params[14]); // 1.0
+    // multiply by xFixed and apply sign
+    resUp = createLinalgBinOp<linalg::BinaryFn::mul>(rewriter, loc, resUp,
+                                                     xFixed, emptyOp)
+                ->getResult(0);
+    auto res = createLinalgBinOp<linalg::BinaryFn::mul>(rewriter, loc, resUp,
+                                                        sign, emptyOp)
+                   ->getResult(0);
+    return res;
+  }
 };
 
-/// normalize cos(x)
-/// cos(x) = sin(x+pi/2)
-///        = sinTayler(norm(x+pi/2,x_round,0.0))*sign(x_round),
-/// where
-/// round_x = round((x+pi/2)*(1/pi))
-///         = sinTayler(norm(x,x_round,pi/2))*sign(x_round),
-/// where
-/// round_x = round(x*(1/pi)+0.5)
-
+/// normalize cos(x) implementation
+/// Cos value precision is improved by using various precision levels of PI
+/// Using an assortment of arithmetic operations, the Taylor expansion is
+/// mimicked to calculate the value of Cos(X) where X is in radians.
 struct NormalizeCosOp : public OpRewritePattern<hfusion::ElemwiseUnaryOp> {
 public:
   using OpRewritePattern<hfusion::ElemwiseUnaryOp>::OpRewritePattern;
 
-  Value computeRoundX(PatternRewriter &rewriter, Location loc,
-                      Value input) const {
-    auto emptyOp = utils::createEmptyOp(rewriter, loc, input);
-    auto elementType = getElementTypeOrSelf(input.getType());
-    auto piRecOp = rewriter.create<arith::ConstantOp>(
-        loc, elementType, rewriter.getFloatAttr(elementType, 1 / (double)M_PI));
-    auto inputDivPi =
-        hfusion::createBinaryOp<linalg::ElemwiseBinaryOp, linalg::BinaryFn,
-                                linalg::BinaryFnAttr>(
-            rewriter, loc, linalg::BinaryFn::mul, ValueRange{input, piRecOp},
-            ValueRange(emptyOp))
-            ->getResult(0);
-    auto halfOp = rewriter.create<arith::ConstantOp>(
-        loc, elementType, rewriter.getFloatAttr(elementType, 0.5));
-    auto inputInit =
-        hfusion::createBinaryOp<linalg::ElemwiseBinaryOp, linalg::BinaryFn,
-                                linalg::BinaryFnAttr>(
-            rewriter, loc, linalg::BinaryFn::add,
-            ValueRange{inputDivPi, halfOp}, ValueRange(emptyOp))
-            ->getResult(0);
-
-    return hfusion::castTo(rewriter, inputInit, rewriter.getF32Type(),
-                           hfusion::RoundMode::ROUND);
-  }
-
   LogicalResult matchAndRewrite(hfusion::ElemwiseUnaryOp op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.hasPureTensorSemantics()) {
+    if (!op.hasPureTensorSemantics())
       return failure();
-    }
-
-    if (op.getFun() != hfusion::UnaryFn::cos) {
+    if (op.getFun() != hfusion::UnaryFn::cos)
       return failure();
-    }
 
     auto inType = getElementTypeOrSelf(op.getInputs()[0].getType());
     assert((inType.isF16() || inType.isF32()) &&
            "only support input Type is f16 or f32");
 
     Value input = op.getDpsInputs()[0];
-    if (inType.isF16()) {
+    if (inType.isF16())
       // for high precision, cast src to fp32 and compute and then cast it back
       input = hfusion::castTo(rewriter, input, rewriter.getF32Type(),
                               hfusion::RoundMode::ROUND);
-    }
 
-    // step 1: compute round_x
-    // round_x = round(input_x*(1/pi)+0.5)
     auto loc = op->getLoc();
-    auto xRound = computeRoundX(rewriter, loc, input);
 
-    // step 2: compute norm(x, x_round, pi/2)
-    const llvm::SmallVector<double> piApproParams = {
-        3.140625, 0.0009670257568359375, 6.2771141529083251953125e-7,
-        1.21644916362129151821136474609375e-10,
-        -1.0290623200529979163359041220560e-13};
-    auto normInput =
-        norm(rewriter, loc, input, xRound, piApproParams, (double)M_PI / 2);
+    const llvm::SmallVector<double> Params = {
+        3.18309873342514038e-01f, 5.00000000000000000e-01f,
+        4.88281250000000000e-04f, 2.04800000000000000e+03f,
+        3.14160156250000000e+00f, -8.9071691036224365e-06f,
+        -1.7412276065442711e-09f, 1.24467439393399770e-13f,
+        1.57079637050628662e+00f, -4.3711390001893750e-08f,
+        4.00000000000000000e+00f, -2.0000000000000000e+00f,
+        1.00000000000000000e+00f, 2.60492652159882710e-06f,
+        -1.9808944489341229e-04f, 8.33304971456527710e-03f,
+        -1.6666658222675323e-01f, -1.0000000000000000e-00f,
+    };
 
-    // step 3: sinTayler(norm(x,x_round,pi/2))
-    auto cosTayler =
-        tayler<hfusion::TaylerMode::SIN>(rewriter, loc, normInput, 5);
-
-    // step 4: compute sign(x_round)
-    auto signX = sign<hfusion::TaylerMode::SIN>(rewriter, loc, xRound);
-
-    // step 5: compute cos(x) = sinTayler(norm(x,x_round,pi/2))*sign(x_round)
     auto emptyOp = utils::createEmptyOp(rewriter, loc, input);
-    Value res = hfusion::createBinaryOp<linalg::ElemwiseBinaryOp,
-                                        linalg::BinaryFn, linalg::BinaryFnAttr>(
-                    rewriter, loc, linalg::BinaryFn::mul,
-                    ValueRange{cosTayler, signX}, ValueRange(emptyOp))
-                    ->getResult(0);
 
-    if (inType.isF16()) {
+    SmallVector<Value> RoundInputs =
+        PrepRoundInput(rewriter, loc, Params, input, emptyOp);
+
+    auto xFixed =
+        CalculateXFixed(rewriter, loc, Params, input, RoundInputs, emptyOp);
+
+    auto sign = CalculateSign(rewriter, loc, Params, RoundInputs[0], emptyOp);
+
+    auto resSigned =
+        CalculateResult(rewriter, loc, Params, sign, xFixed, emptyOp);
+    auto res = ClipInput(rewriter, loc, resSigned, Params[12], Params[17]);
+
+    if (inType.isF16())
       res = hfusion::castTo(rewriter, res, rewriter.getF16Type(),
                             hfusion::RoundMode::ROUND);
-    }
+
     rewriter.replaceOp(op, res);
     return success();
+  }
+
+private:
+  template <mlir::linalg::BinaryFn T>
+  Operation *createLinalgBinOp(PatternRewriter &rewriter, Location loc,
+                               Value inp1, Value inp2, Value out) const {
+    return hfusion::createBinaryOp<linalg::ElemwiseBinaryOp, linalg::BinaryFn,
+                                   linalg::BinaryFnAttr>(
+        rewriter, loc, T, ValueRange({inp1, inp2}), out);
+  }
+
+  // ---------------------------------Phase1----------------------------------
+  // Multiply the input by a set of constants (π, 1/2048, 2048), round the
+  // intermediate results, and produce three values (roundPiDiv, roundPiDiv0,
+  // roundPiDiv1). These values are later used for angle reduction and sign
+  // determination in the subsequent phases.
+  SmallVector<Value> PrepRoundInput(PatternRewriter &rewriter, Location loc,
+                                    const llvm::SmallVector<double> Params,
+                                    const Value &input, Value &emptyOp) const {
+    auto f32Ty = rewriter.getF32Type();
+    // input * PI_FOR_X_TODIV
+    auto piForXDiv = rewriter.create<arith::ConstantOp>( // PI_FOR_X_TODIV
+        loc, f32Ty, rewriter.getFloatAttr(f32Ty, Params[0]));
+    auto xVmul = createLinalgBinOp<linalg::BinaryFn::mul>(
+                     rewriter, loc, input, piForXDiv->getResults()[0], emptyOp)
+                     ->getResult(0);
+
+    // xVmul + 0.5
+    auto half = rewriter.create<arith::ConstantOp>( // 0.5
+        loc, f32Ty, rewriter.getFloatAttr(f32Ty, Params[1]));
+    auto xVmul1 = createLinalgBinOp<linalg::BinaryFn::add>(
+                      rewriter, loc, xVmul, half->getResults()[0], emptyOp)
+                      ->getResult(0);
+
+    // xVmul * ONE_OVER_2048
+    auto oneOver2048 = rewriter.create<arith::ConstantOp>( // ONE_OVER_2048
+        loc, f32Ty, rewriter.getFloatAttr(f32Ty, Params[2]));
+    auto xVmul0 =
+        createLinalgBinOp<linalg::BinaryFn::mul>(
+            rewriter, loc, xVmul, oneOver2048->getResults()[0], emptyOp)
+            ->getResult(0);
+
+    // rounding
+    auto roundPiDiv =
+        hfusion::castTo(rewriter, xVmul1, f32Ty, hfusion::RoundMode::ROUND);
+    auto roundPiDiv0 =
+        hfusion::castTo(rewriter, xVmul0, f32Ty, hfusion::RoundMode::ROUND);
+
+    // roundPiDiv1 = roundPiDiv - roundPiDiv0 * 2048
+    auto const2048 = rewriter.create<arith::ConstantOp>( // 2048
+        loc, f32Ty, rewriter.getFloatAttr(f32Ty, Params[3]));
+    roundPiDiv0 =
+        createLinalgBinOp<linalg::BinaryFn::mul>(
+            rewriter, loc, roundPiDiv0, const2048->getResults()[0], emptyOp)
+            ->getResult(0);
+    auto roundPiDiv1 = createLinalgBinOp<linalg::BinaryFn::sub>(
+                           rewriter, loc, roundPiDiv, roundPiDiv0, emptyOp)
+                           ->getResult(0);
+    SmallVector<Value> roundInputs{roundPiDiv, roundPiDiv0, roundPiDiv1};
+    return roundInputs;
+  }
+
+  // ---------------------------------Phase2----------------------------------
+  // Using the outputs from Phase 1 (roundPiDiv0 / roundPiDiv1) and a series of
+  // π‑scaled constants, iteratively apply multiply‑subtract operations three
+  // times to obtain a reduced angle `xFixed` that lies within [‑π/2, π/2].
+  // This reduced angle is the argument for the polynomial approximation of
+  // cos(x).
+  Value CalculateXFixed(PatternRewriter &rewriter, Location loc,
+                        const llvm::SmallVector<double> Params, Value &input,
+                        SmallVector<Value> RoundInputs, Value &emptyOp) const {
+    auto f32Ty = rewriter.getF32Type();
+
+    Value xFixed = input; // start from the original input
+
+    auto subScaled = [this, &rewriter, loc, f32Ty, &emptyOp,
+                      &xFixed](float coeff, Value part) {
+      auto coeffVal = rewriter.create<arith::ConstantOp>(
+          loc, f32Ty, rewriter.getFloatAttr(f32Ty, coeff));
+      auto term = createLinalgBinOp<linalg::BinaryFn::mul>(
+                      rewriter, loc, part, coeffVal->getResults()[0], emptyOp)
+                      ->getResult(0);
+      xFixed = createLinalgBinOp<linalg::BinaryFn::sub>(rewriter, loc, xFixed,
+                                                        term, emptyOp)
+                   ->getResult(0);
+    };
+
+    subScaled(Params[4], RoundInputs[1]); // PI_0
+    subScaled(Params[4], RoundInputs[2]); // PI_0
+    subScaled(Params[5], RoundInputs[1]); // PI_1
+
+    auto piDown = rewriter.create<arith::ConstantOp>( // PI_DOWN
+        loc, f32Ty, rewriter.getFloatAttr(f32Ty, Params[8]));
+    xFixed = createLinalgBinOp<linalg::BinaryFn::add>(
+                 rewriter, loc, xFixed, piDown->getResults()[0], emptyOp)
+                 ->getResult(0);
+
+    subScaled(Params[5], RoundInputs[2]); // PI_1
+    subScaled(Params[6], RoundInputs[1]); // PI_2
+    subScaled(Params[6], RoundInputs[2]); // PI_2
+    subScaled(Params[7], RoundInputs[1]); // PI_3
+    subScaled(Params[7], RoundInputs[2]); // PI_3
+    auto piResDownNeg =
+        rewriter.create<arith::ConstantOp>( // PI_RESDOWN_ADDS_NEG
+            loc, f32Ty, rewriter.getFloatAttr(f32Ty, Params[9]));
+    xFixed = createLinalgBinOp<linalg::BinaryFn::add>(
+                 rewriter, loc, xFixed, piResDownNeg->getResults()[0], emptyOp)
+                 ->getResult(0);
+    return xFixed;
+  }
+
+  // ---------------------------------Phase3----------------------------------
+  // Derive the sign factor for the final result. Starting from `roundPiDiv0`
+  // (which represents k/2), compute the integer part’s parity via a sequence of
+  // multiply‑add‑floor‑multiply‑add‑add operations, yielding the scalar `sign`
+  // that will later flip the polynomial output when necessary.
+  Value CalculateSign(PatternRewriter &rewriter, Location loc,
+                      const llvm::SmallVector<double> Params,
+                      const Value &roundInput, Value &emptyOp) const {
+    auto f32Ty = rewriter.getF32Type();
+    // kover2 = roundInput * 0.5
+    auto half = rewriter.create<arith::ConstantOp>( // 0.5
+        loc, f32Ty, rewriter.getFloatAttr(f32Ty, Params[1]));
+    auto kover2 = createLinalgBinOp<linalg::BinaryFn::mul>(
+                      rewriter, loc, roundInput, half->getResults()[0], emptyOp)
+                      ->getResult(0);
+    // floor(kover2)
+    auto koverFloor =
+        hfusion::castTo(rewriter, kover2, f32Ty, hfusion::RoundMode::FLOOR);
+    // koverFloorM4 = koverFloor * 4.0
+    auto const4 = rewriter.create<arith::ConstantOp>( // 4.0
+        loc, f32Ty, rewriter.getFloatAttr(f32Ty, Params[10]));
+    auto koverFloorM4 =
+        createLinalgBinOp<linalg::BinaryFn::mul>(
+            rewriter, loc, koverFloor, const4->getResults()[0], emptyOp)
+            ->getResult(0);
+    // k2 = roundInput * -2.0
+    auto neg2 = rewriter.create<arith::ConstantOp>( //-2.0
+        loc, f32Ty, rewriter.getFloatAttr(f32Ty, Params[11]));
+    auto k2 = createLinalgBinOp<linalg::BinaryFn::mul>(
+                  rewriter, loc, roundInput, neg2->getResults()[0], emptyOp)
+                  ->getResult(0);
+    // sign = koverFloorM4 + k2 + 1.0
+    auto one = rewriter.create<arith::ConstantOp>( // 1.0
+        loc, f32Ty, rewriter.getFloatAttr(f32Ty, Params[12]));
+    auto _sign = createLinalgBinOp<linalg::BinaryFn::add>(
+                     rewriter, loc, koverFloorM4, k2, emptyOp)
+                     ->getResult(0);
+    auto sign = createLinalgBinOp<linalg::BinaryFn::add>(
+                    rewriter, loc, _sign, one->getResults()[0], emptyOp)
+                    ->getResult(0);
+    return sign;
+  }
+
+  // ---------------------------------Phase4----------------------------------
+  // Perform a polynomial (Taylor‑like) approximation of cos(x) using the
+  // reduced angle `xFixed` and pre‑computed coefficients. The computation
+  // proceeds through a cascade of multiply‑add steps to build the series
+  // expansion. Finally, add `xFixed` and the `sign` from Phase 3 to obtain the
+  // correctly signed cosine value.
+  Value CalculateResult(PatternRewriter &rewriter, Location loc,
+                        const llvm::SmallVector<double> Params,
+                        const Value &sign, const Value &xFixed,
+                        Value &emptyOp) const {
+    auto f32Ty = rewriter.getF32Type();
+    auto xPow = createLinalgBinOp<linalg::BinaryFn::mul>(rewriter, loc, xFixed,
+                                                         xFixed, emptyOp)
+                    ->getResult(0);
+    // resUp = xPow * COS_RES_MULIT_SCA
+    auto cosResMulitSca =
+        rewriter.create<arith::ConstantOp>( // COS_RES_MULIT_SCA
+            loc, f32Ty, rewriter.getFloatAttr(f32Ty, Params[13]));
+    auto resUp =
+        createLinalgBinOp<linalg::BinaryFn::mul>(
+            rewriter, loc, xPow, cosResMulitSca->getResults()[0], emptyOp)
+            ->getResult(0);
+    // resUp = resUp + COS_RES_ADDICT_UP
+    auto cosResAddictUp =
+        rewriter.create<arith::ConstantOp>( // COS_RES_ADDICT_UP
+            loc, f32Ty, rewriter.getFloatAttr(f32Ty, Params[14]));
+    resUp = createLinalgBinOp<linalg::BinaryFn::add>(
+                rewriter, loc, resUp, cosResAddictUp->getResults()[0], emptyOp)
+                ->getResult(0);
+
+    // lambda: resUp = (resUp * xPow) + coeff
+    auto mulAdd = [this, &rewriter, loc, f32Ty, emptyOp, &resUp,
+                   xPow](float coeff) {
+      auto constVal = rewriter.create<arith::ConstantOp>(
+          loc, f32Ty, rewriter.getFloatAttr(f32Ty, coeff));
+      auto term = createLinalgBinOp<linalg::BinaryFn::mul>(rewriter, loc, resUp,
+                                                           xPow, emptyOp)
+                      ->getResult(0);
+      resUp = createLinalgBinOp<linalg::BinaryFn::add>(
+                  rewriter, loc, term, constVal->getResults()[0], emptyOp)
+                  ->getResult(0);
+    };
+
+    mulAdd(Params[15]); // COS_2ADDS
+    mulAdd(Params[16]); // COS_3ADDS
+    mulAdd(Params[12]); // 1.0
+    // multiply by xFixed and apply sign
+    resUp = createLinalgBinOp<linalg::BinaryFn::mul>(rewriter, loc, resUp,
+                                                     xFixed, emptyOp)
+                ->getResult(0);
+    auto resUpSigned = createLinalgBinOp<linalg::BinaryFn::mul>(
+                           rewriter, loc, resUp, sign, emptyOp)
+                           ->getResult(0);
+    return resUpSigned;
   }
 };
 
