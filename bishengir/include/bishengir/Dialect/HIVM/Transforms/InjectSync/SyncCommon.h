@@ -226,7 +226,7 @@ public:
   // sync is inserted under the element when codegen is executed.
   SyncOps pipeAfter;
 
-  enum class KindTy { COMPOUND, LOOP, BRANCH };
+  enum class KindTy { COMPOUND, LOOP, BRANCH, PLACE_HOLDER };
 
 public:
   virtual ~InstanceElement() = default;
@@ -249,6 +249,18 @@ protected:
 
 private:
   const KindTy kKindTy;
+};
+
+class PlaceHolderInstanceElement : public InstanceElement {
+public:
+  unsigned parentScopeId;
+  PlaceHolderInstanceElement(unsigned index, unsigned parentScopeId)
+      : InstanceElement(KindTy::PLACE_HOLDER, index),
+        parentScopeId(parentScopeId) {};
+
+  std::unique_ptr<PlaceHolderInstanceElement> Clone() const;
+
+  static bool classof(const InstanceElement *e);
 };
 
 enum class KindOfLoop { LOOP_BEGIN, LOOP_END };
@@ -298,7 +310,10 @@ public:
         branchId(beginId), kBranchKind(branchKind) {}
 
   ~BranchInstanceElement() override = default;
-  std::unique_ptr<InstanceElement> CloneBranch(KindOfBranch branchKind) const;
+
+  std::unique_ptr<BranchInstanceElement>
+  CloneBranch(KindOfBranch branchKind) const;
+
   KindOfBranch getBranchKind() const { return kBranchKind; }
 
   static bool classof(const InstanceElement *e);

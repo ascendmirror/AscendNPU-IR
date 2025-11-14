@@ -120,8 +120,22 @@ void SyncAnalyzer::InsertLastPipeAll() {
   assert(syncOperations.size() == syncIndex);
 }
 
-bool SyncAnalyzer::isParallelLoop(scf::ForOp forOp) {
+bool SyncAnalyzer::isParallelLoop(scf::ForOp forOp) const {
   return forOp->hasAttrOfType<UnitAttr>(hivm::ParallelLoopAttr::name);
+}
+
+bool SyncAnalyzer::checkUnderParallelLoop(
+    const CompoundInstanceElement *nowCompound,
+    const CompoundInstanceElement *frontCompound) const {
+  auto loopOp1 = nowCompound->elementOp->getParentOfType<LoopLikeOpInterface>();
+  auto loopOp2 =
+      frontCompound->elementOp->getParentOfType<LoopLikeOpInterface>();
+  auto forOp1 = llvm::dyn_cast_if_present<scf::ForOp>(loopOp1.getOperation());
+  auto forOp2 = llvm::dyn_cast_if_present<scf::ForOp>(loopOp2.getOperation());
+  if (!forOp1 || !forOp2 || forOp1 != forOp2) {
+    return false;
+  }
+  return isParallelLoop(forOp1);
 }
 
 void SyncAnalyzer::DealWithLoopSync(LoopInstanceElement *nowElement) {
@@ -133,12 +147,6 @@ void SyncAnalyzer::DealWithLoopSync(LoopInstanceElement *nowElement) {
   //  *  A [j + 1]   copy cmd
   //  *  B [j + 1]   copy cmd
   // Then call InsertSeqSync func to insert backward sync as sequential sync.
-  if (auto forOp =
-          llvm::dyn_cast_if_present<scf::ForOp>(nowElement->elementOp)) {
-    if (isParallelLoop(forOp)) {
-      return;
-    }
-  }
   if (nowElement->getLoopKind() == KindOfLoop::LOOP_END) {
     SyncIRs backSyncIr;
     assert(syncIR.size() >= nowElement->endId);
@@ -155,6 +163,10 @@ void SyncAnalyzer::DealWithLoopSync(LoopInstanceElement *nowElement) {
         auto newBranchPtr =
             branchElement->CloneBranch(branchElement->getBranchKind());
         backSyncIr.emplace_back(std::move(newBranchPtr));
+      } else if (auto *placeHolderElement =
+                     dyn_cast<PlaceHolderInstanceElement>(syncIR[i].get())) {
+        auto newPlaceHolderElement = placeHolderElement->Clone();
+        backSyncIr.emplace_back(std::move(newPlaceHolderElement));
       }
     }
   }
@@ -267,8 +279,16 @@ void SyncAnalyzer::UpdateSyncRecord(const SyncOperation *sync,
                                     SyncRecord &syncRecord,
                                     hivm::PIPE nowPipeValue) {
   auto &[recordAlready, recordFinder] = syncRecord;
-  const hivm::PIPE waitPipeValue = sync->GetDstPipe();
   const hivm::PIPE setPipeValue = sync->GetSrcPipe();
+  hivm::PIPE waitPipeValue = sync->GetDstPipe();
+  if (syncAnalysisMode == SyncAnalysisMode::BLOCKSYNC) {
+    // Unlike normal-sync mode, in block-sync mode, there is no wait-pipe (or
+    // dst-pipe), all further instructions after the syncBlockWait instruction
+    // will be blocked, as if it is blocking the pipe-s pipeline.
+    nowPipeValue = hivm::PIPE::PIPE_S;
+    waitPipeValue = hivm::PIPE::PIPE_S;
+  }
+
   bool barrierFinder = (nowPipeValue == waitPipeValue) &&
                        (sync->GetType() == SyncOperation::TYPE::PIPE_BARRIER);
   if (barrierFinder) {
@@ -409,7 +429,16 @@ bool SyncAnalyzer::IsNoNeedToInsertSync(
     // of forward synchronization, only need to be judged in reverse.
     return true;
   }
+  if (isBackwardDep) {
+    if (checkUnderParallelLoop(nowCompound, frontCompound)) {
+      return true;
+    }
+  }
   if (syncAnalysisMode == SyncAnalysisMode::BLOCKSYNC) {
+    // will be handled by normal sync analysis.
+    if (frontCompound->compoundCoreType == TCoreType::CUBE_AND_VECTOR) {
+      return true;
+    }
     // TODO: support vector-vector
     // currently we only support cube-cube (vv unsupported)
     if (nowCompound->compoundCoreType == frontCompound->compoundCoreType) {
@@ -625,7 +654,7 @@ void SyncAnalyzer::InsertBlockSyncOperation(
     std::unique_ptr<SyncOperation, std::default_delete<SyncOperation>>
         syncBlockSetOp = std::make_unique<SyncOperation>(SyncOperation{
             SyncOperation::TYPE::SYNC_BLOCK_SET, frontCompound->kPipeValue,
-            nowCompound->kPipeValue, syncIndex, insertSetId, forEndIndex});
+            hivm::PIPE::PIPE_S, syncIndex, insertSetId, forEndIndex});
     auto syncBlockWaitOp = syncBlockSetOp->GetMatchSync(insertWaitId);
 
     auto parentLoops =
@@ -646,9 +675,19 @@ void SyncAnalyzer::InsertBlockSyncOperation(
       UpdateBackSyncMultiBufferInfo(syncBlockSetOp.get(), syncBlockWaitOp.get(),
                                     depBaseMemInfosVec, forEndIndex);
     }
-
+    // set the core-type info.
     syncBlockSetOp->syncCoreType = frontCompound->compoundCoreType;
     syncBlockWaitOp->syncCoreType = nowCompound->compoundCoreType;
+    // only wait/core-type can be CUBE_AND_VECTOR, set/core-type cannot.
+    assert(syncBlockSetOp->syncCoreType != TCoreType::CUBE_AND_VECTOR);
+    // if wait/core-type is CUBE_AND_VECTOR, change it to the other type.
+    if (syncBlockWaitOp->syncCoreType == TCoreType::CUBE_AND_VECTOR) {
+      if (syncBlockSetOp->syncCoreType == TCoreType::CUBE) {
+        syncBlockWaitOp->syncCoreType = TCoreType::VECTOR;
+      } else if (syncBlockSetOp->syncCoreType == TCoreType::VECTOR) {
+        syncBlockWaitOp->syncCoreType = TCoreType::CUBE;
+      }
+    }
     syncIR[insertSetId]->pipeAfter.push_back(syncBlockSetOp.get());
     syncIR[insertWaitId]->pipeBefore.push_back(syncBlockWaitOp.get());
     SmallVector<std::unique_ptr<SyncOperation>> newSync;
@@ -704,11 +743,103 @@ void SyncAnalyzer::ChangeFrontPipeToVirtualMTE2(
   }
 }
 
+InstanceElement *
+SyncAnalyzer::getParentScope(InstanceElement *instanceElement) {
+  for (int i = instanceElement->GetIndex(); i >= 0; i--) {
+    if (auto *loopOp = dyn_cast<LoopInstanceElement>(syncIR[i].get())) {
+      auto loopKind = loopOp->getLoopKind();
+      if (loopKind == KindOfLoop::LOOP_BEGIN) {
+        return loopOp;
+      }
+      i = loopOp->beginId;
+    } else if (auto *branchOp =
+                   dyn_cast<BranchInstanceElement>(syncIR[i].get())) {
+      auto branchKind = branchOp->getBranchKind();
+      if (branchKind == KindOfBranch::IF_BEGIN ||
+          branchKind == KindOfBranch::ELSE_BEGIN) {
+        return branchOp;
+      }
+      i = branchOp->beginId;
+    }
+  }
+  return nullptr;
+}
+
+PlaceHolderInstanceElement *
+SyncAnalyzer::checkUnlikelyScope(CompoundInstanceElement *nowCompound,
+                                 CompoundInstanceElement *frontCompound) {
+  auto *parentScope = getParentScope(frontCompound);
+  if (parentScope == nullptr) {
+    return nullptr;
+  }
+  if (parentScope->elementOp == nullptr) {
+    return nullptr;
+  }
+  if (auto *branchOp = dyn_cast<BranchInstanceElement>(parentScope)) {
+    if (auto ifOp = dyn_cast<scf::IfOp>(parentScope->elementOp)) {
+      if (ifOp->hasAttrOfType<UnitAttr>(hivm::UnlikelyConditionAttr::name)) {
+        auto *placeHolder = dyn_cast<PlaceHolderInstanceElement>(
+            syncIR[branchOp->endId - 1].get());
+        assert(placeHolder != nullptr);
+        return placeHolder;
+      }
+    }
+  }
+  return nullptr;
+}
+
+void SyncAnalyzer::insertUnlikelySyncOperation(
+    PlaceHolderInstanceElement *placeHolder,
+    CompoundInstanceElement *nowCompound,
+    CompoundInstanceElement *frontCompound,
+    DepBaseMemInfoPairVec &depBaseMemInfosVec,
+    const std::optional<unsigned> &forEndIndex) {
+  auto nowPipe = nowCompound->kPipeValue;
+  auto frontPipe = frontCompound->kPipeValue;
+  ChangeToVirtualMTE2IfNeed(nowCompound, frontCompound, nowPipe, frontPipe,
+                            depBaseMemInfosVec);
+  if (nowPipe == frontPipe) {
+    unsigned insertBarrierId = placeHolder->GetIndex();
+    auto barrierSyncOp = std::make_unique<SyncOperation>(
+        SyncOperation{SyncOperation::TYPE::PIPE_BARRIER, frontPipe, nowPipe,
+                      syncIndex, nowCompound->GetIndex(), forEndIndex});
+    barrierSyncOp->SetDepSyncIRIndex(frontCompound->GetIndex());
+    syncIR[insertBarrierId]->pipeBefore.push_back(barrierSyncOp.get());
+    barrierSyncOp->SetSyncIRIndex(insertBarrierId);
+    SmallVector<std::unique_ptr<SyncOperation>> newSync;
+    newSync.emplace_back(std::move(barrierSyncOp));
+    syncOperations.emplace_back(std::move(newSync));
+  } else {
+    unsigned insertWaitId = placeHolder->GetIndex();
+    unsigned insertSetId = frontCompound->GetIndex();
+    auto setFlag = std::make_unique<SyncOperation>(
+        SyncOperation{SyncOperation::TYPE::SET_EVENT, frontPipe, nowPipe,
+                      syncIndex, insertSetId, forEndIndex});
+    auto waitFlag = setFlag->GetMatchSync(insertWaitId);
+    UpdateBackSyncMultiBufferInfo(setFlag.get(), waitFlag.get(),
+                                  depBaseMemInfosVec, forEndIndex);
+    syncIR[insertSetId]->pipeAfter.push_back(setFlag.get());
+    syncIR[insertWaitId]->pipeBefore.push_back(waitFlag.get());
+    SmallVector<std::unique_ptr<SyncOperation>> newSync;
+    newSync.emplace_back(std::move(setFlag));
+    newSync.emplace_back(std::move(waitFlag));
+    syncOperations.emplace_back(std::move(newSync));
+  }
+  syncIndex++;
+  assert(syncOperations.size() == syncIndex);
+}
+
 void SyncAnalyzer::InsertSyncOperation(
     CompoundInstanceElement *nowCompound,
     CompoundInstanceElement *frontCompound,
     DepBaseMemInfoPairVec &depBaseMemInfosVec,
     const std::optional<unsigned> &forEndIndex) {
+  if (auto *placeHolder = checkUnlikelyScope(nowCompound, frontCompound)) {
+    insertUnlikelySyncOperation(placeHolder, nowCompound, frontCompound,
+                                depBaseMemInfosVec, forEndIndex);
+    return;
+  }
+
   auto nowPipe = nowCompound->kPipeValue;
   auto frontPipe = frontCompound->kPipeValue;
   ChangeToVirtualMTE2IfNeed(nowCompound, frontCompound, nowPipe, frontPipe,

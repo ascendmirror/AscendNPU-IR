@@ -55,8 +55,8 @@ module {
                         outs(%2 : memref<256xf32, #hivm.address_space<cc>>)
     hivm.hir.fixpipe {enable_nz2nd} ins(%2 : memref<256xf32, #hivm.address_space<cc>>)
                      outs(%arg2 : memref<256xf32, #hivm.address_space<gm>>)
-    // CHECK: hivm.hir.sync_block_set{{\[}}<CUBE>, <PIPE_FIX>, <PIPE_MTE2>] flag = 0
-    // CHECK: hivm.hir.sync_block_wait{{\[}}<VECTOR>, <PIPE_FIX>, <PIPE_MTE2>] flag = 0
+    // CHECK: hivm.hir.sync_block_set{{\[}}<CUBE>, <PIPE_FIX>, <PIPE_S>] flag = 0
+    // CHECK: hivm.hir.sync_block_wait{{\[}}<VECTOR>, <PIPE_FIX>, <PIPE_S>] flag = 0
     %5 = memref.alloc() : memref<256xf32, #hivm.address_space<ub>>
     %4 = memref.alloc() : memref<256xf32, #hivm.address_space<ub>>
     hivm.hir.load ins(%arg2 : memref<256xf32, #hivm.address_space<gm>>)
@@ -100,8 +100,8 @@ module {
                      outs(%arg2 : memref<256xf32, #hivm.address_space<gm>>)
     %5 = memref.alloc() : memref<256xf32, #hivm.address_space<ub>>
     %4 = memref.alloc() : memref<256xf32, #hivm.address_space<ub>>
-    // CHECK: hivm.hir.sync_block_set{{\[}}<CUBE>, <PIPE_FIX>, <PIPE_MTE2>] flag = 0
-    // CHECK: hivm.hir.sync_block_wait{{\[}}<VECTOR>, <PIPE_FIX>, <PIPE_MTE2>] flag = 0
+    // CHECK: hivm.hir.sync_block_set{{\[}}<CUBE>, <PIPE_FIX>, <PIPE_S>] flag = 0
+    // CHECK: hivm.hir.sync_block_wait{{\[}}<VECTOR>, <PIPE_FIX>, <PIPE_S>] flag = 0
     scf.if %arg4 {
       hivm.hir.load ins(%arg2 : memref<256xf32, #hivm.address_space<gm>>)
                     outs(%5 : memref<256xf32, #hivm.address_space<ub>>)
@@ -133,7 +133,7 @@ module {
     %c0_i64 = arith.constant 0 : i64
     %c0 = arith.constant 0 : index
     %c4 = arith.constant 4 : index
-    // CHECK: hivm.hir.sync_block_set{{\[}}<VECTOR>, <PIPE_MTE2>, <PIPE_FIX>] flag = 0
+    // CHECK: hivm.hir.sync_block_set{{\[}}<VECTOR>, <PIPE_MTE2>, <PIPE_S>] flag = 0
     scf.for %arg7 = %c0 to %c16 step %c4 {
         %0 = memref.alloc() : memref<16xf32, #hivm.address_space<cbuf>>
         hivm.hir.nd2nz {dst_continuous} ins(%arg0 : memref<16xf32, #hivm.address_space<gm>>)
@@ -145,23 +145,23 @@ module {
         hivm.hir.mmadL1 ins(%0, %1, %true, %c16, %c256, %c16 : memref<16xf32, #hivm.address_space<cbuf>>,
                             memref<16xf32, #hivm.address_space<cbuf>>, i1, index, index, index)
                             outs(%2 : memref<256xf32, #hivm.address_space<cc>>)
-        // CHECK: hivm.hir.sync_block_wait{{\[}}<CUBE>, <PIPE_MTE2>, <PIPE_FIX>] flag = 0
+        // CHECK: hivm.hir.sync_block_wait{{\[}}<CUBE>, <PIPE_MTE2>, <PIPE_S>] flag = 0
         hivm.hir.fixpipe {enable_nz2nd} ins(%2 : memref<256xf32, #hivm.address_space<cc>>)
                          outs(%arg2 : memref<256xf32, #hivm.address_space<gm>>)
-        // CHECK: hivm.hir.sync_block_set{{\[}}<CUBE>, <PIPE_FIX>, <PIPE_MTE2>] flag = 1
-        // CHECK: hivm.hir.sync_block_wait{{\[}}<VECTOR>, <PIPE_FIX>, <PIPE_MTE2>] flag = 1
+        // CHECK: hivm.hir.sync_block_set{{\[}}<CUBE>, <PIPE_FIX>, <PIPE_S>] flag = 1
+        // CHECK: hivm.hir.sync_block_wait{{\[}}<VECTOR>, <PIPE_FIX>, <PIPE_S>] flag = 1
         %5 = memref.alloc() : memref<256xf32, #hivm.address_space<ub>>
         %4 = memref.alloc() : memref<256xf32, #hivm.address_space<ub>>
         hivm.hir.load ins(%arg2 : memref<256xf32, #hivm.address_space<gm>>)
                     outs(%5 : memref<256xf32, #hivm.address_space<ub>>)
-        // CHECK: hivm.hir.sync_block_set{{\[}}<VECTOR>, <PIPE_MTE2>, <PIPE_FIX>] flag = 0
+        // CHECK: hivm.hir.sync_block_set{{\[}}<VECTOR>, <PIPE_MTE2>, <PIPE_S>] flag = 0
         hivm.hir.vadd ins(%5, %4 : memref<256xf32, #hivm.address_space<ub>>,
                     memref<256xf32, #hivm.address_space<ub>>)
                     outs(%5 : memref<256xf32, #hivm.address_space<ub>>)
         hivm.hir.store ins(%5 : memref<256xf32, #hivm.address_space<ub>>)
                     outs(%arg3 : memref<256xf32, #hivm.address_space<gm>>)
     }
-    // CHECK: hivm.hir.sync_block_wait{{\[}}<CUBE>, <PIPE_MTE2>, <PIPE_FIX>] flag = 0
+    // CHECK: hivm.hir.sync_block_wait{{\[}}<CUBE>, <PIPE_MTE2>, <PIPE_S>] flag = 0
     return
   }
 }
@@ -192,10 +192,10 @@ module {
                         memref<16xf32>, i1, index, index, index)
                         outs(%2 : memref<256xf32>)
     hivm.hir.fixpipe {enable_nz2nd} ins(%2 : memref<256xf32>) outs(%arg2 : memref<256xf32>)
-    // CHECK: hivm.hir.sync_block_set{{\[}}<CUBE>, <PIPE_FIX>, <PIPE_MTE2>] flag = 0
+    // CHECK: hivm.hir.sync_block_set{{\[}}<CUBE>, <PIPE_FIX>, <PIPE_S>] flag = 0
     %11 = bufferization.to_tensor %arg2 restrict writable : memref<256xf32>
     %13 = tensor.empty() : tensor<256xf32>
-    // CHECK: hivm.hir.sync_block_wait{{\[}}<VECTOR>, <PIPE_FIX>, <PIPE_MTE2>] flag = 0
+    // CHECK: hivm.hir.sync_block_wait{{\[}}<VECTOR>, <PIPE_FIX>, <PIPE_S>] flag = 0
     %12 = hivm.hir.load ins(%11 : tensor<256xf32>) outs(%13 : tensor<256xf32>) -> tensor<256xf32>
     %14 = tensor.empty() : tensor<256xf32>
     %15 = hivm.hir.vsub ins(%12, %12 : tensor<256xf32>, tensor<256xf32>)
@@ -441,9 +441,9 @@ func.func @matmul_x_w_bias_down_up_fused_layer_1_kernel(%arg0: i64 {hacc.arg_typ
   %21 = memref_ext.alloc_workspace() from %arg1 offset = [%c0] : from memref<?xi8> to memref<32x64xf16>
   %22 = bufferization.to_tensor %21 restrict writable : memref<32x64xf16>
   %23 = hivm.hir.fixpipe {enable_nz2nd, pre_quant = #hivm.fixpipe_pre_quant_mode<F322F16>} ins(%19#0 : tensor<32x64xf32>) outs(%22 : tensor<32x64xf16>) -> tensor<32x64xf16>
-  // CHECK: hivm.hir.sync_block_set{{\[}}<CUBE>, <PIPE_FIX>, <PIPE_MTE2>] flag = 0
+  // CHECK: hivm.hir.sync_block_set{{\[}}<CUBE>, <PIPE_FIX>, <PIPE_S>] flag = 0
   %24 = tensor.empty() : tensor<32x64xf16>
-  // CHECK: hivm.hir.sync_block_wait{{\[}}<VECTOR>, <PIPE_FIX>, <PIPE_MTE2>] flag = 0
+  // CHECK: hivm.hir.sync_block_wait{{\[}}<VECTOR>, <PIPE_FIX>, <PIPE_S>] flag = 0
   %25 = hivm.hir.load ins(%23 : tensor<32x64xf16>) outs(%24 : tensor<32x64xf16>) -> tensor<32x64xf16>
   %26 = tensor.empty() : tensor<32x64xf16>
   // CHECK: hivm.hir.sync_block[<BARRIER_CUBE>]
@@ -582,9 +582,9 @@ func.func @matmul_x_w_bias_down_up_fused_layer_1_kernel(%arg0: i64 {hacc.arg_typ
   %23 = memref_ext.alloc_workspace() from %arg1 offset = [%c0] : from memref<?xi8> to memref<32x32xf32>
   %24 = bufferization.to_tensor %23 restrict writable : memref<32x32xf32>
   %25 = hivm.hir.fixpipe {enable_nz2nd} ins(%22#0 : tensor<32x32xf32>) outs(%24 : tensor<32x32xf32>) -> tensor<32x32xf32>
-  // CHECK: hivm.hir.sync_block_set{{\[}}<CUBE>, <PIPE_FIX>, <PIPE_MTE2>] flag = 0
+  // CHECK: hivm.hir.sync_block_set{{\[}}<CUBE>, <PIPE_FIX>, <PIPE_S>] flag = 0
   %26 = tensor.empty() : tensor<32x32xf32>
-  // CHECK: hivm.hir.sync_block_wait{{\[}}<VECTOR>, <PIPE_FIX>, <PIPE_MTE2>] flag = 0
+  // CHECK: hivm.hir.sync_block_wait{{\[}}<VECTOR>, <PIPE_FIX>, <PIPE_S>] flag = 0
   %27 = hivm.hir.load ins(%25 : tensor<32x32xf32>) outs(%26 : tensor<32x32xf32>) -> tensor<32x32xf32>
   %alloc = memref.alloc() : memref<1x32xf16>
   %collapse_shape = memref.collapse_shape %alloc [[0, 1]] : memref<1x32xf16> into memref<32xf16>
@@ -623,9 +623,9 @@ func.func @matmul_x_w_bias_down_up_fused_layer_1_kernel(%arg0: i64 {hacc.arg_typ
   %48 = memref_ext.alloc_workspace() from %arg1 offset = [%c8192] : from memref<?xi8> to memref<32x32xf32>
   %49 = bufferization.to_tensor %48 restrict writable : memref<32x32xf32>
   %50 = hivm.hir.fixpipe {enable_nz2nd} ins(%47 : tensor<32x32xf32>) outs(%49 : tensor<32x32xf32>) -> tensor<32x32xf32>
-  // CHECK: hivm.hir.sync_block_set{{\[}}<CUBE>, <PIPE_FIX>, <PIPE_MTE2>] flag = 0
+  // CHECK: hivm.hir.sync_block_set{{\[}}<CUBE>, <PIPE_FIX>, <PIPE_S>] flag = 0
   %51 = tensor.empty() : tensor<32x32xf32>
-  // CHECK: hivm.hir.sync_block_wait{{\[}}<VECTOR>, <PIPE_FIX>, <PIPE_MTE2>] flag = 0
+  // CHECK: hivm.hir.sync_block_wait{{\[}}<VECTOR>, <PIPE_FIX>, <PIPE_S>] flag = 0
   %52 = hivm.hir.load ins(%50 : tensor<32x32xf32>) outs(%51 : tensor<32x32xf32>) -> tensor<32x32xf32>
   %53 = tensor.empty() : tensor<32x32xf32>
   %54 = hivm.hir.vadd ins(%52, %38 : tensor<32x32xf32>, tensor<32x32xf32>) outs(%53 : tensor<32x32xf32>) -> tensor<32x32xf32>

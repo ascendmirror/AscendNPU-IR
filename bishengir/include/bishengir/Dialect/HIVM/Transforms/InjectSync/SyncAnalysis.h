@@ -165,6 +165,20 @@ private:
                            DepBaseMemInfoPairVec &depBaseMemInfosVec,
                            const std::optional<unsigned> &forEndIndex);
 
+  InstanceElement *getParentScope(InstanceElement *instanceElement);
+
+  PlaceHolderInstanceElement *
+  checkUnlikelyScope(CompoundInstanceElement *nowCompound,
+                     CompoundInstanceElement *frontCompound);
+
+  /// Insert synchronization instructions for dependent elements when the front
+  /// compound is inside an "unlikely" scope.
+  void insertUnlikelySyncOperation(PlaceHolderInstanceElement *placeHolder,
+                                   CompoundInstanceElement *nowCompound,
+                                   CompoundInstanceElement *frontCompound,
+                                   DepBaseMemInfoPairVec &depBaseMemInfosVec,
+                                   const std::optional<unsigned> &forEndIndex);
+
   std::optional<std::pair<LoopLikeOpInterface, LoopLikeOpInterface>>
   getBlockSyncMultibufferEnabledLoops(CompoundInstanceElement *nowCompound,
                                       CompoundInstanceElement *frontCompound);
@@ -273,7 +287,11 @@ private:
       CompoundInstanceElement *frontCompound,
       const std::optional<unsigned> &forEndIndex);
 
-  bool isParallelLoop(scf::ForOp forOp);
+  bool isParallelLoop(scf::ForOp forOp) const;
+
+  bool
+  checkUnderParallelLoop(const CompoundInstanceElement *nowCompound,
+                         const CompoundInstanceElement *frontCompound) const;
 };
 
 } // namespace hivm
