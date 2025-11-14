@@ -208,7 +208,7 @@ struct ElementwiseOpToHFusionCast : OpRewritePattern<CastOp> {
         return hfusion::RoundMode::TRUNCWITHOVERFLOW;
       }
       return hfusion::RoundMode::RINT;
-    } else if (isa<arith::ExtSIOp>(op) || isa<arith::ExtUIOp>(op)) {
+    } else if (isa<arith::ExtSIOp>(op)) {
       return hfusion::RoundMode::RINT;
     } else if (isa<arith::FPToSIOp>(op) || isa<arith::SIToFPOp>(op) ||
                isa<arith::FPToUIOp>(op) || isa<arith::UIToFPOp>(op)) {
@@ -238,6 +238,129 @@ struct ElementwiseOpToHFusionCast : OpRewritePattern<CastOp> {
     return success();
   }
 };
+
+template<>
+LogicalResult
+ElementwiseOpToHFusionCast<arith::ExtUIOp>::matchAndRewrite(
+    arith::ExtUIOp op, PatternRewriter &rewriter) const {
+
+  if (!operateOnTensors(op))
+      return failure();
+  
+  Location loc = op.getLoc();
+  Value src = op.getIn(); // tensor<i8>, tensor<i16>, ...
+
+  // Destination tensor (e.g. tensor<i32>)
+  SmallVector<Value> dsts;
+  if (failed(tensor::getOrCreateDestinations(rewriter, loc, op, dsts)))
+      return failure();
+  
+  Value dst = dsts[0];
+
+  auto srcTy = mlir::cast<ShapedType>(src.getType());
+  auto dstTy = mlir::cast<ShapedType>(dst.getType());
+
+  Type inElem = srcTy.getElementType();
+  Type outElem = dstTy.getElementType();
+
+  // Only handle integer -> larger integer (real ExtUI)
+  if (!inElem.isInteger() || !outElem.isInteger())
+      return failure();
+  
+  unsigned inW = inElem.getIntOrFloatBitWidth();
+  unsigned outW = outElem.getIntOrFloatBitWidth();
+  if (outW <= inW)
+      return failure();
+
+  // -----------------------------------------------------------------
+  // 1. First do a "signed" cast via hfusion.cast (cheap but wrong for < 0)
+  // -----------------------------------------------------------------
+  Value signedExtEmpty =
+      tensor::createTensorEmptyOpWithTargetElemType(
+        rewriter, loc, src, outElem
+      );
+  
+  auto castOp = rewriter.create<hfusion::CastOp>(
+    loc,
+    /*inputs*/ ValueRange{src},
+    /*outputs*/ ValueRange{signedExtEmpty},
+    ArrayRef{rewriter.getNamedAttr(
+        hfusion::RoundModeAttr::getMnemonic(),
+        rewriter.getAttr<hfusion::RoundModeAttr>(
+          hfusion::RoundMode::RINT
+        )
+    )}
+  );
+
+  Value signedExt = castOp.getResult(0);
+
+  // -----------------------------------------------------------------
+  // 2. Repair negatives: if (signedExt < 0) signedExt + 2^inW else signedExt
+  // -----------------------------------------------------------------
+  int64_t addVal = 1LL << inW; // 256 for i8, 65536 for i16, ...
+
+  Value addConst = rewriter.create<arith::ConstantOp>(
+    loc, rewriter.getIntegerAttr(outElem, addVal)
+  );
+  Value zeroConst = rewriter.create<arith::ConstantOp>(
+    loc, rewriter.getIntegerAttr(outElem, 0)
+  );
+
+  // signedExt < 0 : tensor<i1>
+  Value cmpDst = 
+    tensor::createTensorEmptyOpWithTargetElemType(
+      rewriter,
+      loc,
+      signedExt,
+      rewriter.getI1Type()
+    );
+  
+  auto cmpOp = rewriter.create<hfusion::CompareOp>(
+    loc, 
+    /*inputs*/ ValueRange{signedExt, zeroConst},
+    /*outputs*/ ValueRange{cmpDst},
+    ArrayRef{rewriter.getNamedAttr(
+      hfusion::CompareFnAttr::getMnemonic(),
+      rewriter.getAttr<hfusion::CompareFnAttr>(
+        hfusion::CompareFn::vlt
+      )
+    )}
+  );
+
+  Value cmp = cmpOp.getResult(0);
+
+  // signedExt + 2^inW (we will use linalg::ElemwiseBinaryOp for add)
+  Value addDst =
+    tensor::createTensorEmptyOpWithTargetElemType(rewriter, loc, signedExt, outElem);
+  
+  auto addFnAttr = rewriter.rewriter.getAttr<linalg::BinaryFnAttr>(
+    linalg::BinaryFn::add
+  );
+  auto funAttr = rewriter.getNamedAttr("fun", addFnAttr);
+
+  auto addOp = rewriter.create<linalg::ElemwiseBinaryOp>(
+    loc,
+    /*inputs*/ ValueRange{signedExt, addConst},
+    /*outputs*/ ValueRange{addDst},
+    ArrayRef{funAttr}
+  );
+
+  Value added = addOp.getResult(0);
+
+  // -----------------------------------------------------------------
+  // 3. Select: cmp ? added : signedExt (result into dsts)
+  // -----------------------------------------------------------------
+  auto selectOp = rewriter.create<hfusion::SelectOp>(
+    loc,
+    /*inputs*/ ValueRange{cmp, added, signedExt},
+    /*outputs*/ ValueRange{dsts}
+  );
+
+  // Replace original arith.extui with the select's result
+  rewriter.replaceOp(op, selectOp.getResults());
+
+  return success(); 
+}
 
 template <typename CompareOp>
 struct ElementwiseOpToHFusionCompare : OpRewritePattern<CompareOp> {
