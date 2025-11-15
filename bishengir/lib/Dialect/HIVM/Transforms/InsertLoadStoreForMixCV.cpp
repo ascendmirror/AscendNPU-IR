@@ -595,7 +595,17 @@ void InsertLoadStoreForMixCVPass::runOnOperation() {
   RewritePatternSet patterns(context);
   populateInsertLoadStorePattern(patterns);
   patterns.insert<InsertStoreForSCFYield>(patterns.getContext());
-  patterns.insert<DuplicateTensorExtractForCube>(patterns.getContext());
+  bool hasCube = false;
+  funcOp->walk([&hasCube](Operation *nestedOp) {
+    if (isa<hivm::MmadL1Op>(nestedOp)) {
+      hasCube = true;
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+  if (hasCube) {
+    patterns.insert<DuplicateTensorExtractForCube>(patterns.getContext());
+  }
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
     signalPassFailure();
   }
