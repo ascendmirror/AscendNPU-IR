@@ -427,7 +427,7 @@ hivm::inferAndPropagateMemScopeForPointerCast(hivm::PointerCastOp op) {
 //   return success();
 // }
 
-hivm::inferAndPropagateMemScopeForAlloc(memref::AllocOp op, TFuncCoreType funcType) {
+LogicalResult hivm::inferAndPropagateMemScopeForAlloc(memref::AllocOp op, TFuncCoreType funcType) {
   LDBG("Begin infer and propagate memory scope for: " << *op);
   auto memorySpace = op.getType().getMemorySpace();
   if (memorySpace) {
