@@ -459,20 +459,20 @@ LogicalResult hivm::inferAndPropagateMemScopeForAlloc(memref::AllocOp op, TFuncC
   return success();
 }
 
-LogicalResult hivm::inferAndPropagateUbufMemScope(memref::AllocOp op) {
-  LDBG("Begin infer and propagate memory scope for: " << *op);
-  auto memorySpace = op.getType().getMemorySpace();
-  if (memorySpace)
-    return success();
+// LogicalResult hivm::inferAndPropagateUbufMemScope(memref::AllocOp op) {
+//   LDBG("Begin infer and propagate memory scope for: " << *op);
+//   auto memorySpace = op.getType().getMemorySpace();
+//   if (memorySpace)
+//     return success();
 
-  MemScopeInferAndPropagateHelper helper;
-  auto ubSpaceAttr =
-      AddressSpaceAttr::get(op->getContext(), hivm::AddressSpace::UB);
-  if (failed(helper.Run(op, ubSpaceAttr))) {
-    return op->emitOpError("Failed to propagate memory scope ub for allocOp");
-  }
-  return success();
-}
+//   MemScopeInferAndPropagateHelper helper;
+//   auto ubSpaceAttr =
+//       AddressSpaceAttr::get(op->getContext(), hivm::AddressSpace::UB);
+//   if (failed(helper.Run(op, ubSpaceAttr))) {
+//     return op->emitOpError("Failed to propagate memory scope ub for allocOp");
+//   }
+//   return success();
+// }
 
 void InferHIVMMemScopePass::runOnOperation() {
   SmallVector<func::FuncOp> deviceFuncList;
