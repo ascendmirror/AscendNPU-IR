@@ -469,10 +469,8 @@ void InferHIVMMemScopePass::runOnOperation() {
     });
 
     auto funcCoreType = queryFuncCoreType(func);
-    // Finally, set the remaining memory scope in the device kernel to UB.
+    // Finally, set the remaining memory scope in the device kernel.
     func->walk([&](memref::AllocOp op) {
-      // if (failed(hivm::inferAndPropagateUbufMemScope(op)))
-      //   signalPassFailure();
       if (failed(hivm::inferAndPropagateMemScopeForAlloc(op, funcCoreType))) {
         signalPassFailure();
       }
