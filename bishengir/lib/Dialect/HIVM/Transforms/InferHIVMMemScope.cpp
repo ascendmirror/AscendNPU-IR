@@ -404,25 +404,57 @@ hivm::inferAndPropagateMemScopeForPointerCast(hivm::PointerCastOp op) {
   return success();
 }
 
-LogicalResult hivm::inferAndPropagateToL1MemScopeForUnusedByHIVMOp(memref::AllocOp op) {
+// LogicalResult hivm::inferAndPropagateToL1MemScopeForUnusedByHIVMOp(memref::AllocOp op) {
+//   LDBG("Begin infer and propagate memory scope for: " << *op);
+//   auto memorySpace = op.getType().getMemorySpace();
+//   if (memorySpace) {
+//     return success();
+//   }
+
+//   mlir::Value allocMemRef = op.getResult();
+//   for (auto user: allocMemRef.getUsers()) {
+//     if (isa<HIVMStructuredOp>(user)) {
+//       return success();
+//     }
+//   }
+
+//   MemScopeInferAndPropagateHelper helper;
+//   auto l1SpaceAttr =
+//       AddressSpaceAttr::get(op->getContext(), hivm::AddressSpace::L1);
+//   if (failed(helper.Run(op, l1SpaceAttr))) {
+//     return op->emitOpError("Failed to propagate memory scope L1 for allocOp");
+//   }
+//   return success();
+// }
+
+hivm::inferAndPropagateMemScopeForAlloc(memref::AllocOp op, TFuncCoreType funcType) {
   LDBG("Begin infer and propagate memory scope for: " << *op);
   auto memorySpace = op.getType().getMemorySpace();
   if (memorySpace) {
     return success();
   }
 
-  mlir::Value allocMemRef = op.getResult();
-  for (auto user: allocMemRef.getUsers()) {
-    if (isa<HIVMStructuredOp>(user)) {
-      return success();
-    }
-  }
-
   MemScopeInferAndPropagateHelper helper;
-  auto l1SpaceAttr =
-      AddressSpaceAttr::get(op->getContext(), hivm::AddressSpace::L1);
-  if (failed(helper.Run(op, l1SpaceAttr))) {
-    return op->emitOpError("Failed to propagate memory scope L1 for allocOp");
+  if (funcType == TFuncCoreType::AIC) {
+    mlir::Value allocMemRef = op.getResult();
+    for (auto user: allocMemRef.getUsers()) {
+      if (isa<HIVMStructuredOp>(user)) {
+        // 如果aic中的alloc的user是hivmop，应该在前面已经被处理过，不应该在这里出现
+        return op->emitOpError("Unexpected op user: the allocOp's user MUST be hivmop here");
+      }
+    }
+
+    auto l1SpaceAttr =
+        AddressSpaceAttr::get(op->getContext(), hivm::AddressSpace::L1);
+    if (failed(helper.Run(op, l1SpaceAttr))) {
+      return op->emitOpError("Failed to propagate memory scope L1 for allocOp");
+    }
+  } else {
+    auto ubSpaceAttr =
+        AddressSpaceAttr::get(op->getContext(), hivm::AddressSpace::UB);
+    if (failed(helper.Run(op, ubSpaceAttr))) {
+      return op->emitOpError("Failed to propagate memory scope ub for allocOp");
+    }
   }
   return success();
 }
@@ -474,19 +506,22 @@ void InferHIVMMemScopePass::runOnOperation() {
         signalPassFailure();
     });
 
-    // Set the alloc memory that not used by hivmop to L1 if the func core is AIC
-    auto funcCoreType = queryFuncCoreType(func);
-    if (funcCoreType.has_value() && funcCoreType.value() == TFuncCoreType::AIC) {
-      func->walk([&](memref::AllocOp op) {
-        if (failed(hivm::inferAndPropagateToL1MemScopeForUnusedByHIVMOp(op)))
-          signalPassFailure();
-      });
-    }
+    // // Set the alloc memory that not used by hivmop to L1 if the func core is AIC
+    // auto funcCoreType = queryFuncCoreType(func);
+    // if (funcCoreType.has_value() && funcCoreType.value() == TFuncCoreType::AIC) {
+    //   func->walk([&](memref::AllocOp op) {
+    //     if (failed(hivm::inferAndPropagateToL1MemScopeForUnusedByHIVMOp(op)))
+    //       signalPassFailure();
+    //   });
+    // }
 
     // Finally, set the remaining memory scope in the device kernel to UB.
     func->walk([&](memref::AllocOp op) {
-      if (failed(hivm::inferAndPropagateUbufMemScope(op)))
+      // if (failed(hivm::inferAndPropagateUbufMemScope(op)))
+      //   signalPassFailure();
+      if (failed(hivm::inferAndPropagateMemScopeForAlloc(op))) {
         signalPassFailure();
+      }
     });
   }
 
