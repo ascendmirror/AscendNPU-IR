@@ -436,7 +436,7 @@ LogicalResult hivm::inferAndPropagateMemScopeForAlloc(memref::AllocOp op, std::o
 
   MemScopeInferAndPropagateHelper helper;
   if (!funcType.has_value()) {
-    return op->emitOpError("Unexpected op user: the allocOp's user MUST be hivmop here");
+    return op->emitOpError("no func core type");
   }
 
   if (funcType.value() == TFuncCoreType::AIC) {
