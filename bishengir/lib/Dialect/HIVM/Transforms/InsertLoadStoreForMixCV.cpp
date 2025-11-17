@@ -483,27 +483,31 @@ struct DuplicateTensorExtractForCube
       auto presumedAllocOp = traceDefOp<memref::AllocOp>(originTensor);
       if (presumedAllocOp.has_value()) {
         auto allocOp = cast<memref::AllocOp>(presumedAllocOp.value());
-        allocOp->setAttr(cubeErasureLabel, rewriter.getI32IntegerAttr(1));
         Value memrefValue = allocOp.getMemref();
-        int cnt = 0;
         bool foundLoad = false;
         bool foundBufferization = false;
+        SmallVector<Operation *, 2> tmpOps;
         for (Operation *userOp : memrefValue.getUsers()) {
-          ++cnt;
           if (isa<hivm::LoadOp>(userOp) &&
               dyn_cast<hivm::LoadOp>(userOp).getDst() == memrefValue) {
             foundLoad = true;
-            userOp->setAttr(cubeErasureLabel, rewriter.getI32IntegerAttr(1));
+            tmpOps.push_back(userOp);
           }
           if (isa<bufferization::ToTensorOp>(userOp) &&
               dyn_cast<bufferization::ToTensorOp>(userOp).getOperand() ==
                   memrefValue) {
             foundBufferization = true;
-            userOp->setAttr(cubeErasureLabel, rewriter.getI32IntegerAttr(1));
+            tmpOps.push_back(userOp);
           }
         }
-        if (!(cnt == 2 && foundLoad && foundBufferization)) {
+        if (!(tmpOps.size() == 2 && foundLoad && foundBufferization)) {
           return failure();
+        } else {
+          // 当bufferization是load来的时候，才需要打erase标签
+          allocOp->setAttr(cubeErasureLabel, rewriter.getI32IntegerAttr(1));
+          for (auto op: tmpOps) {
+            op->setAttr(cubeErasureLabel, rewriter.getI32IntegerAttr(1));
+          }
         }
       } else {
         return failure();
