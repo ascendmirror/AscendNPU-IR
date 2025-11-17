@@ -435,11 +435,7 @@ LogicalResult hivm::inferAndPropagateMemScopeForAlloc(memref::AllocOp op, std::o
   }
 
   MemScopeInferAndPropagateHelper helper;
-  if (!funcType.has_value()) {
-    return op->emitOpError("no func core type");
-  }
-
-  if (funcType.value() == TFuncCoreType::AIC) {
+  if (funcType.has_value() && funcType.value() == TFuncCoreType::AIC) {
     mlir::Value allocMemRef = op.getResult();
     for (auto user: allocMemRef.getUsers()) {
       if (isa<HIVMStructuredOp>(user)) {
