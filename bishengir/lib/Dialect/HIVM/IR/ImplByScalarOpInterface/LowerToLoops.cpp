@@ -683,7 +683,7 @@ createScalarReduceComputeOp(RewriterBase &rewriter, hivm::VReduceOp op,
 
   // Order is important, so we only insert once we have inserted
   // min/max value while running max_with_index/min_with_index.
-  if (util::isArgminOrArgmax(reduceOpAttr)) {
+  if (VReduceOp::isArgminOrArgmax(reduceOpAttr)) {
     resTensors.push_back(resIndex);
   }
 
@@ -717,7 +717,7 @@ void insertReduceInitialization(RewriterBase &rewriter, hivm::VReduceOp op,
                                    op.getDpsInits()[0], dstIndexes);
 
   auto arith = op.getArithAttr().getReduceOp();
-  if (util::isArgminOrArgmax(arith)) {
+  if (VReduceOp::isArgminOrArgmax(arith)) {
     auto constIndexInit = rewriter.create<arith::ConstantOp>(
         op->getLoc(), IntegerAttr::get(rewriter.getI32Type(), 0));
     rewriter.create<memref::StoreOp>(op->getLoc(), constIndexInit,
@@ -767,7 +767,7 @@ void decomposeVReduceOpToScalarOpImpl(RewriterBase &rewriter, VReduceOp op) {
 
     auto reduceOpArith = op.getArithAttr();
     auto reduceOpAttr = reduceOpArith.getReduceOp();
-    if (util::isArgminOrArgmax(reduceOpAttr)) {
+    if (VReduceOp::isArgminOrArgmax(reduceOpAttr)) {
       // Load the Index value needed for update across iterations.
       auto loadIndOp = createSinglePointLoad(rewriter, op.getLoc(),
                                              op.getDpsInits()[1], dstIndexes);
