@@ -454,8 +454,8 @@ void InferHIVMMemScopePass::runOnOperation() {
     // Finally, set the remaining memory scope in the device kernel.
     auto funcCoreType = queryFuncCoreType(func);
     if (funcCoreType.has_value()) {
-      hivm::AddressSpace scope = hivm::AddressSpace::UB;
-      if (funcType.value() == TFuncCoreType::AIC) {
+      hivm::AddressSpace space = hivm::AddressSpace::UB;
+      if (funcCoreType.value() == TFuncCoreType::AIC) {
         space = hivm::AddressSpace::L1;
       }
       func->walk([&](memref::AllocOp op) {
