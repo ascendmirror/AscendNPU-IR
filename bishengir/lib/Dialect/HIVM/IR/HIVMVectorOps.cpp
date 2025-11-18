@@ -307,7 +307,7 @@ LogicalResult VReduceOp::verify() {
     }
   }
   auto arith = getArithAttr();
-  if (util::isArgminOrArgmax(arith.getReduceOp())) {
+  if (isArgminOrArgmax(arith.getReduceOp())) {
     if (!getDstIndex()) {
       return emitOpError() << "dst index must be defined for min_with_index "
                               "and max_with_index";

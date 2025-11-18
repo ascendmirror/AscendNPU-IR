@@ -1178,6 +1178,13 @@ def VReduceOp : HIVM_VectorOp<"vreduce",
     }
 
     bool useVectorCrossIntr(bool lastAxis, int rank);
+
+    static bool isArgminOrArgmax(ReduceOperation op){
+      return op == ReduceOperation::min_with_index_left ||
+             op == ReduceOperation::max_with_index_left ||
+             op == ReduceOperation::min_with_index_right ||
+             op == ReduceOperation::max_with_index_right;
+    }
   }];
 }
 
