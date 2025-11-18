@@ -1,6 +1,54 @@
 // RUN: bishengir-opt -hivm-insert-load-store-for-mix-cv %s -split-input-file -verify-diagnostics --canonicalize-ext | FileCheck %s
 
 // -----
+// CHECK-LABEL: @no_insert_store_between_extract_and_non_vector_non_cube_user(
+// CHECK: %[[EXTRACTED_INDEX:.*]] = tensor.extract %{{.*}}[%{{.*}}] : tensor<52xi64>
+// CHECK: %{{[A-Za-z0-9_]+}} = arith.index_cast %[[EXTRACTED_INDEX:.*]] : i64 to index
+// CHECK-NOT: %{{[A-Za-z0-9_]+}} = hivm.hir.store ins(%input_indices : tensor<52xi64>) outs(%{{[A-Za-z0-9_]+}} : tensor<52xi64>) -> tensor<52xi64>
+func.func @no_insert_store_between_extract_and_non_vector_non_cube_user(%input_indices: tensor<52xi64>, %reinterpret_cast_1: memref<16384x768xf16, strided<[768, 1]>>, %alloc_2: memref<52x768xf16>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c52 = arith.constant 52 : index
+  scf.for %arg10 = %c0 to %c52 step %c1 {
+    %extracted = tensor.extract %input_indices[%arg10] : tensor<52xi64>
+    %26 = arith.index_cast %extracted : i64 to index
+    %subview_5 = memref.subview %reinterpret_cast_1[%26, 0] [1, 768] [1, 1] : memref<16384x768xf16, strided<[768, 1]>> to memref<1x768xf16, strided<[768, 1], offset: ?>>
+    %subview_6 = memref.subview %alloc_2[%arg10, 0] [1, 768] [1, 1] : memref<52x768xf16> to memref<1x768xf16, strided<[768, 1], offset: ?>>
+    annotation.mark %subview_6 {hivm.stride_align_dims = array<i32: 0>, hivm.stride_align_value_in_byte = array<i32: 32>} : memref<1x768xf16, strided<[768, 1], offset: ?>>
+    hivm.hir.load ins(%subview_5 : memref<1x768xf16, strided<[768, 1], offset: ?>>) outs(%subview_6 : memref<1x768xf16, strided<[768, 1], offset: ?>>) left_padding_num = %c0 : index init_out_buffer = false may_implicit_transpose_with_last_axis = false
+  }
+  return
+}
+
+// -----
+// CHECK-LABEL: @insert_store_between_vector_and_cube_grandchild(
+// CHECK: %[[VEC_RESULT:.*]] = hivm.hir.vmul ins(%{{.*}}, %{{.*}} : tensor<16x16xf32>, tensor<16x16xf32>) outs(%{{.*}} : tensor<16x16xf32>) -> tensor<16x16xf32>
+// CHECK: %[[EXTRACTED:.*]] = tensor.extract_slice %[[VEC_RESULT]][{{.*}}, {{.*}}] [1, 16] [1, 1] : tensor<16x16xf32> to tensor<1x16xf32>
+// CHECK: %{{[A-Za-z0-9_]+}} = hivm.hir.store ins(%[[VEC_RESULT:.*]] : tensor<1x16xf32>) outs(%{{.*}} : tensor<1x16xf32>) -> tensor<1x16xf32>
+func.func @insert_store_between_vector_and_cube_grandchild(%2 : tensor<16x16xf32>, %arg0 : tensor<1x16xf32>, %other_matrix : tensor<16x1xf32>, %out_buf : memref<16x16x16xf32>) {
+  %c0 = arith.constant 0 : index
+	%c1 = arith.constant 1 : index
+	%c16 = arith.constant 16 : index
+  %init = arith.constant 1 : i1
+  %0 = tensor.empty() : tensor<16x16xf32>
+	%vec_result = hivm.hir.vmul ins(%2, %2 : tensor<16x16xf32>, tensor<16x16xf32>) outs(%0 : tensor<16x16xf32>) -> tensor<16x16xf32>
+  scf.for %arg10 = %c0 to %c16 step %c1 {
+    %extracted = tensor.extract_slice %vec_result[%arg10, %c0] [1, 16] [1, 1] : tensor<16x16xf32> to tensor<1x16xf32>
+		%vec_sum_out = tensor.empty() : tensor<1x16xf32>
+		%vec_sum = hivm.hir.vadd ins(%extracted, %arg0 : tensor<1x16xf32>, tensor<1x16xf32>) outs(%vec_sum_out : tensor<1x16xf32>) -> tensor<1x16xf32>
+		%out_for_result = tensor.empty() : tensor<16x16xf32>
+		%result = hivm.hir.mmadL1 ins(%other_matrix, %vec_sum, %init, %c16, %c16, %c16 :
+                                tensor<16x1xf32>, tensor<1x16xf32>, i1, index, index, index)
+                          outs(%out_for_result : tensor<16x16xf32>) -> tensor<16x16xf32>
+
+    %reinterpret_cast_0 = memref.reinterpret_cast %out_buf to offset: [%arg10], sizes: [16, 16], strides: [16, 1] : memref<16x16x16xf32> to memref<16x16xf32, strided<[16, 1], offset: ?>>
+    bufferization.materialize_in_destination %result in writable %reinterpret_cast_0 : (tensor<16x16xf32>, memref<16x16xf32, strided<[16, 1], offset: ?>>) -> ()
+	}
+	return
+}
+
+
+// -----
 // CHECK-LABEL: @insert_load_between_fixpipe_and_vector(
 // CHECK-SAME: %[[ARG0:.*]]: memref<?xf16>, %[[ARG1:.*]]: memref<?xi8>) {
 func.func @insert_load_between_fixpipe_and_vector(%arg0 : memref<?xf16>, %arg1 : memref<?xi8>) {

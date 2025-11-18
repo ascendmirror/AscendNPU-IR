@@ -456,6 +456,48 @@ struct DuplicateTensorExtractForCube
         mlir::hivm::TCoreTypeAttr::get(markOp->getContext(), tCoreType));
   }
 
+  bool findCubeUser(tensor::ExtractOp extractOp) const {
+    bool hasCubeUser = false;
+    SmallVector<Operation *> worklist;
+    
+    if (extractOp->getNumResults() > 0) {
+      for (Operation *userOp : extractOp->getResult(0).getUsers()) {
+        worklist.push_back(userOp);
+      }
+    } else {
+      return false; 
+    }
+
+    SmallPtrSet<Operation *, 16> visited;
+    while (!worklist.empty()) {
+      Operation *currentOp = worklist.pop_back_val();
+
+      if (!visited.insert(currentOp).second) {
+        continue;
+      }
+
+      currentOp->walk([&hasCubeUser](Operation *nestedOp) {
+        if (getCoreType(nestedOp) == TCoreType::CUBE) {
+          hasCubeUser = true;
+          return WalkResult::interrupt();
+        }
+        return WalkResult::advance();
+      });
+
+      if (hasCubeUser) {
+        return true;
+      }
+
+      for (Value result : currentOp->getResults()) {
+        for (Operation *userOp : result.getUsers()) {
+          worklist.push_back(userOp);
+        }
+      }
+    }
+
+    return false;
+  }
+
   LogicalResult matchAndRewrite(tensor::ExtractOp extractOp,
                                 PatternRewriter &rewriter) const override {
     // check if it has already been visited
@@ -511,43 +553,7 @@ struct DuplicateTensorExtractForCube
     }
 
     // only process cases with cube users
-    bool hasCubeUser = false;
-    SmallVector<Operation *> worklist;
-    // Initialize worklist with immediate users
-    for (Operation *userOp : extractOp.getResult().getUsers()) {
-      worklist.push_back(userOp);
-    }
-    // Process worklist
-    SmallPtrSet<Operation *, 16> visited;
-    while (!worklist.empty()) {
-      Operation *currentOp = worklist.pop_back_val();
-
-      // Skip if already visited
-      if (!visited.insert(currentOp).second) {
-        continue;
-      }
-
-      // Check this operation and all nested operations
-      currentOp->walk([&hasCubeUser](Operation *nestedOp) {
-        if (getCoreType(nestedOp) == TCoreType::CUBE) {
-          hasCubeUser = true;
-          return WalkResult::interrupt();
-        }
-        return WalkResult::advance();
-      });
-
-      if (hasCubeUser) {
-        break;
-      }
-
-      // Add users of this operation's results to worklist
-      for (Value result : currentOp->getResults()) {
-        for (Operation *userOp : result.getUsers()) {
-          worklist.push_back(userOp);
-        }
-      }
-    }
-    if (!hasCubeUser) {
+    if (!findCubeUser(extractOp)) {
       return failure();
     }
 
