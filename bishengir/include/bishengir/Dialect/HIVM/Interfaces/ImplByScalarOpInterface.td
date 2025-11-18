@@ -32,16 +32,6 @@ def ImplByScalarOpInterface : OpInterface<"ImplByScalarOpInterface"> {
   let methods = [
     InterfaceMethod<
       /*desc=*/[{
-        Method to lower the operation to scalar loops.
-      }],
-      /*retType=*/"mlir::FailureOr<mlir::SmallVector<mlir::Value>>",
-      /*methodName=*/"lowerToLoops",
-      /*args=*/(ins
-          "RewriterBase &":$b),
-      /*methodBody=*/""
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
         Return whether the operation should be lowered to scalar loops.
       }],
       /*retType=*/"bool",

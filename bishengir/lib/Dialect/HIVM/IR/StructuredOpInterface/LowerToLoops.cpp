@@ -15,11 +15,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "bishengir/Dialect/HIVM/IR/HIVM.h"
 #include "bishengir/Dialect/HIVM/Utils/Utils.h"
 #include "bishengir/Dialect/Utils/Util.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "llvm/Support/LogicalResult.h"
 #include <algorithm>
 
 #define DEBUG_TYPE "op-lower-to-loops-impl"
@@ -320,12 +322,12 @@ decomposeCumVectorOpToScalarOpImpl(RewriterBase &rewriter, HIVMOP op) {
 //===----------------------------------------------------------------------===//
 
 #define ENABLE_DEFAULT_OP_LOWER_TO_LOOPS_IMPLEMENTATION(OP_NAME)               \
-  FailureOr<SmallVector<Value>> OP_NAME::lowerToLoops(RewriterBase &b) {       \
+  FailureOr<SmallVector<Value>> mlir::hivm::OP_NAME::lowerToLoops(RewriterBase &b) {       \
     return decomposeVectorOpToScalarOp(b, *this);                              \
   }
 
 #define ENABLE_CUM_OP_LOWER_TO_LOOPS_IMPLEMENTATION(OP_NAME)                   \
-  FailureOr<SmallVector<Value>> OP_NAME::lowerToLoops(RewriterBase &b) {       \
+  FailureOr<SmallVector<Value>> mlir::hivm::OP_NAME::lowerToLoops(RewriterBase &b) {       \
     return decomposeCumVectorOpToScalarOpImpl(b, *this);                       \
   }
 
@@ -348,6 +350,7 @@ ENABLE_CUM_OP_LOWER_TO_LOOPS_IMPLEMENTATION(VCumsumOp)
 //===----------------------------------------------------------------------===//
 // VCmpOp
 //===----------------------------------------------------------------------===//
+
 
 FailureOr<SmallVector<Value>> VCmpOp::lowerToLoops(RewriterBase &b) {
   decomposeVectorOpToScalarOpImpl(b, *this);

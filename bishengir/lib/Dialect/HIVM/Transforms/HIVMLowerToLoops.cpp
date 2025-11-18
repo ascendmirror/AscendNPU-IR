@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 #include "bishengir/Dialect/HACC/Utils/Utils.h"
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
+#include "bishengir/Dialect/HIVM/IR/HIVMInterfaces.h"
 #include "bishengir/Dialect/HIVM/Transforms/Passes.h"
 #include "bishengir/Dialect/HIVM/Utils/Utils.h"
 #include "bishengir/Dialect/Utils/Util.h"
@@ -60,7 +61,9 @@ struct HIVMLowerToLoopsPattern
     if (!op.shouldLowerToScalarLoops())
       return failure();
 
-    FailureOr<SmallVector<Value>> maybeNewResults = op.lowerToLoops(rewriter);
+    FailureOr<SmallVector<Value>> maybeNewResults =
+        cast<mlir::hivm::HIVMStructuredOp>(op.getOperation())
+            .lowerToLoops(rewriter);
 
     if (failed(maybeNewResults))
       return failure();
