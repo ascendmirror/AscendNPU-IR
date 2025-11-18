@@ -404,7 +404,7 @@ hivm::inferAndPropagateMemScopeForPointerCast(hivm::PointerCastOp op) {
   return success();
 }
 
-LogicalResult hivm::inferAndPropagateMemScopeForAlloc(memref::AllocOp op, std::optional<TFuncCoreType> funcType) {
+LogicalResult hivm::inferAndPropagateMemScopeForAlloc(memref::AllocOp op, TFuncCoreType funcType) {
   LDBG("Begin infer and propagate memory scope for: " << *op);
   auto memorySpace = op.getType().getMemorySpace();
   if (memorySpace) {
@@ -412,15 +412,6 @@ LogicalResult hivm::inferAndPropagateMemScopeForAlloc(memref::AllocOp op, std::o
   }
 
   MemScopeInferAndPropagateHelper helper;
-  if (funcType.has_value() && funcType.value() == TFuncCoreType::AIC) {
-    mlir::Value allocMemRef = op.getResult();
-    for (auto user: allocMemRef.getUsers()) {
-      if (isa<HIVMStructuredOp>(user)) {
-        // 如果aic中的alloc的user是hivmop，应该在前面已经被处理过，不应该在这里出现
-        return op->emitOpError("Unexpected op user: the allocOp's user MUST be hivmop here");
-      }
-    }
-
     auto l1SpaceAttr =
         AddressSpaceAttr::get(op->getContext(), hivm::AddressSpace::L1);
     if (failed(helper.Run(op, l1SpaceAttr))) {
@@ -468,13 +459,15 @@ void InferHIVMMemScopePass::runOnOperation() {
         signalPassFailure();
     });
 
-    auto funcCoreType = queryFuncCoreType(func);
     // Finally, set the remaining memory scope in the device kernel.
-    func->walk([&](memref::AllocOp op) {
-      if (failed(hivm::inferAndPropagateMemScopeForAlloc(op, funcCoreType))) {
-        signalPassFailure();
-      }
-    });
+    auto funcCoreType = queryFuncCoreType(func);
+    if (funcCoreType.has_value()) {
+      func->walk([&](memref::AllocOp op) {
+        if (failed(hivm::inferAndPropagateMemScopeForAlloc(op, funcCoreType.value()))) {
+          signalPassFailure();
+        }
+      });
+    }
   }
 
   for (auto func : deviceFuncList) {
