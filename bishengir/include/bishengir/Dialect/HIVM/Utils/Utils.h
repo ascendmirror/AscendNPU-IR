@@ -358,8 +358,6 @@ bool isLastDimContiguous(Value operand);
 /// Used to check if it is lowered from triton::IntToPtrOp
 bool isGMPointerCastOp(Operation *op);
 
-bool isArgminOrArgmax(ReduceOperation op);
-
 } // namespace util
 } // namespace hivm
 } // namespace mlir
