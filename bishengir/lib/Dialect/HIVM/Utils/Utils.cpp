@@ -1031,7 +1031,7 @@ Value createNestedIndexModular(OpBuilder &builder, Operation *op, int modular) {
                                                loopInfoVec, modular);
 }
 
-Value mlir::hivm::createNestedIndexModular(OpBuilder &builder,
+Value createNestedIndexModular(OpBuilder &builder,
                                            LoopLikeOpInterface loopOp,
                                            int modular) {
   auto loopInfoVec = getLoopsInfo(loopOp);
