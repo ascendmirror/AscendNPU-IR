@@ -219,7 +219,7 @@ struct RedudantVReduceOp : public OpRewritePattern<VReduceOp> {
       if (reduceOp.hasPureTensorSemantics()) {
         assert(isa<TensorType>(srcType));
         auto arith = reduceOp.getArithAttr().getReduceOp();
-        if (util::isArgminOrArgmax(arith)) {
+        if (VReduceOp::isArgminOrArgmax(arith)) {
           if (!reduceOp->getResult(1).getUsers().empty()) {
             return decomposeRedundantReduceWithIndex(reduceOp, rewriter,
                                                      isa<TensorType>(srcType));
@@ -234,7 +234,7 @@ struct RedudantVReduceOp : public OpRewritePattern<VReduceOp> {
           return failure();
         }
         auto arith = reduceOp.getArithAttr().getReduceOp();
-        if (util::isArgminOrArgmax(arith)) {
+        if (VReduceOp::isArgminOrArgmax(arith)) {
           return decomposeRedundantReduceWithIndex(reduceOp, rewriter,
                                                    isa<TensorType>(srcType));
         }
