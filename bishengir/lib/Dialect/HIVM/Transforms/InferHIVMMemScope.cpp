@@ -404,7 +404,7 @@ hivm::inferAndPropagateMemScopeForPointerCast(hivm::PointerCastOp op) {
   return success();
 }
 
-LogicalResult hivm::inferAndPropagateMemScopeForAlloc(memref::AllocOp op, TFuncCoreType funcType) {
+LogicalResult hivm::inferAndPropagateMemScopeForAlloc(memref::AllocOp op, hivm::AddressSpace space) {
   LDBG("Begin infer and propagate memory scope for: " << *op);
   auto memorySpace = op.getType().getMemorySpace();
   if (memorySpace) {
@@ -412,17 +412,9 @@ LogicalResult hivm::inferAndPropagateMemScopeForAlloc(memref::AllocOp op, TFuncC
   }
 
   MemScopeInferAndPropagateHelper helper;
-    auto l1SpaceAttr =
-        AddressSpaceAttr::get(op->getContext(), hivm::AddressSpace::L1);
-    if (failed(helper.Run(op, l1SpaceAttr))) {
-      return op->emitOpError("Failed to propagate memory scope L1 for allocOp");
-    }
-  } else if (funcType.has_value() && funcType.value() == TFuncCoreType::AIV) {
-    auto ubSpaceAttr =
-        AddressSpaceAttr::get(op->getContext(), hivm::AddressSpace::UB);
-    if (failed(helper.Run(op, ubSpaceAttr))) {
-      return op->emitOpError("Failed to propagate memory scope ub for allocOp");
-    }
+  auto spaceAttr = AddressSpaceAttr::get(op->getContext(), space);
+  if (failed(helper.Run(op, spaceAttr))) {
+    return op->emitOpError("Failed to propagate memory scope L1 for allocOp");
   }
   return success();
 }
@@ -462,8 +454,12 @@ void InferHIVMMemScopePass::runOnOperation() {
     // Finally, set the remaining memory scope in the device kernel.
     auto funcCoreType = queryFuncCoreType(func);
     if (funcCoreType.has_value()) {
+      hivm::AddressSpace scope = hivm::AddressSpace::UB;
+      if (funcType.value() == TFuncCoreType::AIC) {
+        space = hivm::AddressSpace::L1;
+      }
       func->walk([&](memref::AllocOp op) {
-        if (failed(hivm::inferAndPropagateMemScopeForAlloc(op, funcCoreType.value()))) {
+        if (failed(hivm::inferAndPropagateMemScopeForAlloc(op, space))) {
           signalPassFailure();
         }
       });
