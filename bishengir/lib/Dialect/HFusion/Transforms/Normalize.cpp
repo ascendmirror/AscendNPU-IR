@@ -3046,7 +3046,7 @@ public:
       return failure();
     }
 
-    if (isSupportOperand<ElemType>(op)) {
+    if (isSupportOperand<ElemType, OpType>(op)) {
       return failure();
     }
 
@@ -3082,50 +3082,44 @@ public:
   }
 
 private:
-  template <typename OpElemType>
-  bool isSupportOperand(OpType op) const = delete;
+  template <typename OpElemType, typename NormalizeOpType>
+  bool isSupportOperand(OpType op) const {
+    if constexpr (std::is_same_v<OpElemType, int8_t>) {
+      if constexpr (std::is_same_v<NormalizeOpType, linalg::FillOp> ||
+                    std::is_same_v<NormalizeOpType, linalg::BroadcastOp> ||
+                    std::is_same_v<NormalizeOpType, linalg::CopyOp> ||
+                    std::is_same_v<NormalizeOpType, hfusion::CastOp>) {
+        return true;
+      }
 
-  template <>
-  bool isSupportOperand<bool>(OpType op) const {
-    return false;
-  }
+      if constexpr (std::is_same_v<NormalizeOpType, hfusion::SelectOp>) {
+        return false;
+      }
 
-  template <>
-  bool isSupportOperand<int8_t>(OpType op) const {
-    if constexpr (std::is_same_v<OpType, linalg::FillOp> ||
-                  std::is_same_v<OpType, linalg::BroadcastOp> ||
-                  std::is_same_v<OpType, linalg::CopyOp> ||
-                  std::is_same_v<OpType, hfusion::CastOp>) {
-      return true;
-    }
+      if constexpr (std::is_same_v<NormalizeOpType, linalg::ElemwiseUnaryOp> ||
+                    std::is_same_v<NormalizeOpType, linalg::ElemwiseBinaryOp>) {
+        // no linalg elemwise unary/binary op support i8
+        return false;
+      }
 
-    if constexpr (std::is_same_v<OpType, hfusion::SelectOp>) {
-      return false;
-    }
+      if constexpr (std::is_same_v<NormalizeOpType, hfusion::ElemwiseUnaryOp>) {
+        // only part of hfusion elemwise unary op support i8
+        auto unaryOp = cast<hfusion::ElemwiseUnaryOp>(op);
+        hfusion::UnaryFn func = unaryOp.getFun();
+        static DenseSet<hfusion::UnaryFn> unarySet = {hfusion::UnaryFn::vnot};
+        return unarySet.contains(func);
+      }
 
-    if constexpr (std::is_same_v<OpType, linalg::ElemwiseUnaryOp> ||
-                  std::is_same_v<OpType, linalg::ElemwiseBinaryOp>) {
-      // no linalg elemwise unary/binary op support i8
-      return false;
-    }
-
-    if constexpr (std::is_same_v<OpType, hfusion::ElemwiseUnaryOp>) {
-      // only part of hfusion elemwise unary op support i8
-      auto unaryOp = cast<hfusion::ElemwiseUnaryOp>(op);
-      hfusion::UnaryFn func = unaryOp.getFun();
-      static DenseSet<hfusion::UnaryFn> unarySet = {hfusion::UnaryFn::vnot};
-      return unarySet.contains(func);
-    }
-
-    if constexpr (std::is_same_v<OpType, hfusion::ElemwiseBinaryOp>) {
-      // only part of hfusion elemwise binary op support both i8
-      auto binOp = cast<hfusion::ElemwiseBinaryOp>(op);
-      hfusion::BinaryFn func = binOp.getFun();
-      // bit operation can support b8 operand
-      static DenseSet<hfusion::BinaryFn> binarySet = {hfusion::BinaryFn::vor,
-                                                      hfusion::BinaryFn::vand,
-                                                      hfusion::BinaryFn::vxor};
-      return binarySet.contains(func);
+      if constexpr (std::is_same_v<NormalizeOpType, hfusion::ElemwiseBinaryOp>) {
+        // only part of hfusion elemwise binary op support both i8
+        auto binOp = cast<hfusion::ElemwiseBinaryOp>(op);
+        hfusion::BinaryFn func = binOp.getFun();
+        // bit operation can support b8 operand
+        static DenseSet<hfusion::BinaryFn> binarySet = {hfusion::BinaryFn::vor,
+                                                        hfusion::BinaryFn::vand,
+                                                        hfusion::BinaryFn::vxor};
+        return binarySet.contains(func);
+      }
     }
     return false;
   }
