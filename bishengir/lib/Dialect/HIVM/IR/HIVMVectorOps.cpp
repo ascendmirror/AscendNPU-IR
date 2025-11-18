@@ -329,7 +329,7 @@ static LogicalResult verifyVReduceArith(VReduceOp op) {
   const auto srcVecType = cast<ShapedType>(op.getSrc().getType());
   const auto dstVecType = cast<ShapedType>(op.getDstValue().getType());
   auto arith = op.getArithAttr();
-  if (util::isArgminOrArgmax(arith.getReduceOp())) {
+  if (isArgminOrArgmax(arith.getReduceOp())) {
     if (op.getDst().size() != 2)
       return op.emitOpError()
              << "with index should have exactly 2 destination operands";

@@ -1031,7 +1031,7 @@ Value createNestedIndexModular(OpBuilder &builder, Operation *op, int modular) {
                                                loopInfoVec, modular);
 }
 
-Value mlir::hivm::createNestedIndexModular(OpBuilder &builder,
+Value createNestedIndexModular(OpBuilder &builder,
                                            LoopLikeOpInterface loopOp,
                                            int modular) {
   auto loopInfoVec = getLoopsInfo(loopOp);
@@ -1216,13 +1216,6 @@ bool isGMPointerCastOp(Operation *op) {
   AddressSpaceAttr memSpaceAttr =
       cast<AddressSpaceAttr>(markOp.getStaticAttrValue(memorySpaceAttr));
   return memSpaceAttr.getAddressSpace() == hivm::AddressSpace::GM;
-}
-
-bool isArgminOrArgmax(ReduceOperation op) {
-  return op == ReduceOperation::min_with_index_left ||
-         op == ReduceOperation::max_with_index_left ||
-         op == ReduceOperation::min_with_index_right ||
-         op == ReduceOperation::max_with_index_right;
 }
 
 } // namespace util
