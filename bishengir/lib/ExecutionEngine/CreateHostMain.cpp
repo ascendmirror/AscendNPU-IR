@@ -369,7 +369,7 @@ struct CreateHostMainPass
         rewriter, std::move(operands),
         llvm::map_to_vector(
             kernelFunc.getFunctionType().getInputs(),
-            static_cast<ShapedType (*)(const Type &)>(cast<ShapedType>)));
+            [](const Type &t) { return cast<ShapedType>(t); }));
     auto kernelCall = rewriter.create<func::CallOp>(
         loc, kernelFunc,
         SmallVector<Value>(kernelOperands.begin(), kernelOperands.end()));
