@@ -663,6 +663,20 @@ def HIVMStructuredOpInterface : OpInterface<"HIVMStructuredOp",
         return false;
       }]
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Method to lower the operation to scalar loops.
+      }],
+      /*retType=*/"mlir::FailureOr<mlir::SmallVector<mlir::Value>>",
+      /*methodName=*/"lowerToLoops",
+      /*args=*/(ins
+          "RewriterBase &":$b),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        llvm_unreachable("Unimplemented!");
+        return ::mlir::failure();
+      }]
+    >,
   ];
   let verify = [{ return detail::verifyStructuredOpInterface($_op); }];
   let extraClassDeclaration = [{

@@ -151,6 +151,7 @@ def VAbsOp : HIVM_ElementwiseUnaryOp<"vabs",
      DeclareOpInterfaceMethods<ImplByScalarOpInterface>,
      DeclareOpInterfaceMethods<ExtraBufferOpInterface,
        ["getExtraBufferSize"]>,
+     DeclareOpInterfaceMethods<HIVMStructuredOpInterface, ["lowerToLoops"]>,
      BroadcastableOTF
     ]> {
   let summary = "Elementwise Vector Absolute Value Op";
@@ -517,6 +518,7 @@ def VAddOp : HIVM_ElementwiseBinaryOp<"vadd",
      DeclareOpInterfaceMethods<ExtraBufferOpInterface,
        ["getExtraBufferSize"]>,
      DeclareOpInterfaceMethods<ImplByScalarOpInterface>,
+     DeclareOpInterfaceMethods<HIVMStructuredOpInterface, ["lowerToLoops"]>,
      BroadcastableOTF
     ]> {
   let summary = "Elementwise Binary Vector Addition Op";
@@ -550,6 +552,7 @@ def VMulOp : HIVM_ElementwiseBinaryOp<"vmul",
      DeclareOpInterfaceMethods<ExtraBufferOpInterface,
        ["getExtraBufferSize"]>,
      DeclareOpInterfaceMethods<ImplByScalarOpInterface>,
+     DeclareOpInterfaceMethods<HIVMStructuredOpInterface, ["lowerToLoops"]>,
      BroadcastableOTF
     ]> {
   let summary = "Elementwise Binary Vector Multiplication Op";
@@ -580,7 +583,8 @@ def VMulExtOp : HIVM_ElementwiseBinaryOp<"vmulext",
     [SameOperandsElementType,
      OperElemTypeConstraints<[0, 1], [I32]>,
      VectorOnlyTrait<0>,
-    DeclareOpInterfaceMethods<ImplByScalarOpInterface>
+    DeclareOpInterfaceMethods<ImplByScalarOpInterface>,
+    DeclareOpInterfaceMethods<HIVMStructuredOpInterface, ["lowerToLoops"]>,
     ]> {
   let summary = [{
     Elementwise Binary Vector Multiplication that Calculates
@@ -601,6 +605,7 @@ def VSubOp
                    DeclareOpInterfaceMethods<ExtraBufferOpInterface,
                      ["getExtraBufferSize"]>,
                    DeclareOpInterfaceMethods<ImplByScalarOpInterface>,
+                   DeclareOpInterfaceMethods<HIVMStructuredOpInterface, ["lowerToLoops"]>,
                    BroadcastableOTF]> {
   let summary = "Elementwise Binary Vector Subtraction Op";
   let description = baseClassDescription # [{
@@ -638,6 +643,7 @@ def VDivOp : HIVM_ElementwiseBinaryOp<
                           DeclareOpInterfaceMethods<ExtraBufferOpInterface,
                             ["getExtraBufferSize"]>,
                           DeclareOpInterfaceMethods<ImplByScalarOpInterface>,
+                          DeclareOpInterfaceMethods<HIVMStructuredOpInterface, ["lowerToLoops"]>,
                           BroadcastableOTF]> {
   let summary = "Elementwise Binary Vector Division Op";
   let description = baseClassDescription # [{
@@ -676,6 +682,7 @@ def VMaxOp : HIVM_ElementwiseBinaryOp<"vmax",
      DeclareOpInterfaceMethods<ExtraBufferOpInterface,
        ["getExtraBufferSize"]>,
      DeclareOpInterfaceMethods<ImplByScalarOpInterface>,
+     DeclareOpInterfaceMethods<HIVMStructuredOpInterface, ["lowerToLoops"]>,
      BroadcastableOTF
     ]> {
   let summary = "Elementwise Binary Vector Maximum Op";
@@ -709,6 +716,7 @@ def VMinOp : HIVM_ElementwiseBinaryOp<"vmin",
      DeclareOpInterfaceMethods<ExtraBufferOpInterface,
        ["getExtraBufferSize"]>,
      DeclareOpInterfaceMethods<ImplByScalarOpInterface>,
+     DeclareOpInterfaceMethods<HIVMStructuredOpInterface, ["lowerToLoops"]>,
      BroadcastableOTF
     ]> {
   let summary = "Elementwise Binary Vector Minimum Op";
@@ -839,7 +847,8 @@ def VXorOp : HIVM_ElementwiseBinaryOp<"vxor",
 def VModOp : HIVM_ElementwiseBinaryOp<"vmod",
     [SameOperandsElementType, 
      VectorOnlyTrait<0>,
-     DeclareOpInterfaceMethods<ImplByScalarOpInterface>
+     DeclareOpInterfaceMethods<ImplByScalarOpInterface>,
+     DeclareOpInterfaceMethods<HIVMStructuredOpInterface, ["lowerToLoops"]>,
     ]> {
   let summary = "Elementwise Vector Mod Op";
   let description = baseClassDescription # [{
@@ -856,6 +865,7 @@ def VShLOp : HIVM_ElementwiseBinaryOp<"vshl",
     DeclareOpInterfaceMethods<ExtraBufferOpInterface,
       ["getExtraBufferSize"]>,
     DeclareOpInterfaceMethods<ImplByScalarOpInterface>,
+     DeclareOpInterfaceMethods<HIVMStructuredOpInterface, ["lowerToLoops"]>,
     BroadcastableOTF
    ]> {
   let summary = "Elementwise Binary Vector Shift Left Op";
@@ -889,6 +899,7 @@ def VShROp : HIVM_ElementwiseBinaryOp<"vshr",
      DeclareOpInterfaceMethods<ExtraBufferOpInterface,
        ["getExtraBufferSize"]>,
      DeclareOpInterfaceMethods<ImplByScalarOpInterface>,
+     DeclareOpInterfaceMethods<HIVMStructuredOpInterface, ["lowerToLoops"]>,
      BroadcastableOTF
     ]> {
   let summary = "Elementwise Binary Vector Shift Right Op";
@@ -924,7 +935,8 @@ def VCmpOp : HIVM_ElementwiseBinaryOp<"vcmp",
     [OperElemTypeConstraints<[0, 1], [F16, F32, I16, I32, I64]>,
      OperElemTypeConstraints<[/*dstIdx=*/2], [I1, I8]>,
      VectorOnlyTrait<0>,
-     DeclareOpInterfaceMethods<ImplByScalarOpInterface>
+     DeclareOpInterfaceMethods<ImplByScalarOpInterface>,
+     DeclareOpInterfaceMethods<HIVMStructuredOpInterface, ["lowerToLoops"]>
     ]> {
   let summary = "Elementwise Binary Vector Comparison Op";
   let description = baseClassDescription # [{
@@ -1105,7 +1117,7 @@ def VReduceOp : HIVM_VectorOp<"vreduce",
      OperElemTypeConstraints<[0, 1], [I1, I8, UI8, I16, UI16, I32, UI32, I64, UI64, F16, F32]>,
      DeclareOpInterfaceMethods<ExtraBufferOpInterface>,
      DeclareOpInterfaceMethods<HIVMStructuredOpInterface,
-       ["getIteratorTypesArray", "getIndexingMaps"]>,
+       ["getIteratorTypesArray", "getIndexingMaps", "lowerToLoops"]>,
      // Will automatically use the default uniform reassociation impl
      UniformReassociationFlattenTrait,
      CollapsibleConsecutiveTargetDimsTrait,
@@ -1304,7 +1316,7 @@ def VInterleaveOp : HIVM_VectorOp<"vinterleave",
        [I16, F16, UI16, I32, F32, UI32, BF16, I64, UI64]>,
      DeclareOpInterfaceMethods<ExtraBufferOpInterface>,
      DeclareOpInterfaceMethods<HIVMStructuredOpInterface,
-       ["getIteratorTypesArray"]>,
+       ["getIteratorTypesArray", "lowerToLoops"]>,
      DeclareOpInterfaceMethods<ImplByScalarOpInterface>,
      // Will automatically use the default uniform reassociation impl
      UniformReassociationFlattenTrait,
@@ -1349,7 +1361,7 @@ def VDeinterleaveOp : HIVM_VectorOp<"vdeinterleave",
      OperElemTypeConstraints<[0],
        [I8, I16, F16, UI16, I32, F32, UI32, BF16, I64, UI64]>,
      DeclareOpInterfaceMethods<HIVMStructuredOpInterface,
-       ["getIteratorTypesArray"]>,
+       ["getIteratorTypesArray", "lowerToLoops"]>,
      DeclareOpInterfaceMethods<BiShengIRAggregatedOpInterface,
        ["decomposeOperation","getDecomposePhase"]>,
      DeclareOpInterfaceMethods<ImplByScalarOpInterface>,
@@ -1620,7 +1632,7 @@ def VCumprodOp : HIVM_VectorOp<"vcumprod",
     [SameOperandsElementType,
      OperElemTypeConstraints<[0], [I16, I32, F16, F32, I64]>,
      DeclareOpInterfaceMethods<HIVMStructuredOpInterface,
-       ["getIteratorTypesArray"]>,
+       ["getIteratorTypesArray", "lowerToLoops"]>,
      UniformReassociationFlattenTrait,
      DeclareOpInterfaceMethods<FlattenInterface,
        ["getLimitedAxes", "adjustTargetDimensions"]>,
@@ -1676,7 +1688,7 @@ def VCumsumOp : HIVM_VectorOp<"vcumsum",
     [SameOperandsElementType,
      OperElemTypeConstraints<[0], [I16, I32, F16, F32, I64]>,
      DeclareOpInterfaceMethods<HIVMStructuredOpInterface,
-       ["getIteratorTypesArray"]>,
+       ["getIteratorTypesArray", "lowerToLoops"]>,
      UniformReassociationFlattenTrait,
      DeclareOpInterfaceMethods<FlattenInterface,
        ["getLimitedAxes", "adjustTargetDimensions"]>,
