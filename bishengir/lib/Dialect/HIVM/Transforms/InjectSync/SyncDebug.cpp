@@ -17,6 +17,7 @@
 
 #include "bishengir/Dialect/HIVM/Transforms/InjectSync/SyncDebug.h"
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
+#include "bishengir/Dialect/HIVM/Transforms/InjectSync/SyncCommon.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
@@ -58,10 +59,12 @@ void SyncDebug::PrintInstanceElement(const InstanceElement *e,
   PrintSyncOperation(e->pipeBefore, os);
   if (LoopInstanceElement::classof(e)) {
     PrintForIR(e, os);
-  } else if (CompoundInstanceElement::classof(e)) {
-    PrintCompoundIR(e, os);
   } else if (BranchInstanceElement::classof(e)) {
     PrintBranchIR(e, os);
+  } else if (CompoundInstanceElement::classof(e)) {
+    PrintCompoundIR(e, os);
+  } else if (PlaceHolderInstanceElement::classof(e)) {
+    printPlaceHolderIR(e, os);
   }
   PrintSyncOperation(e->pipeAfter, os);
 }
@@ -130,6 +133,11 @@ void SyncDebug::PrintSetWaitSync(const SyncOperation *s, raw_ostream &os) {
   os << "> \tID: " << s->GetSyncIRIndex();
   os << " eventIdNum: " << s->eventIdNum;
   os << (s->uselessSync ? " useless\n" : "\n");
+}
+
+void SyncDebug::printPlaceHolderIR(const InstanceElement *s, raw_ostream &os) {
+  PrintIndent(os);
+  os << "placeHolder\n";
 }
 
 void SyncDebug::PrintCompoundIR(const InstanceElement *e, raw_ostream &os) {
