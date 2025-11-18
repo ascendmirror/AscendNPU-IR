@@ -65,9 +65,9 @@ func.func @mlir_fused_bitwise_not_clone_mul_sub_14(%arg0: memref<1x16384xi64, #h
 //===----------------------------------------------------------------------===//
 // -----
 func.func @test_vmulhi_op_memref_i32() {
-  // CHECK: %[[VAL_1:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_3:.*]] = arith.constant 6 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_3:.*]] = arith.constant 6 : index
   // CHECK: %[[VAL_4:.*]] = memref.alloc() {alignment = 64 : i64} : memref<6xi32>
   // CHECK: %[[VAL_5:.*]] = memref.alloc() {alignment = 64 : i64} : memref<6xi32>
   // CHECK: %[[VAL_6:.*]] = memref.alloc() {alignment = 64 : i64} : memref<6xi32>
@@ -93,10 +93,10 @@ func.func @test_vmulhi_op_memref_i32() {
 //===----------------------------------------------------------------------===//
 // -----
 func.func @test_vmul_b64() {
-  // CHECK: %[[VAL_1:.*]] = arith.constant 8 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_3:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_4:.*]] = arith.constant 64 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 8 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_3:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_4:.*]] = arith.constant 64 : index
   // CHECK: %[[ALLOC_SRC0:.*]] = memref.alloc() : memref<64x8xi64>
   // CHECK: %[[ALLOC_SRC1:.*]] = memref.alloc() : memref<64x8xi64>
   // CHECK: %[[ALLOC_DST:.*]] = memref.alloc() : memref<64x8xi64>
@@ -118,10 +118,10 @@ func.func @test_vmul_b64() {
 //===----------------------------------------------------------------------===//
 // -----
 func.func @test_vsub_b64() {
-  // CHECK: %[[VAL_1:.*]] = arith.constant 8 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_3:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_4:.*]] = arith.constant 64 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 8 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_3:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_4:.*]] = arith.constant 64 : index
   // CHECK: %[[ALLOC_SRC0:.*]] = memref.alloc() : memref<64x8xi64>
   // CHECK: %[[ALLOC_SRC1:.*]] = memref.alloc() : memref<64x8xi64>
   // CHECK: %[[ALLOC_DST:.*]] = memref.alloc() : memref<64x8xi64>
@@ -143,10 +143,10 @@ func.func @test_vsub_b64() {
 //===----------------------------------------------------------------------===//
 // -----
 func.func @test_vadd_b64() {
-  // CHECK: %[[VAL_1:.*]] = arith.constant 8 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_3:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_4:.*]] = arith.constant 64 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 8 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_3:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_4:.*]] = arith.constant 64 : index
   // CHECK: %[[ALLOC_SRC0:.*]] = memref.alloc() : memref<64x8xi64>
   // CHECK: %[[ALLOC_SRC1:.*]] = memref.alloc() : memref<64x8xi64>
   // CHECK: %[[ALLOC_DST:.*]] = memref.alloc() : memref<64x8xi64>
@@ -168,10 +168,10 @@ func.func @test_vadd_b64() {
 //===----------------------------------------------------------------------===//
 // -----
 func.func @test_vabs_b64() {
-  // CHECK: %[[VAL_1:.*]] = arith.constant 8 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_3:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_4:.*]] = arith.constant 64 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 8 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_3:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_4:.*]] = arith.constant 64 : index
   // CHECK: %[[ALLOC_SRC:.*]] = memref.alloc() : memref<64x8xi64>
   // CHECK: %[[ALLOC_DST:.*]] = memref.alloc() : memref<64x8xi64>
    %allocIn0 = memref.alloc() : memref<64x8xi64>
@@ -191,10 +191,10 @@ func.func @test_vabs_b64() {
 
 // -----
 func.func @test_vcmp_b32_lt() {
-  // CHECK: %[[VAL_1:.*]] = arith.constant 8 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_3:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_4:.*]] = arith.constant 64 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 8 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_3:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_4:.*]] = arith.constant 64 : index
   // CHECK: %[[ALLOC_SRC0:.*]] = memref.alloc() : memref<64x8xi32>
   // CHECK: %[[ALLOC_SRC1:.*]] = memref.alloc() : memref<64x8xi32>
   // CHECK: %[[ALLOC_DST1:.*]] = memref.alloc() : memref<64x8xi8>
@@ -221,10 +221,10 @@ func.func @test_vcmp_b32_lt() {
 
 // -----
 func.func @test_vcmp_b32_gt() {
-  // CHECK: %[[VAL_1:.*]] = arith.constant 8 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_3:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_4:.*]] = arith.constant 64 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 8 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_3:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_4:.*]] = arith.constant 64 : index
   // CHECK: %[[ALLOC_SRC0:.*]] = memref.alloc() : memref<64x8xi32>
   // CHECK: %[[ALLOC_SRC1:.*]] = memref.alloc() : memref<64x8xi32>
   // CHECK: %[[ALLOC_DST1:.*]] = memref.alloc() : memref<64x8xi8>
@@ -251,10 +251,10 @@ func.func @test_vcmp_b32_gt() {
 
 // -----
 func.func @test_vcmp_b32_le() {
-  // CHECK: %[[VAL_1:.*]] = arith.constant 8 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_3:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_4:.*]] = arith.constant 64 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 8 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_3:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_4:.*]] = arith.constant 64 : index
   // CHECK: %[[ALLOC_SRC0:.*]] = memref.alloc() : memref<64x8xi32>
   // CHECK: %[[ALLOC_SRC1:.*]] = memref.alloc() : memref<64x8xi32>
   // CHECK: %[[ALLOC_DST1:.*]] = memref.alloc() : memref<64x8xi8>
@@ -281,10 +281,10 @@ func.func @test_vcmp_b32_le() {
 
 // -----
 func.func @test_vcmp_b32_ge() {
-  // CHECK: %[[VAL_1:.*]] = arith.constant 8 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_3:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_4:.*]] = arith.constant 64 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 8 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_3:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_4:.*]] = arith.constant 64 : index
   // CHECK: %[[ALLOC_SRC0:.*]] = memref.alloc() : memref<64x8xi32>
   // CHECK: %[[ALLOC_SRC1:.*]] = memref.alloc() : memref<64x8xi32>
   // CHECK: %[[ALLOC_DST1:.*]] = memref.alloc() : memref<64x8xi8>
@@ -336,9 +336,9 @@ func.func @test_vcmp_b32_ne() {
 
 // -----
 func.func @test_vcmp_b16_lt() {
-  // CHECK: %[[VAL_0:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_1:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 1024 : index
+  // CHECK-DAG: %[[VAL_0:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 1024 : index
   // CHECK: %[[ALLOC_SRC0:.*]] = memref.alloc() : memref<1024xi16>
   // CHECK: %[[ALLOC_SRC1:.*]] = memref.alloc() : memref<1024xi16>
   // CHECK: %[[ALLOC_DST1:.*]] = memref.alloc() : memref<1024xi8>
@@ -364,9 +364,9 @@ func.func @test_vcmp_b16_lt() {
 
 // -----
 func.func @test_vcmp_b16_gt() {
-  // CHECK: %[[VAL_0:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_1:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 1024 : index
+  // CHECK-DAG: %[[VAL_0:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 1024 : index
   // CHECK: %[[ALLOC_SRC0:.*]] = memref.alloc() : memref<1024xi16>
   // CHECK: %[[ALLOC_SRC1:.*]] = memref.alloc() : memref<1024xi16>
   // CHECK: %[[ALLOC_DST1:.*]] = memref.alloc() : memref<1024xi8>
@@ -392,9 +392,9 @@ func.func @test_vcmp_b16_gt() {
 
 // -----
 func.func @test_vcmp_b16_le() {
-  // CHECK: %[[VAL_0:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_1:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 1024 : index
+  // CHECK-DAG: %[[VAL_0:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 1024 : index
   // CHECK: %[[ALLOC_SRC0:.*]] = memref.alloc() : memref<1024xi16>
   // CHECK: %[[ALLOC_SRC1:.*]] = memref.alloc() : memref<1024xi16>
   // CHECK: %[[ALLOC_DST1:.*]] = memref.alloc() : memref<1024xi8>
@@ -420,9 +420,9 @@ func.func @test_vcmp_b16_le() {
 
 // -----
 func.func @test_vcmp_b16_ge() {
-  // CHECK: %[[VAL_0:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_1:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 1024 : index
+  // CHECK-DAG: %[[VAL_0:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 1024 : index
   // CHECK: %[[ALLOC_SRC0:.*]] = memref.alloc() : memref<1024xi16>
   // CHECK: %[[ALLOC_SRC1:.*]] = memref.alloc() : memref<1024xi16>
   // CHECK: %[[ALLOC_DST1:.*]] = memref.alloc() : memref<1024xi8>
@@ -448,9 +448,9 @@ func.func @test_vcmp_b16_ge() {
 
 // -----
 func.func @test_vcmp_b16_eq() {
-  // CHECK: %[[VAL_0:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_1:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 1024 : index
+  // CHECK-DAG: %[[VAL_0:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 1024 : index
   // CHECK: %[[ALLOC_SRC0:.*]] = memref.alloc() : memref<1024xi16>
   // CHECK: %[[ALLOC_SRC1:.*]] = memref.alloc() : memref<1024xi16>
   // CHECK: %[[ALLOC_DST1:.*]] = memref.alloc() : memref<1024xi8>
@@ -476,9 +476,9 @@ func.func @test_vcmp_b16_eq() {
 
 // -----
 func.func @test_vcmp_b16_ne() {
-  // CHECK: %[[VAL_0:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_1:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 1024 : index
+  // CHECK-DAG: %[[VAL_0:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 1024 : index
   // CHECK: %[[ALLOC_SRC0:.*]] = memref.alloc() : memref<1024xi16>
   // CHECK: %[[ALLOC_SRC1:.*]] = memref.alloc() : memref<1024xi16>
   // CHECK: %[[ALLOC_DST1:.*]] = memref.alloc() : memref<1024xi8>
@@ -504,9 +504,9 @@ func.func @test_vcmp_b16_ne() {
 
 // -----
 func.func @test_vcmp_b64_lt() {
-  // CHECK: %[[VAL_0:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_1:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 1024 : index
+  // CHECK-DAG: %[[VAL_0:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 1024 : index
   // CHECK: %[[ALLOC_SRC0:.*]] = memref.alloc() : memref<1024xi64>
   // CHECK: %[[ALLOC_SRC1:.*]] = memref.alloc() : memref<1024xi64>
   // CHECK: %[[ALLOC_DST1:.*]] = memref.alloc() : memref<1024xi8>
@@ -532,9 +532,9 @@ func.func @test_vcmp_b64_lt() {
 
 // -----
 func.func @test_vcmp_b64_gt() {
-  // CHECK: %[[VAL_0:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_1:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 1024 : index
+  // CHECK-DAG: %[[VAL_0:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 1024 : index
   // CHECK: %[[ALLOC_SRC0:.*]] = memref.alloc() : memref<1024xi64>
   // CHECK: %[[ALLOC_SRC1:.*]] = memref.alloc() : memref<1024xi64>
   // CHECK: %[[ALLOC_DST1:.*]] = memref.alloc() : memref<1024xi8>
@@ -560,9 +560,9 @@ func.func @test_vcmp_b64_gt() {
 
 // -----
 func.func @test_vcmp_b64_le() {
-  // CHECK: %[[VAL_0:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_1:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 1024 : index
+  // CHECK-DAG: %[[VAL_0:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 1024 : index
   // CHECK: %[[ALLOC_SRC0:.*]] = memref.alloc() : memref<1024xi64>
   // CHECK: %[[ALLOC_SRC1:.*]] = memref.alloc() : memref<1024xi64>
   // CHECK: %[[ALLOC_DST1:.*]] = memref.alloc() : memref<1024xi8>
@@ -588,9 +588,9 @@ func.func @test_vcmp_b64_le() {
 
 // -----
 func.func @test_vcmp_b64_ge() {
-  // CHECK: %[[VAL_0:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_1:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 1024 : index
+  // CHECK-DAG: %[[VAL_0:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 1024 : index
   // CHECK: %[[ALLOC_SRC0:.*]] = memref.alloc() : memref<1024xi64>
   // CHECK: %[[ALLOC_SRC1:.*]] = memref.alloc() : memref<1024xi64>
   // CHECK: %[[ALLOC_DST1:.*]] = memref.alloc() : memref<1024xi8>
@@ -616,9 +616,9 @@ func.func @test_vcmp_b64_ge() {
 
 // -----
 func.func @test_vcmp_b64_eq() {
-  // CHECK: %[[VAL_0:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_1:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 1024 : index
+  // CHECK-DAG: %[[VAL_0:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 1024 : index
   // CHECK: %[[ALLOC_SRC0:.*]] = memref.alloc() : memref<1024xi64>
   // CHECK: %[[ALLOC_SRC1:.*]] = memref.alloc() : memref<1024xi64>
   // CHECK: %[[ALLOC_DST1:.*]] = memref.alloc() : memref<1024xi8>
@@ -644,9 +644,9 @@ func.func @test_vcmp_b64_eq() {
 
 // -----
 func.func @test_vcmp_b64_ne() {
-  // CHECK: %[[VAL_0:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_1:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 1024 : index
+  // CHECK-DAG: %[[VAL_0:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 1024 : index
   // CHECK: %[[ALLOC_SRC0:.*]] = memref.alloc() : memref<1024xi64>
   // CHECK: %[[ALLOC_SRC1:.*]] = memref.alloc() : memref<1024xi64>
   // CHECK: %[[ALLOC_DST1:.*]] = memref.alloc() : memref<1024xi8>
@@ -672,9 +672,9 @@ func.func @test_vcmp_b64_ne() {
 
 // -----
 func.func @test_vcmp_b64_eq_vs() {
-  // CHECK: %[[VAL_0:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_1:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 2 : i64
+  // CHECK-DAG: %[[VAL_0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 2 : i64
   // CHECK: %[[ALLOC_SRC:.*]] = memref.alloc() : memref<1xi64>
   // CHECK: %[[ALLOC_DST1:.*]] = memref.alloc() : memref<1xi8>
   %cst = arith.constant 0.000000e+00 : f16
@@ -704,7 +704,7 @@ func.func @test_vshl_b64() {
    %allocIn0 = memref.alloc() : memref<64x8xi64>
    %allocOut = memref.alloc() : memref<64x8xi64>
    %cst = arith.constant 2 : i64
-   // CHECK: %[[cst:.*]] = arith.constant 2 : i64
+   // CHECK-DAG: %[[cst:.*]] = arith.constant 2 : i64
    // CHECK: scf.for %[[arg0:.*]] = {{.*}} to {{.*}} step {{.*}}
    // CHECK: scf.for %[[arg1:.*]] = {{.*}} to {{.*}} step {{.*}}
    // CHECK: %[[src0:.*]] = memref.load {{.*}}[%[[arg0]], %[[arg1]]]
@@ -722,7 +722,7 @@ func.func @test_vshr_b64() {
    %allocIn0 = memref.alloc() : memref<64x8xi64>
    %allocOut = memref.alloc() : memref<64x8xi64>
    %cst = arith.constant 2 : i64
-   // CHECK: %[[cst:.*]] = arith.constant 2 : i64
+   // CHECK-DAG: %[[cst:.*]] = arith.constant 2 : i64
    // CHECK: scf.for %[[arg0:.*]] = {{.*}} to {{.*}} step {{.*}}
    // CHECK: scf.for %[[arg1:.*]] = {{.*}} to {{.*}} step {{.*}}
    // CHECK: %[[src0:.*]] = memref.load {{.*}}[%[[arg0]], %[[arg1]]]
@@ -771,8 +771,8 @@ func.func @test_vmax_b64() {
 //===----------------------------------------------------------------------===//
 // -----
 func.func @test_reduce_sum_ar_b64() {
-  // CHECK: %[[CST_VALUE_INIT:.*]] = arith.constant 0 : i64
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST_VALUE_INIT:.*]] = arith.constant 0 : i64
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<24x32xi64>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<24x1xi64>
   // CHECK: scf.for %[[arg0:.*]] = {{.*}} to {{.*}} step {{.*}}
@@ -793,8 +793,8 @@ func.func @test_reduce_sum_ar_b64() {
 
 // -----
 func.func @test_reduce_min_ar_b64() {
-  // CHECK: %[[CST_VALUE_INIT:.*]] = arith.constant 9223372036854775807 : i64
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST_VALUE_INIT:.*]] = arith.constant 9223372036854775807 : i64
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<24x32xi64>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<24x1xi64>
   // CHECK: scf.for %[[arg0:.*]] = {{.*}} to {{.*}} step {{.*}}
@@ -815,8 +815,8 @@ func.func @test_reduce_min_ar_b64() {
 
 // -----
 func.func @test_reduce_max_ar_b64() {
-  // CHECK: %[[CST_VALUE_INIT:.*]] = arith.constant -9223372036854775808 : i64
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST_VALUE_INIT:.*]] = arith.constant -9223372036854775808 : i64
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<24x32xi64>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<24x1xi64>
   // CHECK: scf.for %[[arg0:.*]] = {{.*}} to {{.*}} step {{.*}}
@@ -837,11 +837,11 @@ func.func @test_reduce_max_ar_b64() {
 
 // -----
 func.func @test_reduce_min_with_index_int64() {
-  // CHECK: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
-  // CHECK: %[[CST_VALUE_INIT:.*]] = arith.constant 9223372036854775807 : i64
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
+  // CHECK-DAG: %[[CST_VALUE_INIT:.*]] = arith.constant 9223372036854775807 : i64
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<2x2xi64>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<1x2xi64>
   // CHECK: %[[ALLOC_1:.*]] = memref.alloc() : memref<1x2xi32>
@@ -870,11 +870,11 @@ func.func @test_reduce_min_with_index_int64() {
 
 // -----
 func.func @test_reduce_min_with_index_int32() {
-  // CHECK: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
-  // CHECK: %[[CST_VALUE_INIT:.*]] = arith.constant 2147483647 : i32
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
+  // CHECK-DAG: %[[CST_VALUE_INIT:.*]] = arith.constant 2147483647 : i32
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<2x2xi32>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<1x2xi32>
   // CHECK: %[[ALLOC_1:.*]] = memref.alloc() : memref<1x2xi32>
@@ -903,11 +903,11 @@ func.func @test_reduce_min_with_index_int32() {
 
 // -----
 func.func @test_reduce_min_with_index_int16() {
-  // CHECK: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
-  // CHECK: %[[CST_VALUE_INIT:.*]] = arith.constant 32767 : i16
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
+  // CHECK-DAG: %[[CST_VALUE_INIT:.*]] = arith.constant 32767 : i16
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<2x2xi16>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<1x2xi16>
   // CHECK: %[[ALLOC_1:.*]] = memref.alloc() : memref<1x2xi32>
@@ -936,11 +936,11 @@ func.func @test_reduce_min_with_index_int16() {
 
 // -----
 func.func @test_reduce_max_with_index_int64() {
-  // CHECK: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
-  // CHECK: %[[CST_VALUE_INIT:.*]] = arith.constant -9223372036854775808 : i64
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
+  // CHECK-DAG: %[[CST_VALUE_INIT:.*]] = arith.constant -9223372036854775808 : i64
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<2x2xi64>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<1x2xi64>
   // CHECK: %[[ALLOC_1:.*]] = memref.alloc() : memref<1x2xi32>
@@ -969,11 +969,11 @@ func.func @test_reduce_max_with_index_int64() {
 
 // -----
 func.func @test_reduce_max_with_index_int32() {
-  // CHECK: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
-  // CHECK: %[[CST_VALUE_INIT:.*]] = arith.constant -2147483648 : i32
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
+  // CHECK-DAG: %[[CST_VALUE_INIT:.*]] = arith.constant -2147483648 : i32
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<2x2xi32>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<1x2xi32>
   // CHECK: %[[ALLOC_1:.*]] = memref.alloc() : memref<1x2xi32>
@@ -1002,11 +1002,11 @@ func.func @test_reduce_max_with_index_int32() {
 
 // -----
 func.func @test_reduce_max_with_index_int16() {
-  // CHECK: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
-  // CHECK: %[[CST_VALUE_INIT:.*]] = arith.constant -32768 : i16
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
+  // CHECK-DAG: %[[CST_VALUE_INIT:.*]] = arith.constant -32768 : i16
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<2x2xi16>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<1x2xi16>
   // CHECK: %[[ALLOC_1:.*]] = memref.alloc() : memref<1x2xi32>
@@ -1035,11 +1035,11 @@ func.func @test_reduce_max_with_index_int16() {
 
 // -----
 func.func @test_reduce_min_with_index_int64_with_index_input() {
-  // CHECK: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
-  // CHECK: %[[CST_VALUE_INIT:.*]] = arith.constant 9223372036854775807 : i64
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
+  // CHECK-DAG: %[[CST_VALUE_INIT:.*]] = arith.constant 9223372036854775807 : i64
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<2x2xi64>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<1x2xi64>
   // CHECK: %[[ALLOC_1:.*]] = memref.alloc() : memref<1x2xi32>
@@ -1074,11 +1074,11 @@ func.func @test_reduce_min_with_index_int64_with_index_input() {
 
 // -----
 func.func @test_reduce_min_with_index_int32_with_index_input() {
-  // CHECK: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
-  // CHECK: %[[CST_VALUE_INIT:.*]] = arith.constant 2147483647 : i32
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
+  // CHECK-DAG: %[[CST_VALUE_INIT:.*]] = arith.constant 2147483647 : i32
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<2x2xi32>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<1x2xi32>
   // CHECK: %[[ALLOC_1:.*]] = memref.alloc() : memref<1x2xi32>
@@ -1113,11 +1113,11 @@ func.func @test_reduce_min_with_index_int32_with_index_input() {
 
 // -----
 func.func @test_reduce_min_with_index_int16_with_index_input() {
-  // CHECK: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
-  // CHECK: %[[CST_VALUE_INIT:.*]] = arith.constant 32767 : i16
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
+  // CHECK-DAG: %[[CST_VALUE_INIT:.*]] = arith.constant 32767 : i16
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<2x2xi16>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<1x2xi16>
   // CHECK: %[[ALLOC_1:.*]] = memref.alloc() : memref<1x2xi32>
@@ -1152,11 +1152,11 @@ func.func @test_reduce_min_with_index_int16_with_index_input() {
 
 // -----
 func.func @test_reduce_max_with_index_int64_with_index_input() {
-  // CHECK: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
-  // CHECK: %[[CST_VALUE_INIT:.*]] = arith.constant -9223372036854775808 : i64
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
+  // CHECK-DAG: %[[CST_VALUE_INIT:.*]] = arith.constant -9223372036854775808 : i64
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<2x2xi64>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<1x2xi64>
   // CHECK: %[[ALLOC_1:.*]] = memref.alloc() : memref<1x2xi32>
@@ -1191,11 +1191,11 @@ func.func @test_reduce_max_with_index_int64_with_index_input() {
 
 // -----
 func.func @test_reduce_max_with_index_int32_with_index_input() {
-  // CHECK: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
-  // CHECK: %[[CST_VALUE_INIT:.*]] = arith.constant -2147483648 : i32
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
+  // CHECK-DAG: %[[CST_VALUE_INIT:.*]] = arith.constant -2147483648 : i32
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<2x2xi32>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<1x2xi32>
   // CHECK: %[[ALLOC_1:.*]] = memref.alloc() : memref<1x2xi32>
@@ -1230,11 +1230,11 @@ func.func @test_reduce_max_with_index_int32_with_index_input() {
 
 // -----
 func.func @test_reduce_max_with_index_int16_with_index_input() {
-  // CHECK: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
-  // CHECK: %[[CST_VALUE_INIT:.*]] = arith.constant -32768 : i16
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST_INDEX_INIT:.*]] = arith.constant 0 : i32
+  // CHECK-DAG: %[[CST_VALUE_INIT:.*]] = arith.constant -32768 : i16
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<2x2xi16>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<1x2xi16>
   // CHECK: %[[ALLOC_1:.*]] = memref.alloc() : memref<1x2xi32>
@@ -1269,8 +1269,8 @@ func.func @test_reduce_max_with_index_int16_with_index_input() {
 
 // -----
 func.func @test_reduce_sum_ra_b64() {
-  // CHECK: %[[CST_VALUE_INIT:.*]] = arith.constant 0 : i64
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST_VALUE_INIT:.*]] = arith.constant 0 : i64
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<24x32xi64>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<1x32xi64>
   // CHECK: scf.for %[[arg0:.*]] = {{.*}} to {{.*}} step {{.*}}
@@ -1291,8 +1291,8 @@ func.func @test_reduce_sum_ra_b64() {
 
 // -----
 func.func @test_reduce_min_ra_b64() {
-  // CHECK: %[[CST_VALUE_INIT:.*]] = arith.constant 9223372036854775807 : i64
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST_VALUE_INIT:.*]] = arith.constant 9223372036854775807 : i64
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<24x32xi64>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<1x32xi64>
   // CHECK: scf.for %[[arg0:.*]] = {{.*}} to {{.*}} step {{.*}}
@@ -1313,8 +1313,8 @@ func.func @test_reduce_min_ra_b64() {
 
 // -----
 func.func @test_reduce_max_ra_b64() {
-  // CHECK: %[[CST_VALUE_INIT:.*]] = arith.constant -9223372036854775808 : i64
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST_VALUE_INIT:.*]] = arith.constant -9223372036854775808 : i64
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<24x32xi64>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<1x32xi64>
   // CHECK: scf.for %[[arg0:.*]] = {{.*}} to {{.*}} step {{.*}}
@@ -1335,8 +1335,8 @@ func.func @test_reduce_max_ra_b64() {
 
 // -----
 func.func @test_reduce_sum_r_b64() {
-  // CHECK: %[[CST_VALUE_INIT:.*]] = arith.constant 0 : i64
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST_VALUE_INIT:.*]] = arith.constant 0 : i64
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<32xi64>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<1xi64>
   // CHECK: scf.for %[[arg0:.*]] = {{.*}} to {{.*}} step {{.*}}
@@ -1356,8 +1356,8 @@ func.func @test_reduce_sum_r_b64() {
 
 // -----
 func.func @test_reduce_min_r_b64() {
-  // CHECK: %[[CST_VALUE_INIT:.*]] = arith.constant 9223372036854775807 : i64
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST_VALUE_INIT:.*]] = arith.constant 9223372036854775807 : i64
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<32xi64>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<1xi64>
   // CHECK: scf.for %[[arg0:.*]] = {{.*}} to {{.*}} step {{.*}}
@@ -1377,8 +1377,8 @@ func.func @test_reduce_min_r_b64() {
 
 // -----
 func.func @test_reduce_max_r_b64() {
-  // CHECK: %[[CST_VALUE_INIT:.*]] = arith.constant -9223372036854775808 : i64
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST_VALUE_INIT:.*]] = arith.constant -9223372036854775808 : i64
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<32xi64>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<1xi64>
   // CHECK: scf.for %[[arg0:.*]] = {{.*}} to {{.*}} step {{.*}}
@@ -1401,10 +1401,10 @@ func.func @test_reduce_max_r_b64() {
 //===----------------------------------------------------------------------===//
 // -----
 func.func @test_vmod_b64() {
-  // CHECK: %[[VAL_0:.*]] = arith.constant 8 : index
-  // CHECK: %[[VAL_1:.*]] = arith.constant 1 : index
-  // CHECK: %[[VAL_2:.*]] = arith.constant 0 : index
-  // CHECK: %[[VAL_3:.*]] = arith.constant 64 : index
+  // CHECK-DAG: %[[VAL_0:.*]] = arith.constant 8 : index
+  // CHECK-DAG: %[[VAL_1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[VAL_2:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[VAL_3:.*]] = arith.constant 64 : index
   // CHECK: %[[VAL_4:.*]] = memref.alloc() : memref<64x8xi64>
   // CHECK: %[[VAL_5:.*]] = memref.alloc() : memref<64x8xi64>
   // CHECK: %[[VAL_6:.*]] = memref.alloc() : memref<64x8xi64>
@@ -1428,8 +1428,8 @@ func.func @test_vmod_b64() {
 // -----
 // CHECK-LABEL:   func.func @test_decompose_vinterleave_b64(
 // CHECK-SAME:              %[[SRC_0:.*]]: memref<16xi64>, %[[SRC_1:.*]]: memref<16xi64>, %[[DST:.*]]: memref<32xi64>) {
-// CHECK:           %[[C2:.*]] = arith.constant 2 : index
-// CHECK:           %[[C1:.*]] = arith.constant 1 : index
+// CHECK-DAG:           %[[C2:.*]] = arith.constant 2 : index
+// CHECK-DAG:           %[[C1:.*]] = arith.constant 1 : index
 // CHECK:           scf.for %[[arg0:.*]] = {{.*}} to {{.*}} step {{.*}} {
 // CHECK:             %[[VAL_0:.*]] = memref.load {{.*}}[%[[arg0]]] : memref<16xi64>
 // CHECK:             %[[VAL_1:.*]] = memref.load {{.*}}[%[[arg0]]] : memref<16xi64>
@@ -1457,8 +1457,8 @@ func.func @test_decompose_vinterleave_b64(%src0: memref<16xi64>,
 // -----
 // CHECK-LABEL:   func.func @test_decompose_vdeinterleave_b64(
 // CHECK-SAME:              %[[SRC:.*]]: memref<32xi64>, %[[EVEN:.*]]: memref<16xi64>, %[[ODD:.*]]: memref<16xi64>) {
-// CHECK:           %[[C2:.*]] = arith.constant 2 : index
-// CHECK:           %[[C1:.*]] = arith.constant 1 : index
+// CHECK-DAG:           %[[C2:.*]] = arith.constant 2 : index
+// CHECK-DAG:           %[[C1:.*]] = arith.constant 1 : index
 // CHECK:           scf.for %[[arg0:.*]] = {{.*}} to {{.*}} step {{.*}} {
 // CHECK:             %[[arg1:.*]] = arith.muli %[[arg0]], %[[C2]] : index
 // CHECK:             %[[VAL_0:.*]] = memref.load {{.*}}[%[[arg1]]] : memref<32xi64>
@@ -1529,9 +1529,9 @@ func.func @test_decompose_argmin_float(%src: memref<2x5x7xf16, strided<[96, 16, 
 //===----------------------------------------------------------------------===//
 // -----
 func.func @test_cumsum_1d_i16() {
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST16:.*]] = arith.constant 16 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST16:.*]] = arith.constant 16 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<16xi16>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<16xi16>
   // CHECK: %[[input0:.*]] = memref.load %[[ALLOC]][%[[CST0]]] : memref<16xi16>
@@ -1550,10 +1550,10 @@ func.func @test_cumsum_1d_i16() {
 
 // -----
 func.func @test_cumsum_2d_i16() {
-  // CHECK: %[[CST16:.*]] = arith.constant 16 : index
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST16:.*]] = arith.constant 16 : index
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<2x16xi16>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<2x16xi16>
   // CHECK: scf.for %[[arg0:.*]] = %[[CST0]] to %[[CST2]] step %[[CST1]]
@@ -1573,11 +1573,11 @@ func.func @test_cumsum_2d_i16() {
 
 // -----
 func.func @test_cumsum_3d_f16() {
-  // CHECK: %[[CST16:.*]] = arith.constant 16 : index
-  // CHECK: %[[CST24:.*]] = arith.constant 24 : index
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST16:.*]] = arith.constant 16 : index
+  // CHECK-DAG: %[[CST24:.*]] = arith.constant 24 : index
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<2x24x16xf16>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<2x24x16xf16>
   // CHECK: scf.for %[[arg0:.*]] = %[[CST0]] to %[[CST2]] step %[[CST1]]
@@ -1598,9 +1598,9 @@ func.func @test_cumsum_3d_f16() {
 
 // -----
 func.func @test_cumsum_1d_i64() {
-    // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST16:.*]] = arith.constant 16 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST16:.*]] = arith.constant 16 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<16xi64>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<16xi64>
   // CHECK: %[[input0:.*]] = memref.load %[[ALLOC]][%[[CST0]]] : memref<16xi64>
@@ -1619,10 +1619,10 @@ func.func @test_cumsum_1d_i64() {
 
 // -----
 func.func @test_cumsum_2d_i64() {
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
-  // CHECK: %[[CST16:.*]] = arith.constant 16 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST16:.*]] = arith.constant 16 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<2x16xi64>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<2x16xi64>
   // CHECK: scf.for %[[arg0:.*]] = %[[CST0]] to %[[CST16]] step %[[CST1]]
@@ -1642,11 +1642,11 @@ func.func @test_cumsum_2d_i64() {
 
 // -----
 func.func @test_cumsum_3d_i64() {
-  // CHECK: %[[CST24:.*]] = arith.constant 24 : index
-  // CHECK: %[[CST16:.*]] = arith.constant 16 : index
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST24:.*]] = arith.constant 24 : index
+  // CHECK-DAG: %[[CST16:.*]] = arith.constant 16 : index
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<2x24x16xi64>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<2x24x16xi64>
   // CHECK: scf.for %[[arg0:.*]] = %[[CST0]] to %[[CST2]] step %[[CST1]]
@@ -1667,8 +1667,8 @@ func.func @test_cumsum_3d_i64() {
 
 // -----
 func.func @test_cumsum_1d_dynshape_lastdim(%src : memref<?xi32>, %dst : memref<?xi32>) {
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
   // CHECK: %[[input0:.*]] = memref.load %[[ALLOC:.*]][%[[CST0]]] : memref<?xi32>
   // CHECK: memref.store %[[input0]], %[[ALLOC_0:.*]][%[[CST0]]] : memref<?xi32>
   // CHECK: %[[dyndim:.*]] = memref.dim %[[ALLOC_0]], %[[CST0]] : memref<?xi32>
@@ -1684,8 +1684,8 @@ func.func @test_cumsum_1d_dynshape_lastdim(%src : memref<?xi32>, %dst : memref<?
 
 // -----
 func.func @test_cumsum_2d_dynshape_highdim(%src : memref<?x?xi64>, %dst : memref<?x?xi64>) {
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
   // CHECK: %[[dyndim1:.*]] = memref.dim %[[ALLOC_0:.*]], %[[CST1]] : memref<?x?xi64>
   // CHECK: scf.for %[[arg0:.*]] = %[[CST0]] to %[[dyndim1]] step %[[CST1]]
   // CHECK: %[[input0:.*]] = memref.load %[[ALLOC:.*]][%[[CST0]], %[[arg0]]] : memref<?x?xi64>
@@ -1703,9 +1703,9 @@ func.func @test_cumsum_2d_dynshape_highdim(%src : memref<?x?xi64>, %dst : memref
 
 // -----
 func.func @test_cumsum_3d_dynshape_i64_highdim(%src : memref<?x?x?xi64>, %dst : memref<?x?x?xi64>) {
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
   // CHECK: %[[dyndim0:.*]] = memref.dim %[[ALLOC_0:.*]], %[[CST0]] : memref<?x?x?xi64>
   // CHECK: scf.for %[[arg0:.*]] = %[[CST0]] to %[[dyndim0]] step %[[CST1]]
   // CHECK: %[[dyndim2:.*]] = memref.dim %[[ALLOC_0]], %[[CST2]] : memref<?x?x?xi64>
@@ -1725,9 +1725,9 @@ func.func @test_cumsum_3d_dynshape_i64_highdim(%src : memref<?x?x?xi64>, %dst : 
 
 // -----
 func.func @test_cumsum_3d_synshape_f32_lastdim(%src : memref<?x?x?xf32>, %dst : memref<?x?x?xf32>) {
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
   // CHECK: %[[dyndim0:.*]] = memref.dim %[[ALLOC_0:.*]], %[[CST0]] : memref<?x?x?xf32>
   // CHECK: scf.for %[[arg0:.*]] = %[[CST0]] to %[[dyndim0]] step %[[CST1]]
   // CHECK: %[[dyndim1:.*]] = memref.dim %[[ALLOC_0]], %[[CST1]] : memref<?x?x?xf32>
@@ -1750,9 +1750,9 @@ func.func @test_cumsum_3d_synshape_f32_lastdim(%src : memref<?x?x?xf32>, %dst : 
 //===----------------------------------------------------------------------===//
 // -----
 func.func @test_cumprod_1d_i16() {
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST16:.*]] = arith.constant 16 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST16:.*]] = arith.constant 16 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<16xi16>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<16xi16>
   // CHECK: %[[input0:.*]] = memref.load %[[ALLOC]][%[[CST0]]] : memref<16xi16>
@@ -1771,10 +1771,10 @@ func.func @test_cumprod_1d_i16() {
 
 // -----
 func.func @test_cumprod_2d_i16() {
-  // CHECK: %[[CST16:.*]] = arith.constant 16 : index
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST16:.*]] = arith.constant 16 : index
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<2x16xi16>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<2x16xi16>
   // CHECK: scf.for %[[arg0:.*]] = %[[CST0]] to %[[CST2]] step %[[CST1]]
@@ -1794,11 +1794,11 @@ func.func @test_cumprod_2d_i16() {
 
 // -----
 func.func @test_cumprod_3d_f16() {
-  // CHECK: %[[CST16:.*]] = arith.constant 16 : index
-  // CHECK: %[[CST24:.*]] = arith.constant 24 : index
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST16:.*]] = arith.constant 16 : index
+  // CHECK-DAG: %[[CST24:.*]] = arith.constant 24 : index
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<2x24x16xf16>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<2x24x16xf16>
   // CHECK: scf.for %[[arg0:.*]] = %[[CST0]] to %[[CST2]] step %[[CST1]]
@@ -1819,9 +1819,9 @@ func.func @test_cumprod_3d_f16() {
 
 // -----
 func.func @test_cumprod_1d_i64() {
-    // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST16:.*]] = arith.constant 16 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST16:.*]] = arith.constant 16 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<16xi64>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<16xi64>
   // CHECK: %[[input0:.*]] = memref.load %[[ALLOC]][%[[CST0]]] : memref<16xi64>
@@ -1840,10 +1840,10 @@ func.func @test_cumprod_1d_i64() {
 
 // -----
 func.func @test_cumprod_2d_i64() {
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
-  // CHECK: %[[CST16:.*]] = arith.constant 16 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST16:.*]] = arith.constant 16 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<2x16xi64>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<2x16xi64>
   // CHECK: scf.for %[[arg0:.*]] = %[[CST0]] to %[[CST16]] step %[[CST1]]
@@ -1863,11 +1863,11 @@ func.func @test_cumprod_2d_i64() {
 
 // -----
 func.func @test_cumprod_3d_i64() {
-  // CHECK: %[[CST24:.*]] = arith.constant 24 : index
-  // CHECK: %[[CST16:.*]] = arith.constant 16 : index
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST24:.*]] = arith.constant 24 : index
+  // CHECK-DAG: %[[CST16:.*]] = arith.constant 16 : index
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
   // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<2x24x16xi64>
   // CHECK: %[[ALLOC_0:.*]] = memref.alloc() : memref<2x24x16xi64>
   // CHECK: scf.for %[[arg0:.*]] = %[[CST0]] to %[[CST2]] step %[[CST1]]
@@ -1888,8 +1888,8 @@ func.func @test_cumprod_3d_i64() {
 
 // -----
 func.func @test_cumprod_1d_dynshape_lastdim(%src : memref<?xi32>, %dst : memref<?xi32>) {
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
   // CHECK: %[[input0:.*]] = memref.load %[[ALLOC:.*]][%[[CST0]]] : memref<?xi32>
   // CHECK: memref.store %[[input0]], %[[ALLOC_0:.*]][%[[CST0]]] : memref<?xi32>
   // CHECK: %[[dyndim:.*]] = memref.dim %[[ALLOC_0]], %[[CST0]] : memref<?xi32>
@@ -1905,8 +1905,8 @@ func.func @test_cumprod_1d_dynshape_lastdim(%src : memref<?xi32>, %dst : memref<
 
 // -----
 func.func @test_cumprod_2d_dynshape_highdim(%src : memref<?x?xi64>, %dst : memref<?x?xi64>) {
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
   // CHECK: %[[dyndim1:.*]] = memref.dim %[[ALLOC_0:.*]], %[[CST1]] : memref<?x?xi64>
   // CHECK: scf.for %[[arg0:.*]] = %[[CST0]] to %[[dyndim1]] step %[[CST1]]
   // CHECK: %[[input0:.*]] = memref.load %[[ALLOC:.*]][%[[CST0]], %[[arg0]]] : memref<?x?xi64>
@@ -1924,9 +1924,9 @@ func.func @test_cumprod_2d_dynshape_highdim(%src : memref<?x?xi64>, %dst : memre
 
 // -----
 func.func @test_cumprod_3d_dynshape_i64_highdim(%src : memref<?x?x?xi64>, %dst : memref<?x?x?xi64>) {
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
   // CHECK: %[[dyndim0:.*]] = memref.dim %[[ALLOC_0:.*]], %[[CST0]] : memref<?x?x?xi64>
   // CHECK: scf.for %[[arg0:.*]] = %[[CST0]] to %[[dyndim0]] step %[[CST1]]
   // CHECK: %[[dyndim2:.*]] = memref.dim %[[ALLOC_0]], %[[CST2]] : memref<?x?x?xi64>
@@ -1946,9 +1946,9 @@ func.func @test_cumprod_3d_dynshape_i64_highdim(%src : memref<?x?x?xi64>, %dst :
 
 // -----
 func.func @test_cumprod_3d_synshape_f32_lastdim(%src : memref<?x?x?xf32>, %dst : memref<?x?x?xf32>) {
-  // CHECK: %[[CST2:.*]] = arith.constant 2 : index
-  // CHECK: %[[CST1:.*]] = arith.constant 1 : index
-  // CHECK: %[[CST0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[CST2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[CST1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant 0 : index
   // CHECK: %[[dyndim0:.*]] = memref.dim %[[ALLOC_0:.*]], %[[CST0]] : memref<?x?x?xf32>
   // CHECK: scf.for %[[arg0:.*]] = %[[CST0]] to %[[dyndim0]] step %[[CST1]]
   // CHECK: %[[dyndim1:.*]] = memref.dim %[[ALLOC_0]], %[[CST1]] : memref<?x?x?xf32>

@@ -3174,16 +3174,13 @@ public:
   }
 
 private:
-  template <typename OpElemType>
-  bool isSupportOperand(OpType op) const = delete;
-
-  template <>
-  bool isSupportOperand<bool>(OpType op) const {
+  template <typename OpElemType, typename std::enable_if_t<!std::is_same_v<OpElemType, int8_t>, int> = 0>
+  bool isSupportOperand(OpType op) const {
     return false;
   }
 
-  template <>
-  bool isSupportOperand<int8_t>(OpType op) const {
+  template <typename OpElemType, typename std::enable_if_t<std::is_same_v<OpElemType, int8_t>, int> = 0>
+  bool isSupportOperand(OpType op) const {
     if constexpr (std::is_same_v<OpType, linalg::FillOp> ||
                   std::is_same_v<OpType, linalg::BroadcastOp> ||
                   std::is_same_v<OpType, linalg::CopyOp> ||
