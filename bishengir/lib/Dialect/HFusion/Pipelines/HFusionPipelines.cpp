@@ -112,6 +112,7 @@ static void preProcess(OpPassManager &pm,
   // normalize should be called after inline-brc pass:
   //  a) convert scalar-vector ops to vector-scalar ops
   pm.nest<func::FuncOp>().addPass(createHFusionNormalizeOpsPass());
+  pm.nest<func::FuncOp>().addPass(createSimplifyOpsPass());
 }
 
 static void preFlattenPass(OpPassManager &pm,
