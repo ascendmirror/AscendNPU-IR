@@ -241,6 +241,9 @@ createTileCubeVectorLoopPass(const TileCubeVectorLoopOptions &options = {});
 /// non-contiguous.
 std::unique_ptr<Pass> createNonContiguousReshapeToCopyPass();
 
+/// Create a pass to generate duplicate load when the dst is used by cube and
+/// vector op at the same time.
+std::unique_ptr<Pass> createInsertDuplicateLoadPass();
 //===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//

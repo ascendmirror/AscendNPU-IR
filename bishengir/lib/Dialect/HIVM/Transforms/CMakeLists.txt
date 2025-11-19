@@ -44,6 +44,8 @@ add_bishengir_dialect_library(BiShengIRHIVMTransforms
   InjectBlockSync.cpp
   InlineFixpipe.cpp
   InlineOTFBroadcast.cpp
+  InsertDuplicateLoad.cpp
+  InsertNZ2NDForDebug.cpp
   InsertInferSyncBlockLockNumAndInitFunc.cpp
   InsertInferWorkSpaceSizeFunc.cpp
   InsertInitAndFinishForDebug.cpp

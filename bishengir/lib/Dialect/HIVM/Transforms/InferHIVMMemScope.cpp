@@ -52,7 +52,8 @@ bool isSingleResultPropagatableMemrefOp(Operation *op) {
   return false;
 }
 
-static BlockArgument getTiedWhileBodyIterArg(scf::WhileOp op, OpOperand *opOperand) {
+static BlockArgument getTiedWhileBodyIterArg(scf::WhileOp op,
+                                             OpOperand *opOperand) {
   auto argsMutable = op.getInitsMutable();
   auto *it = llvm::find(argsMutable, *opOperand);
   if (it == argsMutable.end())
@@ -169,6 +170,7 @@ struct InferHIVMMemScopePass
 
 private:
   LogicalResult fixDeviceCallSite(func::FuncOp op);
+  LogicalResult fixDeviceLoads(func::FuncOp op);
   LogicalResult fixHostFuncSignature(func::FuncOp op);
 };
 } // namespace
@@ -183,21 +185,21 @@ LogicalResult hivm::inferAndPropagateMemScopeForMmadL1(hivm::MmadL1Op op) {
   auto *mC = op.getDpsInitOperand(0);
 
   // mA, mB and mC must originate from an AllocOP
-  auto allocA = utils::tracebackMemRefToAlloc(mA->get());
-  auto allocB = utils::tracebackMemRefToAlloc(mB->get());
-  auto allocC = utils::tracebackMemRefToAlloc(mC->get());
+  auto allocAs = utils::tracebackMemRefsToAlloc(mA->get());
+  auto allocBs = utils::tracebackMemRefsToAlloc(mB->get());
+  auto allocCs = utils::tracebackMemRefsToAlloc(mC->get());
 
-  if (!allocA.has_value()) {
+  if (!allocAs.has_value()) {
     emitError(op.getLoc())
         << "Cannot find root memref.alloc for mA of this op.";
     return failure();
   }
-  if (!allocB.has_value()) {
+  if (!allocBs.has_value()) {
     emitError(op.getLoc())
         << "Cannot find root memref.alloc for mB of this op.";
     return failure();
   }
-  if (!allocC.has_value()) {
+  if (!allocCs.has_value()) {
     emitError(op.getLoc())
         << "Cannot find root memref.alloc for mC of this op.";
     return failure();
@@ -211,22 +213,28 @@ LogicalResult hivm::inferAndPropagateMemScopeForMmadL1(hivm::MmadL1Op op) {
   MemScopeInferAndPropagateHelper helper;
 
   // For MmadL1Op, operand mA should be in L1.
-  if (failed(helper.Run(*allocA, l1SpaceAttr))) {
-    return op->emitOpError("Failed to infer/propagate memory scope for mA");
+  for (memref::AllocOp allocA : *allocAs) {
+    if (failed(helper.Run(allocA, l1SpaceAttr))) {
+      return op->emitOpError("Failed to infer/propagate memory scope for mA");
+    }
   }
   LDBG("IR after setting mem scope for mA:\n"
        << *(op->getParentOfType<ModuleOp>()));
 
   // For MmadL1Op, operand mB should be in L1.
-  if (failed(helper.Run(*allocB, l1SpaceAttr))) {
-    return op->emitOpError("Failed to infer/propagate memory scope for mB");
+  for (memref::AllocOp allocB : *allocBs) {
+    if (failed(helper.Run(allocB, l1SpaceAttr))) {
+      return op->emitOpError("Failed to infer/propagate memory scope for mB");
+    }
   }
   LDBG("IR after setting mem scope for mB:\n"
        << *(op->getParentOfType<ModuleOp>()));
 
   // For MmadL1Op, operand mC should be in L0C.
-  if (failed(helper.Run(*allocC, l0cSpaceAttr))) {
-    return op->emitOpError("Failed to infer/propagate memory scope for mC");
+  for (memref::AllocOp allocC : *allocCs) {
+    if (failed(helper.Run(allocC, l0cSpaceAttr))) {
+      return op->emitOpError("Failed to infer/propagate memory scope for mC");
+    }
   }
   LDBG("IR after setting mem scope for mC:\n"
        << *(op->getParentOfType<ModuleOp>()));
@@ -294,6 +302,34 @@ LogicalResult InferHIVMMemScopePass::fixDeviceCallSite(func::FuncOp op) {
       }
     }
   }
+  return success();
+}
+
+LogicalResult InferHIVMMemScopePass::fixDeviceLoads(func::FuncOp op) {
+  LDBG("Begin fixing loads for " << op.getSymName());
+
+  auto coreTypeAttr = dyn_cast_if_present<hivm::TFuncCoreTypeAttr>(
+      op->getAttr(hivm::TFuncCoreTypeAttr::name));
+
+  if (coreTypeAttr.getFuncCoreType() != hivm::TFuncCoreType::AIC) {
+    return success();
+  }
+
+  op.walk<WalkOrder::PostOrder>([&](Operation *op) {
+    FailureOr<bool> res = hivm::util::isCoreTypeOp(op, TCoreType::VECTOR);
+    if (failed(res)) {
+      return;
+    }
+    if (!isa<DestinationStyleOpInterface>(op)) {
+      return;
+    }
+    // If core type does not match, erase the operation
+    if (res.value()) {
+      mlir::hivm::util::replaceResultWithInitOperand(op);
+      op->erase();
+    }
+  });
+  
   return success();
 }
 
@@ -459,6 +495,11 @@ void InferHIVMMemScopePass::runOnOperation() {
 
   for (auto func : deviceFuncList) {
     if (failed(fixDeviceCallSite(func)))
+      signalPassFailure();
+  }
+
+  for (auto func : deviceFuncList) {
+    if (failed(fixDeviceLoads(func)))
       signalPassFailure();
   }
 

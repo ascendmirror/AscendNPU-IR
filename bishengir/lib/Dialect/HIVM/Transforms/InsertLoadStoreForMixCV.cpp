@@ -32,6 +32,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Value.h"
@@ -58,6 +59,9 @@ struct InsertLoadStoreForMixCVPass
 };
 
 enum class InsertMode { LoadOnly = 0, StoreOnly, LoadAndStore };
+enum class LoadCoreType { ForAic = 0, ForAiv, Other};
+constexpr StringRef loadOnlyForCube = "LoadOnlyForCube";
+constexpr StringRef loadOnlyForVector = "LoadOnlyForVector";
 
 Value insertLoadOperation(PatternRewriter &rewriter, Location loc,
                           OpOperand *consumerOperand, Operation **lastInsertOp,
@@ -95,6 +99,7 @@ Value insertStoreOperation(PatternRewriter &rewriter, Location loc,
 Value inertLoadStoreOperation(PatternRewriter &rewriter, Location loc,
                               OpOperand *consumerOperand,
                               Operation **lastInsertOp,
+                              LoadCoreType loadType = LoadCoreType::Other,
                               std::optional<Value> insertInit = std::nullopt) {
   Type type = consumerOperand->get().getType();
   Type elemType = getElementTypeOrSelf(type);
@@ -110,6 +115,16 @@ Value inertLoadStoreOperation(PatternRewriter &rewriter, Location loc,
   *lastInsertOp = rewriter.create<hivm::LoadOp>(
       loc, isBufferized ? TypeRange() : TypeRange(type),
       isBufferized ? storeInit : storeOp->getResults()[0], loadInit);
+  switch (loadType) {
+  case LoadCoreType::ForAic:
+    (*lastInsertOp)->setAttr(loadOnlyForCube, rewriter.getI32IntegerAttr(1));
+    break;
+  case LoadCoreType::ForAiv:
+    (*lastInsertOp)->setAttr(loadOnlyForVector, rewriter.getI32IntegerAttr(1));
+    break;
+  default:
+    break;
+  }
   return isBufferized ? loadInit : (*lastInsertOp)->getResult(0);
 }
 
@@ -117,7 +132,8 @@ LogicalResult
 insertLoadStoreOp(PatternRewriter &rewriter, Location loc,
                   const llvm::SmallVector<OpOperand *> &consumerOperands,
                   InsertMode insertMode,
-                  std::optional<Value> insertInit = std::nullopt) {
+                  std::optional<Value> insertInit = std::nullopt,
+                  LoadCoreType loadType = LoadCoreType::Other) {
   if (consumerOperands.empty()) {
     return failure();
   }
@@ -133,8 +149,8 @@ insertLoadStoreOp(PatternRewriter &rewriter, Location loc,
       replaceOperand = insertStoreOperation(rewriter, loc, consumerOperand,
                                             &lastInsertOp, insertInit);
     } else if (insertMode == InsertMode::LoadAndStore) {
-      replaceOperand = inertLoadStoreOperation(rewriter, loc, consumerOperand,
-                                               &lastInsertOp, insertInit);
+      replaceOperand = inertLoadStoreOperation(
+          rewriter, loc, consumerOperand, &lastInsertOp, loadType, insertInit);
     }
     if (!lastInsertOp) {
       llvm_unreachable("lastInsertOp not defined");
@@ -266,6 +282,39 @@ struct InsertLoadStoreOpBetweenVectorAndCube
     llvm::SmallVector<OpOperand *> consumerOperands;
     for (OpOperand &operand : op->getOpOperands()) {
       if (traceDefOp<OpType>(operand.get()).has_value()) {
+        consumerOperands.push_back(&operand);
+      }
+    }
+    return insertLoadStoreOp(rewriter, op.getLoc(), consumerOperands,
+                             InsertMode::LoadAndStore);
+  }
+};
+
+template <typename OpType>
+struct InsertLoadStoreOpBetweenCrossLoopVectorAndCube
+    : public OpRewritePattern<hivm::MmadL1Op> {
+  using OpRewritePattern<hivm::MmadL1Op>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(hivm::MmadL1Op op,
+                                PatternRewriter &rewriter) const override {
+    llvm::SmallVector<OpOperand *> consumerOperands;
+    for (OpOperand &operand : op->getOpOperands()) {
+      if (!isa<BlockArgument>(operand.get())) {
+        continue;
+      }
+
+      auto scfForOp = dyn_cast<scf::ForOp>(op->getParentOp());
+      if (!scfForOp) {
+        continue;
+      }
+
+      auto blockArg = cast<BlockArgument>(operand.get());
+      auto *yield = scfForOp.getTiedLoopYieldedValue(blockArg);
+      if (!yield) {
+        continue;
+      }
+      
+      if (traceDefOp<OpType>(yield->get()).has_value()) {
         consumerOperands.push_back(&operand);
       }
     }
@@ -559,10 +608,49 @@ struct DuplicateTensorExtractForCube
 };
 
 template <typename OpType>
+struct InsertStoreForSCFYieldAfterVector
+    : public OpRewritePattern<hivm::MmadL1Op> {
+  using OpRewritePattern<hivm::MmadL1Op>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(hivm::MmadL1Op mmadop,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<OpOperand *> consumerOperands;
+    for (OpOperand &operand : mmadop->getOpOperands()) {
+      auto blockArg = dyn_cast_if_present<BlockArgument>(operand.get());
+      if (!blockArg) {
+        continue;
+      }
+      auto scfForOp = 
+          dyn_cast_if_present<scf::ForOp>(blockArg.getOwner()->getParentOp());
+      if (!scfForOp) {
+        continue;
+      }
+      OpOperand *initArgs = scfForOp.getTiedLoopInit(blockArg);
+      if (traceDefOp<hivm::StoreOp>(initArgs->get()).has_value() ||
+          traceDefOp<hivm::FixpipeOp>(initArgs->get()).has_value()) {
+        continue;
+      }
+      OpOperand *yieldOperand = scfForOp.getTiedLoopYieldedValue(blockArg);
+      if (traceDefOp<hivm::LoadOp>(yieldOperand->get()).has_value()) {
+        continue;
+      }
+      if (traceDefOp<OpType>(yieldOperand->get()).has_value()) {
+        consumerOperands.push_back(yieldOperand);
+      }
+    }
+    return insertLoadStoreOp(rewriter, mmadop.getLoc(), consumerOperands,
+                            InsertMode::LoadAndStore, std::nullopt,
+                            LoadCoreType::ForAic);
+  }
+};
+
+template <typename OpType>
 static void registerOne(RewritePatternSet &patterns) {
   patterns.add<InsertLoadStoreOpBetweenVectorAndCube<OpType>,
                InsertStoreOpBetweenVectorAndLoad<OpType>,
-               InsertLoadOpBetweenStoreLikeAndVectorOrCube<OpType>>(
+               InsertLoadOpBetweenStoreLikeAndVectorOrCube<OpType>,
+               InsertLoadStoreOpBetweenCrossLoopVectorAndCube<OpType>,
+               InsertStoreForSCFYieldAfterVector<OpType>>(
       patterns.getContext());
 }
 
