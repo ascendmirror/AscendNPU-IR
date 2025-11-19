@@ -107,11 +107,12 @@ static void preProcess(OpPassManager &pm,
       /*skipAlignedSlice=*/options.enableTritonKernelCompile));
   pm.nest<func::FuncOp>().addPass(createHFusionNormalizeOpsPass());
   pm.addPass(createLegalizeBoolPass());
-  pm.nest<func::FuncOp>().addPass(createSimplifyOpsPass());
+  pm.nest<func::FuncOp>().addPass(creaiteSimplifyOpsPass());
   pm.nest<func::FuncOp>().addPass(createHFusionInlineBrcPass());
   // normalize should be called after inline-brc pass:
   //  a) convert scalar-vector ops to vector-scalar ops
   pm.nest<func::FuncOp>().addPass(createHFusionNormalizeOpsPass());
+  pm.nest<func::FuncOp>().addPass(createSimplifyOpsPass);i
 }
 
 static void preFlattenPass(OpPassManager &pm,
