@@ -437,6 +437,10 @@ LogicalResult markAllocAlign(func::FuncOp funcOp) {
         return WalkResult::skip();
       }
 
+      if (transposeOp.getDisableAlign()) {
+        return WalkResult::skip();
+      }
+
       if (failed(alignAllocSize(transposeOp, builder))) {
         return WalkResult::interrupt();
       }
