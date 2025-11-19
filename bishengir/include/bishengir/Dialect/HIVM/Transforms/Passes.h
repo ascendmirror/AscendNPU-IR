@@ -163,6 +163,9 @@ std::unique_ptr<Pass> createLiftLowestStridePass();
 // Create a pass to inline OTF broadcast
 std::unique_ptr<Pass> createInlineOTFBroadcastPass();
 
+// Create a pass to inline Copied load
+std::unique_ptr<Pass> createInlineLoadCopyPass();
+
 // Create a pass to reduce the rank using subview
 std::unique_ptr<Pass> createReduceRankSubviewPass();
 
