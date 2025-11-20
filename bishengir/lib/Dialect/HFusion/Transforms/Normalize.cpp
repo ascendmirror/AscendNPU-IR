@@ -858,6 +858,20 @@ struct NormalizeModOp : public OpRewritePattern<hfusion::ElemwiseBinaryOp> {
 public:
   using OpRewritePattern<hfusion::ElemwiseBinaryOp>::OpRewritePattern;
 
+  Value handleInfinityModulus(PatternRewriter &rewriter, Location loc,
+                              Value xF32, Value yF32, Value result) const {
+    Type boolType = RankedTensorType::get(
+        dyn_cast<RankedTensorType>(yF32.getType()).getShape(),
+        rewriter.getIntegerType(1));
+    auto isInf = rewriter.create<hfusion::IsInfOp>(loc, boolType, yF32);
+    auto correctResult = utils::createEmptyOp(rewriter, loc, result);
+    return rewriter
+        .create<hfusion::SelectOp>(loc, TypeRange{correctResult.getType()},
+                                   ValueRange{isInf, xF32, result},
+                                   ValueRange{correctResult})
+        .getResults()[0];
+  }
+
   Value handleZeromodulusForIntegerType(PatternRewriter &rewriter, Location loc,
                                         Value modulus, Value res) const {
     auto yType = modulus.getType();
@@ -1000,18 +1014,22 @@ public:
                           ValueRange{emptyResTensor})
                       .getResults()[0];
 
+    auto correctResF32 =
+        handleInfinityModulus(rewriter, op.getLoc(), xF32, yF32, resF32);
+
     // step 7: res = cast(res_f32) => orignal type
     if (elemType.isF32()) {
-      rewriter.replaceOp(op, resF32);
+      rewriter.replaceOp(op, correctResF32);
       return success();
     }
-    auto res = hfusion::castTo(rewriter, resF32, elemType);
+    auto res = hfusion::castTo(rewriter, correctResF32, elemType);
 
     if (elemType.isInteger()) {
       // step 8: res_f32 = select(div == 0, -1, res)
       res = handleZeromodulusForIntegerType(rewriter, op->getLoc(),
                                             op.getInputs()[1], res);
     }
+
     rewriter.replaceOp(op, res);
     return success();
   }
@@ -5686,4 +5704,3 @@ public:
 
 std::unique_ptr<Pass> mlir::hfusion::createHFusionNormalizeOpsPass() {
   return std::make_unique<NormalizeHFusionPass>();
-}
