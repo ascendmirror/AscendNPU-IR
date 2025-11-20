@@ -2,7 +2,7 @@
 
 // -----
 // CHECK-LABEL: @no_insert_store_between_extract_and_non_vector_non_cube_user(
-// CHECK: %[[EXTRACTED_INDEX:.*]] = tensor.extract %{{.*}}[%{{.*}}] : tensor<52xi64>
+// CHECK: %[[EXTRACTED_INDEX:.*]] = tensor.extract %{{.*}}[%{{.*}}] {{.*}} : tensor<52xi64>
 // CHECK: %{{[A-Za-z0-9_]+}} = arith.index_cast %[[EXTRACTED_INDEX:.*]] : i64 to index
 // CHECK-NOT: %{{[A-Za-z0-9_]+}} = hivm.hir.store ins(%input_indices : tensor<52xi64>) outs(%{{[A-Za-z0-9_]+}} : tensor<52xi64>) -> tensor<52xi64>
 func.func @no_insert_store_between_extract_and_non_vector_non_cube_user(%input_indices: tensor<52xi64>, %reinterpret_cast_1: memref<16384x768xf16, strided<[768, 1]>>, %alloc_2: memref<52x768xf16>) {
@@ -23,7 +23,7 @@ func.func @no_insert_store_between_extract_and_non_vector_non_cube_user(%input_i
 // -----
 // CHECK-LABEL: @insert_store_between_vector_and_cube_grandchild(
 // CHECK: %[[VEC_RESULT:.*]] = hivm.hir.vmul ins(%{{.*}}, %{{.*}} : tensor<16x16xf32>, tensor<16x16xf32>) outs(%{{.*}} : tensor<16x16xf32>) -> tensor<16x16xf32>
-// CHECK: %[[EXTRACTED:.*]] = tensor.extract %{{.*}}[{{.*}}] : tensor<256xf32>
+// CHECK: %[[EXTRACTED:.*]] = tensor.extract %{{.*}}[{{.*}}] {{.*}} : tensor<256xf32>
 // CHECK: %[[VEC:.*]] = tensor.splat %[[EXTRACTED:.*]] : tensor<1x16xf32>
 // CHECK: %[[SUM:.*]] = hivm.hir.vadd ins(%[[VEC:.*]], %arg1 : tensor<1x16xf32>, tensor<1x16xf32>) outs(%2 : tensor<1x16xf32>) -> tensor<1x16xf32>
 // CHECK: %{{[A-Za-z0-9_]+}} = hivm.hir.store ins(%[[SUM:.*]] : tensor<1x16xf32>) outs(%{{.*}} : tensor<1x16xf32>) -> tensor<1x16xf32>
