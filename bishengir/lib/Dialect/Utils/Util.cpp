@@ -551,6 +551,28 @@ bool utils::isAllocLikeOp(Operation *op) {
   return isa<memref::AllocOp>(op) || isa<memref::AllocaOp>(op);
 }
 
+bool utils::isCollapseShapeOp(Value val) {
+  return isCollapseShapeOp(val.getDefiningOp());
+}
+
+bool utils::isCollapseShapeOp(Operation *op) {
+  if (op == nullptr) {
+    return false;
+  }
+  return isa<memref::CollapseShapeOp>(op);
+}
+
+bool utils::isExpandShapeOp(Value val) {
+  return isExpandShapeOp(val.getDefiningOp());
+}
+
+bool utils::isExpandShapeOp(Operation *op) {
+  if (op == nullptr) {
+    return false;
+  }
+  return isa<memref::ExpandShapeOp>(op);
+}
+
 memref::ViewOp
 utils::createAllocWithSettingBufferSize(Operation *op, int64_t bufferSize,
                                         RewriterBase &opBuilder) {
@@ -925,6 +947,46 @@ std::optional<memref::AllocOp> utils::tracebackMemRefToAlloc(Value memrefVal) {
   return utils::isAllocLikeOp(tracedValue)
              ? tracedValue.getDefiningOp<memref::AllocOp>()
              : std::optional<memref::AllocOp>();
+}
+
+Value utils::tracebackMemRefAllocRelate(Value memrefVal) {
+  SmallVector<Value> memrefValues = utils::tracebackMemRefAllocRelateVec(memrefVal);
+  if (memrefValues.empty()) {
+    return memrefVal;
+  }
+  if (memrefValues.size() > 1) {
+    LDBG("tracebackMemRefAllocRelate found multiple sources!");
+  }
+  return memrefValues[0];
+}
+
+SmallVector<Value> utils::tracebackMemRefAllocRelateVec(Value memrefVal) {
+  return utils::tracebackMemRefVecByTargetFn(
+    memrefVal, [](Value val) {
+      return utils::isAllocLikeOp(val) ||
+             utils::isCollapseShapeOp(val) ||
+             utils::isExpandShapeOp(val);
+    });
+}
+
+std::optional<Operation *> utils::tracebackMemRefToAllocRelate(Value memrefVal) {
+  struct OpHandler {
+    bool (*isOp)(Value);
+    std::function<Operation *(Value)> getOp;
+  };
+  std::vector<OpHandler> opHandlers = {
+    { utils::isAllocLikeOp, [](Value val) { return val.getDefiningOp<memref::AllocOp>(); } },
+    { utils::isCollapseShapeOp, [](Value val) { return val.getDefiningOp<memref::CollapseShapeOp>(); } },
+    { utils::isExpandShapeOp, [](Value val) { return val.getDefiningOp<memref::ExpandShapeOp>(); } }
+  };
+
+  auto traceValue = utils::tracebackMemRefAllocRelate(memrefVal);
+  for (const auto &handler : opHandlers) {
+    if (handler.isOp(traceValue)) {
+      return handler.getOp(traceValue);
+    }
+  }
+  return std::nullopt;
 }
 
 namespace reshape_utils {

@@ -186,6 +186,18 @@ bool isAllocLikeOp(Operation *op);
 /// `memref.alloca` op.
 bool isAllocLikeOp(Value val);
 
+/// Return true if the input operation is `memref.collapse_shape`
+bool isCollapseShapeOp(Operation *op);
+
+/// Return true if the input value is the SSA result value of `memref.collapse_shape` op.
+bool isCollapseShapeOp(Value val);
+
+/// Return true if the input operation is `memref.expand_shape`
+bool isExpandShapeOp(Operation *op);
+
+/// Return true if the input value is the SSA result value of `memref.expand_shape` op.
+bool isExpandShapeOp(Value val);
+
 /// Set buffer size to alloc like ops by constructing a new, static-shape
 /// alloc. The new alloc is viewed to the original shape.
 /// \note Assertion is raised if `op` is not `memref.alloc` or `memref.alloca`
@@ -362,6 +374,19 @@ Value tracebackMemRef(Value memrefVal);
 /// Return `std::nullopt` if max-iteration is reached, or that the value doesn't
 /// originate from a alloc op.
 std::optional<memref::AllocOp> tracebackMemRefToAlloc(Value memrefVal);
+
+/// Try to trace back the current mermef-typed value to the source values.
+SmallVector<Value> tracebackMemRefAllocRelateVec(Value memrefVal);
+
+/// Try to trace back the current mermef-typed value to the source value.
+/// This function always return a value.
+Value tracebackMemRefAllocRelate(Value memrefVal);
+
+/// Try to trace back the current mermef-typed value to the source
+/// `memref.alloc`, `memref.alloca`, `memref.collapse_shape`, `memref.expand_shape`.
+/// Return `std::nullopt` if max-iteration is reached, or that the value doesn't
+/// originate from a alloc related op.
+std::optional<Operation *> tracebackMemRefToAllocRelate(Value memrefVal);
 
 void fillAncestorOfOperation(SmallPtrSet<Operation *, 3> &container,
                              Operation *op);
