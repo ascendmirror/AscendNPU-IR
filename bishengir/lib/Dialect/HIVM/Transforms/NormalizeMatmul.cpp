@@ -30,6 +30,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 
@@ -98,9 +99,25 @@ static bool isConstZero(Value v) {
 /// Optimize padding on L1 if we're given the hint.
 void tryOptimizePad(Operation *maybeLoadOp, Value mmadSource,
                     PatternRewriter &rewriter) {
-  assert(!isa<BlockArgument>(mmadSource));
   bool padKOnly =
       utils::getAnnotateOpWithAttr(mmadSource, kDotPadOnlyK).has_value();
+  while (BlockArgument ba = llvm::dyn_cast<BlockArgument>(mmadSource)) {
+    Value maybeNextMmadSource =
+      llvm::TypeSwitch<Operation *, Value>(ba.getOwner()->getParentOp())
+        .Case<scf::ForOp>([&](scf::ForOp forOp) -> Value {
+          // not an iter_arg - invalid
+          if (llvm::find(forOp.getRegionIterArgs(), ba) ==
+              forOp.getRegionIterArgs().end())
+            return nullptr;
+          return forOp.getTiedLoopInit(ba)->get();
+        })
+        .Default([](auto){return nullptr;});
+    if (!maybeNextMmadSource)
+      break;
+    mmadSource = maybeNextMmadSource;
+    padKOnly |=
+      utils::getAnnotateOpWithAttr(mmadSource, kDotPadOnlyK).has_value();
+  }
   if (!padKOnly)
     return;
 
