@@ -50,11 +50,11 @@ namespace {
 // Patterns that convert ops from other dialects to HIVM ops.
 //===---------------------------------------------------------------------===//
 
-std::optional<Value> getPadValue(std::optional<memref::AllocOp> maybeAlloc) {
-  if (!maybeAlloc.has_value())
+std::optional<Value> getPadValue(std::optional<Operation *> maybeAllocRelate) {
+  if (!maybeAllocRelate.has_value())
     return std::nullopt;
 
-  for (auto *user : maybeAlloc.value()->getUsers()) {
+  for (auto *user : maybeAllocRelate.value()->getUsers()) {
     if (llvm::isa_and_nonnull<hivm::VBrcOp>(user) &&
         user->getOperand(0).getType().isIntOrFloat()) {
       return user->getOperand(0);
@@ -64,11 +64,11 @@ std::optional<Value> getPadValue(std::optional<memref::AllocOp> maybeAlloc) {
 }
 
 std::optional<Value> getLeftPadNum(PatternRewriter &rewriter,
-                                   std::optional<memref::AllocOp> maybeAlloc) {
-  if (!maybeAlloc.has_value())
+                                   std::optional<Operation *> maybeAllocRelate) {
+  if (!maybeAllocRelate.has_value())
     return std::nullopt;
 
-  for (auto *user : maybeAlloc.value()->getUsers()) {
+  for (auto *user : maybeAllocRelate.value()->getUsers()) {
     if (auto subviewOp = llvm::dyn_cast<memref::SubViewOp>(user)) {
       auto offsets = subviewOp.getMixedOffsets();
       return mlir::getValueOrCreateConstantIndexOp(
@@ -100,7 +100,7 @@ getInitInfo(Operation *op, hivm::LoadOp loadOp) {
 }
 
 std::pair<std::optional<Operation *>, std::optional<Value>>
-getUniqueInitInfo(std::optional<memref::AllocOp> maybeAlloc,
+getUniqueInitInfo(std::optional<Operation *> maybeAlloc,
                   hivm::LoadOp loadOp) {
   if (!maybeAlloc.has_value())
     return {std::nullopt, std::nullopt};
@@ -127,7 +127,7 @@ getUniqueInitInfo(std::optional<memref::AllocOp> maybeAlloc,
 LogicalResult replaceMemCopyByHIVMLoadOp(memref::CopyOp copyOp,
                                          PatternRewriter &rewriter) {
   Value dst = copyOp.getTarget();
-  auto maybeAlloc = utils::tracebackMemRefToAlloc(dst);
+  auto maybeAlloc = utils::tracebackMemRefToAllocRelate(dst);
   auto maybePadValue = getPadValue(maybeAlloc);
   auto maybeLeftPadNum = getLeftPadNum(rewriter, maybeAlloc);
 
