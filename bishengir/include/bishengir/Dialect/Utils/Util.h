@@ -527,6 +527,15 @@ bool areReassociationsCompatible(
     ArrayRef<int64_t> collapseSourceShape, ArrayRef<int64_t> expandShapeResult,
     SmallVector<int64_t> &newExpandShape);
 
+/// Get reassociation of expandShapeOp
+/// eg.
+///   tensor.expand_shape %arg0 [[0, 1], [2], [3, 4]] : tensor<4x5x3xf32> into
+///                                                     tensor<4x1x5x3x1f32>
+/// here outRank = 5, expandDims = {1, 4},
+/// the result reassociation=[[0, 1], [2], [3, 4]]
+SmallVector<SmallVector<int64_t, 2>>
+getReAssociation(ArrayRef<int64_t> expandDims, int64_t outRank);
+
 } // namespace reshape_utils
 } // namespace mlir
 

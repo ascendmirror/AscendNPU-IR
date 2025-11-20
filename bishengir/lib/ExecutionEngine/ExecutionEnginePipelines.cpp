@@ -43,11 +43,14 @@ void execution_engine::buildCPURunnerPipeline(
   hostFuncWrapperOpts.wrapperName = options.wrapperName;
   pm.addPass(execution_engine::createCreateHostMainPass(hostFuncWrapperOpts));
 
-  // Bufferization Passes
-  // decompose tensor.concat into slices before bufferization
+  // Conversion to upstream dialect Passes
+  pm.addPass(createConvertHIVMToUpstreamPass());
+
+  // Decompose tensor.concat into slices before bufferization
   pm.addNestedPass<func::FuncOp>(tensor::createDecomposeTensorConcatPass());
   pm.addPass(bufferization::createEmptyTensorToAllocTensorPass());
 
+  // Bufferization Passes
   bufferization::OneShotBufferizationOptions bufferizationOpts;
   bufferizationOpts.bufferizeFunctionBoundaries = true;
   bufferizationOpts.setFunctionBoundaryTypeConversion(
