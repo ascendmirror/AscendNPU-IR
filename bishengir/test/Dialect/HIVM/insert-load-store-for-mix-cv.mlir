@@ -2,7 +2,7 @@
 
 // -----
 // CHECK-LABEL: @no_insert_store_between_extract_and_non_vector_non_cube_user(
-// CHECK: %[[EXTRACTED_INDEX:.*]] = tensor.extract %{{.*}}[%{{.*}}] {{.*}} : tensor<52xi64>
+// CHECK: %[[EXTRACTED_INDEX:.*]] = tensor.extract %{{.*}}[%{{.*}}] : tensor<52xi64>
 // CHECK: %{{[A-Za-z0-9_]+}} = arith.index_cast %[[EXTRACTED_INDEX:.*]] : i64 to index
 // CHECK-NOT: %{{[A-Za-z0-9_]+}} = hivm.hir.store ins(%input_indices : tensor<52xi64>) outs(%{{[A-Za-z0-9_]+}} : tensor<52xi64>) -> tensor<52xi64>
 func.func @no_insert_store_between_extract_and_non_vector_non_cube_user(%input_indices: tensor<52xi64>, %reinterpret_cast_1: memref<16384x768xf16, strided<[768, 1]>>, %alloc_2: memref<52x768xf16>) {
