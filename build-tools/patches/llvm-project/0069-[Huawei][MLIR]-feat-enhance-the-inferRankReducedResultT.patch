@@ -1,0 +1,57 @@
+From b07f9a784ccb55b390e9a83b43ca7e052d9bb05e Mon Sep 17 00:00:00 2001
+From: ccdedreams <chengchen8@huawei.com>
+Date: Thu, 20 Nov 2025 22:37:39 +0800
+Subject: [PATCH] [Huawei][MLIR] feat: enhance the inferRankReducedResultType
+ of SubViewOp
+
+---
+ mlir/lib/Dialect/MemRef/IR/MemRefOps.cpp | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
+
+diff --git a/mlir/lib/Dialect/MemRef/IR/MemRefOps.cpp b/mlir/lib/Dialect/MemRef/IR/MemRefOps.cpp
+index 135165b7b03a..d98a5c672dea 100644
+--- a/mlir/lib/Dialect/MemRef/IR/MemRefOps.cpp
++++ b/mlir/lib/Dialect/MemRef/IR/MemRefOps.cpp
+@@ -2469,12 +2469,12 @@ computeCollapsedLayoutMap(MemRefType srcType,
+       auto srcStride = SaturatedInteger::wrap(srcStrides[idx - 1]);
+       if (strict && (stride.saturated || srcStride.saturated))
+         return failure();
+- 
++
+       // Dimensions of size 1 should be skipped, because their strides are
+       // meaningless and could have any arbitrary value.
+       if (srcShape[idx - 1] == 1)
+         continue;
+- 
++
+       if (!stride.saturated && !srcStride.saturated && stride != srcStride)
+         return failure();
+     }
+@@ -2786,11 +2786,24 @@ Type SubViewOp::inferRankReducedResultType(ArrayRef<int64_t> resultShape,
+     if (!dimsToProject->contains(idx))
+       rankReducedStrides.push_back(value);
+   }
++#if BSPUB_DAVINCI_BISHENGIR
++  bool isContiguous = inferredLayout.getOffset() == 0 &&
++                      rankReducedStrides.size() == 1 &&
++                      rankReducedStrides[0] == 1;
++  return MemRefType::get(
++      resultShape, inferredType.getElementType(),
++      isContiguous ? MemRefLayoutAttrInterface{}
++                   : StridedLayoutAttr::get(inferredLayout.getContext(),
++                                            inferredLayout.getOffset(),
++                                            rankReducedStrides),
++      inferredType.getMemorySpace());
++#else
+   return MemRefType::get(resultShape, inferredType.getElementType(),
+                          StridedLayoutAttr::get(inferredLayout.getContext(),
+                                                 inferredLayout.getOffset(),
+                                                 rankReducedStrides),
+                          inferredType.getMemorySpace());
++#endif
+ }
+ 
+ Type SubViewOp::inferRankReducedResultType(ArrayRef<int64_t> resultShape,
+-- 
+2.34.1
+

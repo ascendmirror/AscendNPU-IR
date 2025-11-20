@@ -131,11 +131,17 @@ MemRefType inferRankReducedResultType(ArrayRef<int64_t> resultShape,
     if (!dropDims.contains(idx))
       rankReducedStrides.push_back(value);
   }
-  return MemRefType::get(resultShape, inferredType.getElementType(),
-                         StridedLayoutAttr::get(inferredLayout.getContext(),
-                                                inferredLayout.getOffset(),
-                                                rankReducedStrides),
-                         inferredType.getMemorySpace());
+  bool isContiguous = inferredLayout.getOffset() == 0 &&
+                      rankReducedStrides.size() == 1 &&
+                      rankReducedStrides[0] == 1;
+
+  return MemRefType::get(
+      resultShape, inferredType.getElementType(),
+      isContiguous ? MemRefLayoutAttrInterface{}
+                   : StridedLayoutAttr::get(inferredLayout.getContext(),
+                                            inferredLayout.getOffset(),
+                                            rankReducedStrides),
+      inferredType.getMemorySpace());
 }
 
 MemRefType inferRankReducedResultType(ArrayRef<int64_t> resultShape,
@@ -342,8 +348,8 @@ struct VReduceOpReduceRankSubviewPattern
                                             dropDimSet, rewriter);
     Value subviewIndicesOp = nullptr;
     if (op.getIndices()) {
-      getReducedSubviewOp(op.getIndices(), srcMemType, op->getLoc(),
-                                            dropDimSet, rewriter);
+      getReducedSubviewOp(op.getIndices(), srcMemType, op->getLoc(), dropDimSet,
+                          rewriter);
     }
     SmallVector<Value> subviewDstRange;
     for (Value dst : dstRange) {
