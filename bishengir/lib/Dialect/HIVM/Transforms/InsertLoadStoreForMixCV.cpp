@@ -473,7 +473,7 @@ struct DuplicateTensorExtractForCube
 
     // only process cases with vector sources
     Value originTensor = extractOp.getTensor();
-    if (getElementTypeOrSelf(originTensor) == rewriter.getI1Type()) {
+    if (getElementTypeOrSelf(originTensor) == rewriter.getI1xxxType()) {
       // TODO: handle i1 cases for every load/store in this file
       return failure();
     }
