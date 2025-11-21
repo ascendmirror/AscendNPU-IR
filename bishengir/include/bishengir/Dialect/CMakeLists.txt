@@ -7,6 +7,7 @@ add_subdirectory(MemRef)
 add_subdirectory(MemRefExt)
 add_subdirectory(SCF)
 add_subdirectory(Symbol)
+add_subdirectory(Scope)
 add_subdirectory(Tensor)
 
 if(BISHENGIR_ENABLE_TORCH_CONVERSIONS)
