@@ -397,6 +397,22 @@ def AllowUnregisteredDialects : BiShengIRHIVMCompileOpt<
   "false"
 >;
 
+def SaveTemps : BiShengIRHIVMCompileOpt<
+  "Enable saving temporal files.",
+  "bool",
+  "false"
+> {
+  bit isSharedWithDownstreamToolchain = 1;
+}
+
+def PrintCommands : BiShengIRHIVMCompileOpt<
+  "Print the commands to run for this compilation.",
+  "bool",
+  "false"
+> {
+  bit isSharedWithDownstreamToolchain = 1;
+}
+
 def HIVMCArgs : BiShengIRHIVMCompileListOpt<
   "List of arguments passed to hivmc.",
   "std::string"

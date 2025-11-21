@@ -54,6 +54,12 @@ FailureOr<OwningModuleRef> runExternalHIVMOptimizationPipeline(
     return failure();
   }
 
+  if (config.getSaveTemps()) {
+    tempDirsStore.save();
+    inputFileHandler->keep();
+    outputFileHandler->keep();
+  }
+
   inputFile = inputFileHandler->outputFilename();
   outputFile = outputFileHandler->outputFilename();
 
@@ -79,7 +85,7 @@ FailureOr<OwningModuleRef> runExternalHIVMOptimizationPipeline(
 
   SmallVector<StringRef> argumentsRef(arguments.begin(), arguments.end());
   if (failed(execute(getBiShengIRHIVMCompilerName(), getBiShengInstallPath(),
-                     argumentsRef))) {
+                     argumentsRef, config.getPrintCommands()))) {
     return failure();
   }
 
@@ -117,6 +123,12 @@ LogicalResult runExternalHIVMLoweringPipeline(
            "hivm compile.\n";
     return failure();
   }
+
+  if (config.getSaveTemps()) {
+    tempDirsStore.save();
+    inputFileHandler->keep();
+  }
+
   inputFile = inputFileHandler->outputFilename();
 
   module.print(inputFileHandler->os(),
@@ -139,7 +151,7 @@ LogicalResult runExternalHIVMLoweringPipeline(
 
   SmallVector<StringRef> argumentsRef(arguments.begin(), arguments.end());
   if (failed(execute(getBiShengIRHIVMCompilerName(), getBiShengInstallPath(),
-                     argumentsRef))) {
+                     argumentsRef, config.getPrintCommands()))) {
     return failure();
   }
 
