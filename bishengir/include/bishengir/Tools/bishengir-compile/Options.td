@@ -158,6 +158,14 @@ def DisableAutoInjectBlockSync : FeatureControlOptions<
   bit isSharedWithDownstreamToolchain = 1;
 }
 
+def DisableAutoCVWorkSpaceManage : FeatureControlOptions<
+  "In combination with the disableAutoInjectBlockSync option.",
+  "bool",
+  "false"
+> {
+  bit isSharedWithDownstreamToolchain = 1;
+}
+
 def EnableHIVMGraphSyncSolver : FeatureControlOptions<
   "Use hivm graph-sync-solver instead of inject-sync.",
   "bool",
