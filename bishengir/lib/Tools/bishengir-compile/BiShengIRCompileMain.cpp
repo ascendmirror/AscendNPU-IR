@@ -39,6 +39,7 @@ StringRef getHIVMCName() {
   return kBiShengIRHIVMBinaryName;
 }
 
+<<<<<<< HEAD
 #ifndef BISHENGIR_PUBLISH
 std::vector<std::string>
 getCompatibleOptions(const std::vector<std::string> &arguments) {
@@ -53,6 +54,73 @@ getCompatibleOptions(const std::vector<std::string> &arguments) {
       continue;
     }
     result.push_back(arg);
+=======
+/// Calls `bishengir-hivm-compile` to run HIVM optimization passes.
+FailureOr<OwningModuleRef> runExternalHIVMOptimizationPipeline(
+    ModuleOp module, const bishengir::BiShengIRCompileMainConfig &config) {
+  TempDirectoriesStore tempDirsStore;
+  std::string inputFile = "module.hivm.mlir";
+  std::string outputFile = "module.hivm.opt.mlir";
+  auto inputFileHandler = getTempFile(inputFile, tempDirsStore);
+  auto outputFileHandler = getTempFile(outputFile, tempDirsStore);
+  if (!inputFileHandler || !outputFileHandler) {
+    llvm::dbgs()
+        << "[ERROR] Failed to create temporary input/output files needed "
+           "to run hivm pipeline.\n";
+    return failure();
+  }
+
+  if (config.getSaveTemps()) {
+    tempDirsStore.save();
+    inputFileHandler->keep();
+    outputFileHandler->keep();
+  }
+
+  inputFile = inputFileHandler->outputFilename();
+  outputFile = outputFileHandler->outputFilename();
+
+  module.print(inputFileHandler->os(),
+               mlir::OpPrintingFlags().enableDebugInfo(
+                   config.getEnableSanitizer() || config.getEnableDebugInfo()));
+  inputFileHandler->os().flush();
+
+  std::vector<std::string> arguments;
+  arguments.emplace_back("");
+  arguments.push_back(inputFile);
+
+  auto hivmCompileArgs = config.getHIVMCompileArgsDashDash();
+  arguments.insert(arguments.end(), hivmCompileArgs.begin(),
+                   hivmCompileArgs.end());
+
+  arguments.emplace_back("-o");
+  arguments.push_back(outputFile);
+  std::string enableHIVMOpt = "--enable-hivm-compile=";
+  enableHIVMOpt += config.getEnableHIVMCompile() ? "true" : "false";
+  arguments.emplace_back(enableHIVMOpt);
+  arguments.emplace_back("--convert-hir-to-lir=false");
+
+  SmallVector<StringRef> argumentsRef(arguments.begin(), arguments.end());
+  if (failed(execute(getBiShengIRHIVMCompilerName(), getBiShengInstallPath(),
+                     argumentsRef, config.getPrintCommands()))) {
+    return failure();
+  }
+
+  std::string errorMessage;
+  auto file = mlir::openInputFile(outputFile, &errorMessage);
+  if (!file) {
+    llvm::errs() << "[ERROR] Failed to open: " << outputFile
+                 << " error message: " << errorMessage << '\n';
+    return failure();
+  }
+
+  llvm::SourceMgr sourceMgr;
+  sourceMgr.AddNewSourceBuffer(std::move(file), mlir::SMLoc());
+  mlir::OwningOpRef<mlir::ModuleOp> moduleRef =
+      mlir::parseSourceFile<mlir::ModuleOp>(sourceMgr, module->getContext());
+  if (!moduleRef) {
+    llvm::errs() << "[ERROR] Failed to open: " << outputFile << '\n';
+    return failure();
+>>>>>>> [AscendNPU IR]: add debugging options: save-temps, print-commands
   }
   return result;
 }
@@ -70,6 +138,12 @@ LogicalResult runExternalHIVMC(ModuleOp module,
            "hivm compile.\n";
     return failure();
   }
+
+  if (config.getSaveTemps()) {
+    tempDirsStore.save();
+    inputFileHandler->keep();
+  }
+
   inputFile = inputFileHandler->outputFilename();
 
   module.print(inputFileHandler->os(),
@@ -92,7 +166,12 @@ LogicalResult runExternalHIVMC(ModuleOp module,
 #endif
 
   SmallVector<StringRef> argumentsRef(arguments.begin(), arguments.end());
+<<<<<<< HEAD
   if (failed(execute(getHIVMCName(), getBiShengInstallPath(), argumentsRef))) {
+=======
+  if (failed(execute(getBiShengIRHIVMCompilerName(), getBiShengInstallPath(),
+                     argumentsRef, config.getPrintCommands()))) {
+>>>>>>> [AscendNPU IR]: add debugging options: save-temps, print-commands
     return failure();
   }
 

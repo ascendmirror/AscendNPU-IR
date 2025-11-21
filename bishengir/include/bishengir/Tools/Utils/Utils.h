@@ -53,7 +53,11 @@ struct TempDirectoriesStore {
   ~TempDirectoriesStore();
 
   void assertInsideTmp(StringTmpPath path) const;
+  void save();
   llvm::SmallVector<StringTmpPath> dirs;
+
+private:
+  bool keep = false;
 };
 
 std::unique_ptr<llvm::ToolOutputFile>
@@ -64,7 +68,8 @@ checkInOutOptionsValidity(BiShengIRCompileConfigBase &config);
 
 llvm::LogicalResult execute(llvm::StringRef binName,
                             llvm::StringRef installPath,
-                            llvm::SmallVectorImpl<llvm::StringRef> &arguments);
+                            llvm::SmallVectorImpl<llvm::StringRef> &arguments,
+                            bool debugPrint = false);
 
 /// Get the path set by environment variable `BISHENG_INSTALL_PATH`.
 std::string getBiShengInstallPath();
