@@ -38,10 +38,10 @@ func.func @insert_store_between_vector_and_cube_grandchild(%2 : tensor<16x16xf32
   scf.for %arg10 = %c0 to %c16 step %c1 {
     %extracted_val = tensor.extract %vec_result[%arg10] : tensor<256xf32>
     %extracted = tensor.splat %extracted_val : tensor<1x16xf32>
-		%vec_sum_out = tensor.empty() : tensor<1x16xf32>
-		%vec_sum = hivm.hir.vadd ins(%extracted, %arg0 : tensor<1x16xf32>, tensor<1x16xf32>) outs(%vec_sum_out : tensor<1x16xf32>) -> tensor<1x16xf32>
-		%out_for_result = tensor.empty() : tensor<16x16xf32>
-		%result = hivm.hir.mmadL1 ins(%other_matrix, %vec_sum, %init, %c16, %c16, %c16 : tensor<16x1xf32>, tensor<1x16xf32>, i1, index, index, index) outs(%out_for_result : tensor<16x16xf32>) -> tensor<16x16xf32>
+    %vec_sum_out = tensor.empty() : tensor<1x16xf32>
+    %vec_sum = hivm.hir.vadd ins(%extracted, %arg0 : tensor<1x16xf32>, tensor<1x16xf32>) outs(%vec_sum_out : tensor<1x16xf32>) -> tensor<1x16xf32>
+    %out_for_result = tensor.empty() : tensor<16x16xf32>
+    %result = hivm.hir.mmadL1 ins(%other_matrix, %vec_sum, %init, %c16, %c16, %c16 : tensor<16x1xf32>, tensor<1x16xf32>, i1, index, index, index) outs(%out_for_result : tensor<16x16xf32>) -> tensor<16x16xf32>
     %reinterpret_cast_0 = memref.reinterpret_cast %out_buf to offset: [%arg10], sizes: [16, 16], strides: [16, 1] : memref<16x16x16xf32> to memref<16x16xf32, strided<[16, 1], offset: ?>>
     bufferization.materialize_in_destination %result in writable %reinterpret_cast_0 : (tensor<16x16xf32>, memref<16x16xf32, strided<[16, 1], offset: ?>>) -> ()
 	}
