@@ -153,9 +153,21 @@ LogicalResult replaceMemCopyByHIVMLoadOp(memref::CopyOp copyOp,
   // TODO: change TA to create hivm.load/store op directly
   auto implicitTransposeAttr = utils::getAnnotateOpWithAttr(
       copyOp.getTarget(), "MayImplicitTransposeWithLastAxis");
-  if (implicitTransposeAttr.has_value()) {
-    loadOp.setMayImplicitTransposeWithLastAxis(true);
+  
+  Value allocRef = utils::tracebackMemRef(copyOp.getTarget());
+  if (allocRef != copyOp.getTarget()) {
+    auto implicitTransposeAttrForAlloc = utils::getAnnotateOpWithAttr(
+      copyOp.getTarget(), "MayImplicitTransposeWithLastAxis");
+    if (implicitTransposeAttr.has_value() || implicitTransposeAttrForAlloc.has_value()) {
+      loadOp.setMayImplicitTransposeWithLastAxis(true);
+    }
+  } else {
+    if (implicitTransposeAttr.has_value()) {
+      loadOp.setMayImplicitTransposeWithLastAxis(true);
+    }
   }
+  
+  
   rewriter.replaceOp(copyOp, loadOp);
   return success();
 }
