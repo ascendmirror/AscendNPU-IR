@@ -1516,6 +1516,66 @@ bool isArgminOrArgmax(ReduceOperation op) {
          op == ReduceOperation::max_with_index_right;
 }
 
+static bool shouldMapToUnsigned(IntegerType::SignednessSemantics val,
+                         hivm::TypeFn casting) {
+  if (hivm::TypeFn::cast_unsigned == casting)
+    return true;
+
+  switch (val) {
+  case IntegerType::Signless:
+  case IntegerType::Signed:
+    return false;
+  case IntegerType::Unsigned:
+    return true;
+  }
+  llvm_unreachable("Unexpected IntegerType::SignednessSemantics");
+}
+
+std::string getTypeName(Location loc, Type type,
+                                      hivm::TypeFn casting) {
+  std::string unknown = "UNKNOWN";
+  if (auto iType = dyn_cast<IntegerType>(type)) {
+    switch (iType.getWidth()) {
+    case 1:
+      return "bool";
+    case 4:
+    case 8:
+    case 16:
+    case 32:
+    case 64:
+      if (shouldMapToUnsigned(iType.getSignedness(), casting))
+        return "uint" + std::to_string(iType.getWidth()) + "_t";
+      else
+        return "int" + std::to_string(iType.getWidth()) + "_t";
+    default:
+      emitError(loc, "unrecognized integer type: ") << type;
+      return unknown;
+    }
+  }
+  if (auto fType = dyn_cast<FloatType>(type)) {
+    switch (fType.getWidth()) {
+    case 16:
+      if (fType.isF16()) {
+        return "half";
+      } else if (fType.isBF16()) {
+        return "bfloat16_t";
+      } else {
+        emitError(loc, "unrecognized float type: ") << type;
+        return unknown;
+      }
+    case 32:
+      return "float";
+    case 64:
+      return "double";
+    default:
+      emitError(loc, "unrecognized float type: ") << type;
+      return unknown;
+    }
+  }
+  emitError(loc, "unsupported type: ") << type;
+  return unknown;
+}
+
 } // namespace util
 } // namespace hivm
 } // namespace mlir
