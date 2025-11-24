@@ -101,6 +101,9 @@ createInjectSyncPass(const InjectSyncOptions &options = {});
 /// Create a pass to calculate memref alignment
 std::unique_ptr<Pass> createInferMemrefAlignmentPass();
 
+/// Create a pass to rewrite unaligned hivm dma instructions
+std::unique_ptr<Pass> createRewriteUnalignedDMAPass();
+
 /// Create a pass to erase memref alignment annotations
 std::unique_ptr<Pass> createEraseMemrefAlignmentMarksPass();
 
