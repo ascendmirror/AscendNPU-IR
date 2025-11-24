@@ -301,6 +301,9 @@ static void hivmPostBufferizationOptimizationPipeline(
       createHIVMAggregatedDecomposeOpPass(decomposeOption));
   pm.nest<func::FuncOp>().addPass(createReduceRankSubviewPass());
   pm.nest<func::FuncOp>().addPass(createLiftLowestStridePass());
+  pm.nest<func::FuncOp>().addPass(createInferMemrefAlignmentPass());
+  // TODO unaligned access rewriter
+  pm.nest<func::FuncOp>().addPass(createEraseMemrefAlignmentMarksPass());
   pm.nest<func::FuncOp>().addPass(createAllocExtraBufferPass());
   // Infer memory scope for newly allocated extra buffer
   pm.addPass(createInferHIVMMemScopePass());
