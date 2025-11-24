@@ -96,7 +96,7 @@ FailureOr<int> getPhysicalBlockNum(func::FuncOp funcOp) {
 
 void replaceBlockIdUsers(IRRewriter &rewriter,
                          hivm::GetBlockIdxOp getBlockIdxOp, Value iv,
-                         Value physicalBlockNum, Value logicBlockNum) {
+                         Value physicalBlockNum, Value logicBlockNum, Value blockifyV2) {
   // block idx returns i64 meanwhile all other args are i32 so we cast it
   rewriter.setInsertionPointAfterValue(getBlockIdxOp);
   auto loc = getBlockIdxOp->getLoc();
@@ -104,7 +104,7 @@ void replaceBlockIdUsers(IRRewriter &rewriter,
       loc, rewriter.getI32Type(), getBlockIdxOp.getResult());
   Value mulOp = rewriter.create<arith::MulIOp>(loc, iv, physicalBlockNum);
   auto sumOp = rewriter.create<arith::AddIOp>(loc, mulOp, castedBlockID);
-  auto minVal = rewriter.create<arith::MinSIOp>(loc, sumOp, logicBlockNum);
+  auto minVal = rewriter.create<arith::MinSIOp>(loc, rewriter.create<arith::MulIOp>(loc, sumOp, blockifyV2), logicBlockNum);
   auto castedMinVal =
       rewriter.create<arith::ExtSIOp>(loc, rewriter.getI64Type(), minVal);
   rewriter.replaceAllUsesExcept(getBlockIdxOp, castedMinVal, castedBlockID);
@@ -147,6 +147,8 @@ LogicalResult loopOnLogicBlock(func::FuncOp funcOp, IRRewriter &rewriter) {
       loc, kPhysicalBlockNum.value(), intBits);
   Value upperBound =
       rewriter.create<arith::CeilDivSIOp>(loc, logicBlockNum, physicalBlockNum);
+  Value blockifyV2 = rewriter.create<arith::ConstantIntOp>(loc, 2, intBits);
+  upperBound = rewriter.create<arith::CeilDivSIOp>(loc, upperBound, blockifyV2);
   Value step = rewriter.create<arith::ConstantIntOp>(loc, 1, intBits);
   auto forOp = rewriter.create<scf::ForOp>(loc, lowerBound, upperBound, step);
 
@@ -158,7 +160,7 @@ LogicalResult loopOnLogicBlock(func::FuncOp funcOp, IRRewriter &rewriter) {
     }
   }
   replaceBlockIdUsers(rewriter, getBlockIdxOp, forOp.getInductionVar(),
-                      physicalBlockNum, logicBlockNum);
+                      physicalBlockNum, logicBlockNum, blockifyV2);
   return success();
 }
 } // namespace
