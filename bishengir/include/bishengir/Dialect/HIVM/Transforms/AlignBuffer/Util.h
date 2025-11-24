@@ -175,6 +175,19 @@ adjustAlignInfo(Operation *op, Value operand,
 
 void dump(const ArrayRef<int32_t> &alignDims,
           const ArrayRef<int32_t> &alignBytes, StringRef debugType = "");
+
+LogicalResult getUnAlignSizeInfo(
+    VTransposeOp op,
+    std::vector<std::unique_ptr<OperAlignInfo>> *operAlignInfoList);
+
+LogicalResult getUnAlignSizeInfo(
+    VCastOp op,
+    std::vector<std::unique_ptr<OperAlignInfo>> *operAlignInfoList);
+
+LogicalResult getUnAlignSizeInfo(
+    VSortOp op,
+    std::vector<std::unique_ptr<OperAlignInfo>> *operAlignInfoList);
+
 } // namespace hivm
 } // namespace mlir
 

@@ -305,20 +305,20 @@ static void hivmPostBufferizationOptimizationPipeline(
   // Infer memory scope for newly allocated extra buffer
   pm.addPass(createInferHIVMMemScopePass());
   canonicalizationHIVMPipeline(pm);
+  pm.nest<func::FuncOp>().addPass(createInlineLoadCopyPass());
 
-  if (!hivmPipelineOptions.disableAutoCVWorkSpaceManage) {
-    MarkMultiBufferOptions multiBufferOptions;
-    multiBufferOptions.enableAuto = hivmPipelineOptions.enableAutoMultiBuffer;
-    // Limit auto multi buffer only work for local buffer at this stage
-    multiBufferOptions.limitAutoMultiBufferOnlyForLocalBuffer = true;
-    multiBufferOptions.limitAutoMultiBufferOfLocalBuffer =
-        hivmPipelineOptions.limitAutoMultiBufferOfLocalBuffer;
-    multiBufferOptions.limitMixAutoMultiBufferBuffer =
-        hivmPipelineOptions.limitAutoMultiBufferBuffer;
-    pm.nest<func::FuncOp>().addPass(
-        createMarkMultiBufferPass(multiBufferOptions));
-    pm.nest<func::FuncOp>().addPass(createPlanMemoryPass());
-  }
+  MarkMultiBufferOptions multiBufferOptions;
+  multiBufferOptions.enableAuto = hivmPipelineOptions.enableAutoMultiBuffer;
+  // Limit auto multi buffer only work for local buffer at this stage
+  multiBufferOptions.limitAutoMultiBufferOnlyForLocalBuffer = true;
+  multiBufferOptions.limitAutoMultiBufferOfLocalBuffer =
+      hivmPipelineOptions.limitAutoMultiBufferOfLocalBuffer;
+  multiBufferOptions.limitMixAutoMultiBufferBuffer =
+      hivmPipelineOptions.limitAutoMultiBufferBuffer;
+  pm.nest<func::FuncOp>().addPass(
+      createMarkMultiBufferPass(multiBufferOptions));
+  pm.nest<func::FuncOp>().addPass(createPlanMemoryPass());
+
   // Lower hivm ops to loops
   pm.nest<func::FuncOp>().addPass(createHIVMLowerToLoopsPass());
   // TODO: move DecomposeI32ScalarExtOp etc. to interface

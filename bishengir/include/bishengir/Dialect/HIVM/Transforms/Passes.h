@@ -163,6 +163,9 @@ std::unique_ptr<Pass> createLiftLowestStridePass();
 // Create a pass to inline OTF broadcast
 std::unique_ptr<Pass> createInlineOTFBroadcastPass();
 
+// Create a pass to inline Copied load
+std::unique_ptr<Pass> createInlineLoadCopyPass();
+
 // Create a pass to reduce the rank using subview
 std::unique_ptr<Pass> createReduceRankSubviewPass();
 
@@ -218,6 +221,9 @@ std::unique_ptr<Pass> createHIVMBubbleUpExtractSlicePass();
 
 // Create a pass to insert init and finish for debug.
 std::unique_ptr<Pass> createInsertInitAndFinishForDebugPass();
+
+// Create a pass to mark memref.loads that need to disable dcache.
+std::unique_ptr<Pass> createMarkDisableLoadPass();
 
 // Create a pass to insert nz2nd for debug.
 std::unique_ptr<Pass> createInsertNZ2NDForDebugPass();
