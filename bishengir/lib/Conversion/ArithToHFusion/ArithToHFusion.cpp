@@ -223,21 +223,44 @@ struct ElementwiseOpToHFusionCast : OpRewritePattern<CastOp> {
     llvm_unreachable("unsupported arith op to hfusion");
   }
 
+  static hfusion::TypeFn selectCast(CastOp op) {
+    if (isa<arith::ExtUIOp>(op)) {
+      auto concreteOp = cast<arith::ExtUIOp>(op);
+      auto inType = getElementTypeOrSelf(concreteOp.getIn().getType());
+
+      if (inType.isInteger(1)) {
+        return hfusion::TypeFn::cast_signed;
+      }
+      return hfusion::TypeFn::cast_unsigned;
+    }
+    
+    if (isa<arith::FPToUIOp>(op) || isa<arith::UIToFPOp>(op))
+      return hfusion::TypeFn::cast_unsigned;
+    return hfusion::TypeFn::cast_signed;
+  }
+
   LogicalResult matchAndRewrite(CastOp op,
                                 PatternRewriter &rewriter) const final {
     if (!operateOnTensors(op))
       return failure();
+
     SmallVector<Value> dsts;
     if (failed(
             tensor::getOrCreateDestinations(rewriter, op.getLoc(), op, dsts)))
       return failure();
     Value src = op.getOperand();
+
     hfusion::RoundMode rounding = selectRoundMode(op);
     auto roundingAttr = rewriter.getAttr<hfusion::RoundModeAttr>(rounding);
     auto modeAttr = rewriter.getNamedAttr(hfusion::RoundModeAttr::getMnemonic(),
                                           roundingAttr);
+
+    hfusion::TypeFn casting = selectCast(op);
+    auto castAttr = rewriter.getAttr<hfusion::TypeFnAttr>(casting);
+    auto typeAttr = rewriter.getNamedAttr("cast", castAttr);
+
     rewriter.replaceOpWithNewOp<hfusion::CastOp>(
-        op, ValueRange{src}, ValueRange{dsts}, ArrayRef{modeAttr});
+        op, ValueRange{src}, ValueRange{dsts}, ArrayRef{modeAttr, typeAttr});
     return success();
   }
 };
