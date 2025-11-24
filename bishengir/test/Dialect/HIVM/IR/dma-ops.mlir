@@ -186,3 +186,28 @@ func.func @noncontiguous_copy(%src : memref<64x32x4xbf16, strided<[512, 16, 1]>,
                 collapse_reassociation = [[0, 1, 2]]
   return
 }
+
+// -----
+// CHECK-LABEL: hivm_memref_copy_ub_to_l1
+// CHECK-LABEL: test_fixpipe_l0c_to_ub
+module attributes {hacc.target = #hacc.target<"Ascend910_9589">} {
+
+  func.func @hivm_memref_copy_ub_to_l1() {
+    %src = memref.alloc() : memref<16x16xf16, #hivm.address_space<ub>>
+    %dst = memref.alloc() : memref<16x16xf16, #hivm.address_space<cbuf>>
+    hivm.hir.copy ins(%src : memref<16x16xf16, #hivm.address_space<ub>>)
+                  outs(%dst : memref<16x16xf16, #hivm.address_space<cbuf>>)
+    return
+  }
+  func.func @test_fixpipe_l0c_to_ub() {
+    %alloc = memref.alloc() : memref<1024x2048xf16, #hivm.address_space<ub>>
+    %subview = memref.subview %alloc[0, 0] [256, 128] [1, 1] : memref<1024x2048xf16, #hivm.address_space<ub>> to memref<256x128xf16, strided<[2048, 1]>, #hivm.address_space<ub>>
+    %alloc_0 = memref.alloc() : memref<256x128xf16, #hivm.address_space<cc>>
+    %alloc_1 = memref.alloc() : memref<8x16x16x16xf16, #hivm.address_space<cc>>
+    // Normal data movement
+    hivm.hir.fixpipe ins(%alloc_0 : memref<256x128xf16, #hivm.address_space<cc>>) outs(%subview : memref<256x128xf16, strided<[2048, 1]>, #hivm.address_space<ub>>)
+    // NZ2ND data movement
+    hivm.hir.fixpipe {enable_nz2nd} ins(%alloc_1 : memref<8x16x16x16xf16, #hivm.address_space<cc>>) outs(%subview : memref<256x128xf16, strided<[2048, 1]>, #hivm.address_space<ub>>)
+    return
+  }
+}
