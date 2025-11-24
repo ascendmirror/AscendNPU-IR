@@ -362,6 +362,10 @@ bool isGMPointerCastOp(Operation *op);
 
 bool isArgminOrArgmax(ReduceOperation op);
 
+/// Return the elementType as string for library call name.
+std::string getTypeName(Location loc, Type type,
+                        hivm::TypeFn casting = hivm::TypeFn::cast_signed);
+
 } // namespace util
 } // namespace hivm
 } // namespace mlir

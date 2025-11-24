@@ -63,37 +63,3 @@
 
 using namespace mlir;
 using namespace mlir::hfusion;
-
-Value hfusion::castTo(OpBuilder &builder, Value src, Type targetElemType,
-                      hfusion::RoundMode roundMode, std::optional<Value> dst,
-                      bool enableOverflow) {
-  Location loc = src.getLoc();
-  if (!isa<TensorType>(src.getType())) {
-    assert(src.getType().isIntOrIndexOrFloat());
-    return convertScalarToDtype(builder, loc, src, targetElemType,
-                                /*isUnsignedCast=*/false);
-  }
-
-  Value targetTensor;
-  if (dst.has_value()) {
-    targetTensor = dst.value();
-  } else {
-    targetTensor = utils::createEmptyOpWithTargetElemType(builder, loc, src,
-                                                          targetElemType);
-  }
-
-  auto roundingAttr = builder.getAttr<hfusion::RoundModeAttr>(roundMode);
-  auto enableOverflowVal = builder.getBoolAttr(enableOverflow);
-  auto vcastOp = builder.create<hfusion::CastOp>(
-      loc, SmallVector<Type>{targetTensor.getType()}, src, targetTensor,
-      roundingAttr, enableOverflowVal);
-  return vcastOp->getResult(0);
-}
-
-Value hfusion::castTo(OpBuilder &builder, Value src, Type targetElemType) {
-  Type srcElemType = getElementTypeOrSelf(src.getType());
-  hfusion::RoundMode rounding =
-      mlir::utils::selectRoundMode<hfusion::RoundMode>(srcElemType,
-                                                       targetElemType);
-  return hfusion::castTo(builder, src, targetElemType, rounding);
-}
