@@ -73,6 +73,7 @@ def AppendTargetDeviceSpec : Pass<"hacc-append-device-spec", "ModuleOp"> {
             // Ascend910B series
             REGISTER_TARGET(Ascend910B1), REGISTER_TARGET(Ascend910B2),
             REGISTER_TARGET(Ascend910B3), REGISTER_TARGET(Ascend910B4),
+            REGISTER_TARGET(Ascend910B2C),
             // Ascend910_93 series
             REGISTER_TARGET(Ascend910_9362), REGISTER_TARGET(Ascend910_9372),
             REGISTER_TARGET(Ascend910_9381), REGISTER_TARGET(Ascend910_9382),
