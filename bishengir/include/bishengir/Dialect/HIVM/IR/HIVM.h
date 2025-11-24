@@ -119,7 +119,8 @@ void printHIVMStructuredDPSOp(OpAsmPrinter &p, Operation *op, ValueRange inputs,
                               ValueRange outputs);
 
 /// Return the elementType as string for library call name.
-std::string getTypeName(Location loc, Type type);
+std::string getTypeName(Location loc, Type type,
+                        hivm::TypeFn casting = hivm::TypeFn::cast_signed);
 } // namespace detail
 
 /// Populates rules for lowering HIVM AddressSpaceAttribute to integer

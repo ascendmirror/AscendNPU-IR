@@ -66,12 +66,13 @@ using namespace mlir::hfusion;
 
 Value hfusion::castTo(OpBuilder &builder, Value src, Type targetElemType,
                       hfusion::RoundMode roundMode, std::optional<Value> dst,
-                      bool enableOverflow) {
+                      bool enableOverflow, hfusion::TypeFn casting) {
   Location loc = src.getLoc();
   if (!isa<TensorType>(src.getType())) {
     assert(src.getType().isIntOrIndexOrFloat());
+    bool isUnsignedCast = (hfusion::TypeFn::cast_unsigned == casting);
     return convertScalarToDtype(builder, loc, src, targetElemType,
-                                /*isUnsignedCast=*/false);
+                                isUnsignedCast);
   }
 
   Value targetTensor;
@@ -84,16 +85,19 @@ Value hfusion::castTo(OpBuilder &builder, Value src, Type targetElemType,
 
   auto roundingAttr = builder.getAttr<hfusion::RoundModeAttr>(roundMode);
   auto enableOverflowVal = builder.getBoolAttr(enableOverflow);
+  auto castAttr = builder.getAttr<hfusion::TypeFnAttr>(casting);
   auto vcastOp = builder.create<hfusion::CastOp>(
       loc, SmallVector<Type>{targetTensor.getType()}, src, targetTensor,
-      roundingAttr, enableOverflowVal);
+      roundingAttr, enableOverflowVal, castAttr);
   return vcastOp->getResult(0);
 }
 
-Value hfusion::castTo(OpBuilder &builder, Value src, Type targetElemType) {
+Value hfusion::castTo(OpBuilder &builder, Value src, Type targetElemType,
+                      hfusion::TypeFn casting) {
   Type srcElemType = getElementTypeOrSelf(src.getType());
   hfusion::RoundMode rounding =
       mlir::utils::selectRoundMode<hfusion::RoundMode>(srcElemType,
                                                        targetElemType);
-  return hfusion::castTo(builder, src, targetElemType, rounding);
+  return hfusion::castTo(builder, src, targetElemType, rounding, std::nullopt,
+                         /*enableOverflow=*/true, casting);
 }

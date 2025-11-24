@@ -54,12 +54,14 @@ Operation *createUnaryOp(OpBuilder &builder, Location loc, OpFun opFn,
 /// to `dst`.
 Value castTo(OpBuilder &builder, Value src, Type targetElemType,
              hfusion::RoundMode roundMode,
+             hfusion::TypeFn casting = hfusion::TypeFn::cast_signed,
              std::optional<Value> dst = std::nullopt,
              bool enableOverflow = true);
 
 /// Cast `src` value to the specified element type.
 /// Select rounding mode inside.
-Value castTo(OpBuilder &builder, Value src, Type targetElemType);
+Value castTo(OpBuilder &builder, Value src, Type targetElemType,
+             hfusion::TypeFn casting = hfusion::TypeFn::cast_signed);
 
 } // namespace hfusion
 } // namespace mlir

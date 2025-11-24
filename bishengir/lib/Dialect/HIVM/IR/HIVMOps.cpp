@@ -366,7 +366,11 @@ static void printDPSResults(OpAsmPrinter &p, TypeRange resultTypes) {
 }
 
 namespace {
-bool shouldMapToUnsigned(IntegerType::SignednessSemantics val) {
+bool shouldMapToUnsigned(IntegerType::SignednessSemantics val,
+                         hivm::TypeFn casting) {
+  if (hivm::TypeFn::cast_unsigned == casting)
+    return true;
+
   switch (val) {
   case IntegerType::Signless:
   case IntegerType::Signed:
@@ -387,7 +391,8 @@ void hivm::detail::printHIVMStructuredDPSOp(OpAsmPrinter &p, Operation *op,
   printDPSResults(p, op->getResultTypes());
 }
 
-std::string hivm::detail::getTypeName(Location loc, Type type) {
+std::string hivm::detail::getTypeName(Location loc, Type type,
+                                      hivm::TypeFn casting) {
   std::string unknown = "UNKNOWN";
   if (auto iType = dyn_cast<IntegerType>(type)) {
     switch (iType.getWidth()) {
@@ -398,7 +403,7 @@ std::string hivm::detail::getTypeName(Location loc, Type type) {
     case 16:
     case 32:
     case 64:
-      if (shouldMapToUnsigned(iType.getSignedness()))
+      if (shouldMapToUnsigned(iType.getSignedness(), casting))
         return "uint" + std::to_string(iType.getWidth()) + "_t";
       else
         return "int" + std::to_string(iType.getWidth()) + "_t";
