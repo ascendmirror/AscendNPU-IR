@@ -65,7 +65,7 @@ struct CastOpFold : public OpRewritePattern<hfusion::CastOp> {
     rewriter.setInsertionPointAfter(op);
     auto foldedCast = hfusion::castTo(
         rewriter, parentCastOp.getInputs().front(), op.getResultTypes().front(),
-        hfusion::RoundMode::RINT, op.getOutputs().front());
+        hfusion::RoundMode::RINT, hfusion::TypeFn{}, op.getOutputs().front());
     rewriter.replaceOp(op, foldedCast);
     return success();
   }

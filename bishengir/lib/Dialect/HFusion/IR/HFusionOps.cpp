@@ -605,16 +605,6 @@ public:
   }
 
   // Build the type functions defined by OpDSL.
-  Value buildRoundMode(RoundMode round, Type toType, Value operand) {
-    bool isUnsignedCast = false;
-    if (operand.getType().isInteger(1) && toType.getIntOrFloatBitWidth() > 1) {
-      // TODO: general support for unsigned cast
-      isUnsignedCast = true;
-    }
-    return cast(toType, operand, isUnsignedCast);
-  }
-
-  // Build the type functions defined by OpDSL.
   Value buildAtomicKind(AtomicKind atkind, Type toType, Value operand) {
     return cast(toType, operand, false);
   }
