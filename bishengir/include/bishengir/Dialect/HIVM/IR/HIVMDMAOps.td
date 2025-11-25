@@ -277,6 +277,13 @@ def FixpipeOp : HIVM_DmaOp<"fixpipe", [
     pre-stage ReLU, element-wise add, post-stage ReLU, post-stage quantization.
 
     Additionally, Fixpipe is also capable of layout transform.
+#ifdef BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
+    ### Attributes
+
+    #### `dual_dst_mode`
+    HIVM dual destination mode control. dual destination mode can be enabled only when nz2nd or normal data
+    movement mode is enabled, and data movement is being performed from L0C to UB. Only supported on Ascend910_95 series.
+#endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
   }];
   let arguments = (ins AnyShaped:$src,
                        AnyShaped:$dst,
@@ -285,6 +292,10 @@ def FixpipeOp : HIVM_DmaOp<"fixpipe", [
                         useful if there is a dependency on a for loop to run at least once.
                        }]>:$unit_flag_cond,
                        OptionalAttr<UnitAttr>:$enable_nz2nd,
+#ifdef BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
+                       DefaultValuedOptionalAttr<HIVM_FixpipeDualDstModeAttr,
+                         "FixpipeDualDstMode::NO_DUAL">:$dual_dst_mode,
+#endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
                        DefaultValuedOptionalAttr<HIVM_FixpipePreQuantModeAttr,
                          "FixpipePreQuantMode::NO_QUANT">:$pre_quant,
                        DefaultValuedOptionalAttr<HIVM_FixpipePreReluModeAttr,
@@ -304,15 +315,35 @@ def FixpipeOp : HIVM_DmaOp<"fixpipe", [
     OpBuilder<(ins "Type":$result, "Value":$src, "Value":$dst,
                     CArg<"UnitAttr", "nullptr">:$enable_nz2nd, CArg<"FixpipePreQuantModeAttr", "nullptr">:$pre_quant,
                     CArg<"FixpipePreReluModeAttr", "nullptr">:$pre_relu, CArg<"BoolAttr", "nullptr">:$channel_split)
+#ifdef BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
+    >,
+    OpBuilder<(ins "TypeRange":$result, "Value":$src, "Value":$dst,
+                    CArg<"UnitAttr", "nullptr">:$enable_nz2nd,
+                    CArg<"FixpipeDualDstModeAttr", "nullptr">:$dual_dst_mode,
+                    CArg<"FixpipePreQuantModeAttr", "nullptr">:$pre_quant,
+                    CArg<"FixpipePreReluModeAttr", "nullptr">:$pre_relu, CArg<"BoolAttr", "nullptr">:$channel_split)
+    >,
+    OpBuilder<(ins "Type":$result, "Value":$src, "Value":$dst,
+                    CArg<"UnitAttr", "nullptr">:$enable_nz2nd,
+                    CArg<"FixpipeDualDstModeAttr", "nullptr">:$dual_dst_mode,
+                    CArg<"FixpipePreQuantModeAttr", "nullptr">:$pre_quant,
+                    CArg<"FixpipePreReluModeAttr", "nullptr">:$pre_relu, CArg<"BoolAttr", "nullptr">:$channel_split)
+#endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
     >
   ];
   let assemblyFormat = [{
     attr-dict
     `ins` `(` $src `:` type($src) `)`
     `outs` `(` $dst `:` type($dst) `)`
+#ifdef BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
+    (`dual_dst_mode` `=` $dual_dst_mode^)?
+#endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
     (`unit_flag` `[` $unit_flag_mode^ (`,` $unit_flag_cond^)? `]`)?
     (`->` type($result_tensor)^)?
   }];
+#ifdef BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
+  let hasVerifier = 1; // verify parameter according to hardware version
+#endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
   let extraClassDeclaration = DmaOpBaseDecl # [{
     int getFixpipeState();
     int needFixpipePreFuse();
