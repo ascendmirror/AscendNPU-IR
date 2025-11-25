@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "bishengir/Dialect/Linalg/IR/LinalgCanonicalizations.h"
-#include "bishengir/Dialect/MemRef/IR/MemRefImpl.h"
+#include "bishengir/Dialect/MemRef/Canonicalization/Canonicalization.h"
 #include "bishengir/Transforms/Passes.h"
 #include "mlir/Rewrite/FrozenRewritePatternSet.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
