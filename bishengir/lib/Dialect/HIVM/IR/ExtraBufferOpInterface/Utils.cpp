@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "bishengir/Dialect/HIVM/Utils/Utils.h"
+#include "bishengir/Dialect/HIVM/IR/Utils/Utils.h"
 #include "bishengir/Dialect/Utils/Util.h"
 
 #define DEBUG_TYPE "hivm-extra-buffer"

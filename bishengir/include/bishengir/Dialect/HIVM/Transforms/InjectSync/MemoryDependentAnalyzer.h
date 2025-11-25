@@ -18,7 +18,7 @@
 #define BISHENGIR_MEMORYDEPENDENTANALYZER_H
 
 #include "bishengir/Dialect/HIVM/Transforms/InjectSync/SyncCommon.h"
-#include "bishengir/Dialect/HIVM/Utils/Utils.h"
+#include "bishengir/Dialect/HIVM/IR/Utils/Utils.h"
 
 namespace mlir {
 namespace hivm {

@@ -26,7 +26,7 @@
 #include "bishengir/Dialect/HIVM/Transforms/InjectSync/SyncDebug.h"
 #include "bishengir/Dialect/HIVM/Transforms/InjectSync/SyncEventIdAllocation.h"
 #include "bishengir/Dialect/HIVM/Transforms/Passes.h"
-#include "bishengir/Dialect/HIVM/Utils/Utils.h"
+#include "bishengir/Dialect/HIVM/IR/Utils/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "llvm/Support/Debug.h"

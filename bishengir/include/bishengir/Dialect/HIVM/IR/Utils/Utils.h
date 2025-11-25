@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef MLIR_DIALECT_HIVM_UTILS_UTILS_H
-#define MLIR_DIALECT_HIVM_UTILS_UTILS_H
+#ifndef MLIR_DIALECT_HIVM_IR_UTILS_UTILS_H
+#define MLIR_DIALECT_HIVM_IR_UTILS_UTILS_H
 
 #include "bishengir/Dialect/Annotation/IR/Annotation.h"
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
@@ -415,4 +415,4 @@ const std::set<std::string> HWSupportedCast{
     "uint8_t_to_half_rintmode",       "half_to_int32_t_rintmode",
     "half_to_float_truncmode",        "bfloat16_t_to_float_roundmode"};
 
-#endif // MLIR_DIALECT_HIVM_UTILS_UTILS_H
+#endif // MLIR_DIALECT_HIVM_IR_UTILS_UTILS_H
