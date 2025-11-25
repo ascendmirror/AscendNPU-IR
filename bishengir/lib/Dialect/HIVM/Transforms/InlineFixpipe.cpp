@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This pass converts ops to hivm.fixpipe .
+// This pass converts ops to hivm.fixpipe.
 //
 //===----------------------------------------------------------------------===//
 
@@ -140,7 +140,8 @@ public:
     auto res = rewriter.create<FixpipeOp>(
         op.getLoc(), /*result_tensor=*/fixpipeInit.getType(),
         /*src=*/insertAfterOp->getResult(resultIndx),
-        /*dst=*/fixpipeInit, rewriter.getUnitAttr());
+        /*dst=*/fixpipeInit, rewriter.getUnitAttr(), /*unit_flag_cond=*/nullptr, /*enable_nz2nd=*/nullptr,
+        /*dual_dst_mode=*/nullptr, /*pre_quant=*/nullptr, /*pre_relu=*/nullptr, /*channel_split=*/nullptr);
     op->setAttr(fixpipeAlreadyInserted, rewriter.getBoolAttr(true));
     rewriter.replaceAllUsesExcept(insertAfterOp->getResult(resultIndx),
                                   res.getResultTensor(), res);
