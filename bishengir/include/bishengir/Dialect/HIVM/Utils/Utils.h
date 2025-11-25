@@ -121,16 +121,16 @@ constexpr unsigned int getPipeNum() {
 std::optional<AddressSpaceAttr> GetBufferSpaceAttr(Value operand);
 
 /// Get operation all touch buffer.
-SmallVector<Value> getOpTouchBuffer(Operation *op);
+SmallVector<Value> getOpTouchBuffer(Operation * op);
 
 /// Determine whether there is a Local Buffer in the current operation.
-bool isOpTouchLocalBuffer(Operation *op);
+bool isOpTouchLocalBuffer(Operation * op);
 
 /// Determine whether there is in ub buffer.
 bool isLocalBuffer(std::optional<AddressSpaceAttr> memorySpaceAttr);
 
 /// Determine whether there is a global Buffer in the current operation.
-bool isOpTouchGlobalBuffer(Operation *op);
+bool isOpTouchGlobalBuffer(Operation * op);
 
 /// Utilities for Map Forall To HIVMBlocks pass and transform op
 struct ForallRewriteResult {
@@ -159,7 +159,7 @@ void removeMarkOpAttr(annotation::MarkOp markOp, StringRef attrName,
 bool isSubBlockBindedFor(scf::ForOp op);
 
 // Find containing subblock loop of current op.
-FailureOr<scf::ForOp> findContainingSubblockLoop(Operation *op);
+FailureOr<scf::ForOp> findContainingSubblockLoop(Operation * op);
 
 /// Get parent loop of val.
 /// If val is yielded by the parent loop, need to get parent of parent loop.
@@ -177,7 +177,7 @@ Value createNestedIndexModular(OpBuilder &builder, Operation *op,
 Value createNestedIndexModular(OpBuilder &builder, LoopLikeOpInterface loopOp,
                                int modular = 2);
 
-Value createNestedIndexForOp(OpBuilder &builder, Operation *operation);
+Value createNestedIndexForOp(OpBuilder & builder, Operation * operation);
 
 /// Create nested loops by choosing `loopDims` of `target`.
 /// For example:
@@ -201,7 +201,7 @@ std::vector<scf::ForOp> createNestedLoops(
   llvm::SmallVector<Value> indexes;
   if (forInitArgs.has_value())
     assert(loopDims.size() == 1 &&
-           "Only support non-nested loop to use iterator arg");
+      "Only support non-nested loop to use iterator arg");
 
   auto index = [&rewriter, &loc](int i) {
     return rewriter.create<arith::ConstantIndexOp>(loc, i);
@@ -219,10 +219,10 @@ std::vector<scf::ForOp> createNestedLoops(
     }
     scf::ForOp forOp =
         forInitArgs.has_value()
-            ? rewriter.create<scf::ForOp>(loc, index(lowBound), upperBound,
-                                          index(1), forInitArgs.value())
-            : rewriter.create<scf::ForOp>(loc, index(lowBound), upperBound,
-                                          index(1));
+          ? rewriter.create<scf::ForOp>(loc, index(lowBound), upperBound,
+                                        index(1), forInitArgs.value())
+          : rewriter.create<scf::ForOp>(loc, index(lowBound), upperBound,
+                                        index(1));
     nestedFor.push_back(forOp);
     indexes.push_back(forOp.getInductionVar());
     rewriter.setInsertionPointToStart(forOp.getBody());
@@ -240,13 +240,13 @@ std::vector<scf::ForOp> createNestedLoops(
 //
 // And it should be used with fixpipe optimization.
 FailureOr<SmallVector<Operation *>> traceForPotentialMatrixC(Value v,
-                                                             Block *storeBlock);
+  Block *storeBlock);
 
 // TODO: move to platform info
 uint32_t getHWAlignBytes(Attribute spaceAttr);
 std::optional<uint32_t> getHWAlignBytes(Type t);
 
-bool isMarkedAsHIVMElementwiseOp(Operation *op);
+bool isMarkedAsHIVMElementwiseOp(Operation * op);
 
 bool isMixModule(ModuleOp mod);
 
@@ -264,7 +264,7 @@ void removeModuleCoreTypeAttr(ModuleOp mod);
 /// Constraints: Skip memref::CollapseShapeOp/ExpandShapeOp
 /// Constraints: Skip memref::SubViewOp/ViewOp/ReinterpretCastOp
 /// Constraints: Skip bufferization::ToMemrefOp
-void getOpUsers(Operation *op, SmallVector<Operation *, 8> &userOps);
+void getOpUsers(Operation * op, SmallVector<Operation *, 8> & userOps);
 
 bool isLastDimTranspose(hivm::VTransposeOp op);
 
@@ -282,7 +282,7 @@ hivm::CreateSyncBlockLockOp createSyncBlockLockVar(OpBuilder &builder,
                                                    Location loc);
 
 /// get Operation alias pair.
-std::vector<std::pair<Value, Value>> getOperationAliasInfo(Operation *op);
+std::vector<std::pair<Value, Value>> getOperationAliasInfo(Operation * op);
 
 /// Get buffer static size.
 std::optional<uint32_t> GetBufferSize(Value buffer);
@@ -291,7 +291,7 @@ std::optional<uint32_t> GetBufferSize(Value buffer);
 AlignKind isBrcOpAligned(VBrcOp vbrcOp, int dim, int rank);
 
 // set bind sub block attr
-void setSubBlockMapping(RewriterBase &rewriter, Operation *loop);
+void setSubBlockMapping(RewriterBase & rewriter, Operation * loop);
 
 /// find vector ops between store and targetOp
 template <typename OpType>
@@ -329,6 +329,60 @@ LogicalResult traceHIVMOpUntil(RewriterBase &rewriter, Operation *op,
   return failure();
 }
 
+struct AlignInfo {
+  llvm::SmallVector<int32_t> alignDims;
+  llvm::SmallVector<int32_t> alignBytes;
+
+  AlignInfo(ArrayRef<int32_t> alignDims_, ArrayRef<int32_t> alignBytes_) {
+    alignDims = SmallVector<int32_t>(alignDims_);
+    alignBytes = SmallVector<int32_t>(alignBytes_);
+  }
+
+  AlignInfo(llvm::SmallVector<int32_t> alignDims_,
+            llvm::SmallVector<int32_t> alignBytes_) {
+    alignDims = alignDims_;
+    alignBytes = alignBytes_;
+  }
+
+  AlignInfo(AlignInfo &&other) {
+    alignDims = other.alignDims;
+    alignBytes = other.alignBytes;
+  }
+
+  bool operator==(const AlignInfo &other);
+  bool operator!=(const AlignInfo &other);
+
+  void dump();
+};
+
+struct OperAlignInfo : public AlignInfo {
+  Value operand;
+
+  OperAlignInfo(Value operand_, ArrayRef<int32_t> alignDims_,
+                ArrayRef<int32_t> alignBytes_)
+    : AlignInfo(alignDims_, alignBytes_) {
+    operand = operand_;
+  }
+
+  OperAlignInfo(Value operand_, llvm::SmallVector<int32_t> alignDims_,
+                llvm::SmallVector<int32_t> alignBytes_)
+    : AlignInfo(alignDims_, alignBytes_) {
+    operand = operand_;
+  }
+};
+
+LogicalResult getUnAlignSizeInfo(
+    VTransposeOp op,
+    std::vector<std::unique_ptr<OperAlignInfo>> *operAlignInfoList);
+
+LogicalResult getUnAlignSizeInfo(
+    VCastOp op,
+    std::vector<std::unique_ptr<OperAlignInfo>> *operAlignInfoList);
+
+LogicalResult getUnAlignSizeInfo(
+    VSortOp op,
+    std::vector<std::unique_ptr<OperAlignInfo>> *operAlignInfoList);
+
 namespace util {
 constexpr static unsigned int VL = 256;
 constexpr static unsigned int BL = VL / 8;
@@ -358,7 +412,7 @@ bool isLastDimContiguous(Value operand);
 
 /// Check if the operation is hivm::PointerCastOp with GM space
 /// Used to check if it is lowered from triton::IntToPtrOp
-bool isGMPointerCastOp(Operation *op);
+bool isGMPointerCastOp(Operation * op);
 
 bool isArgminOrArgmax(ReduceOperation op);
 
@@ -368,51 +422,51 @@ bool isArgminOrArgmax(ReduceOperation op);
 
 // TODO : move to platform file
 const std::set<std::string> HWSupportedCast{
-    "bfloat16_t_to_float_rintmode",   "bfloat16_t_to_int32_t_roundmode",
+    "bfloat16_t_to_float_rintmode", "bfloat16_t_to_int32_t_roundmode",
     "bfloat16_t_to_int32_t_ceilmode", "bfloat16_t_to_int32_t_floormode",
     "bfloat16_t_to_int32_t_rintmode", "bfloat16_t_to_int32_t_truncmode",
-    "half_to_float_roundmode",        "half_to_float_floormode",
-    "half_to_float_rintmode",         "half_to_int16_t_roundmode",
-    "half_to_int16_t_ceilmode",       "half_to_int16_t_floormode",
-    "half_to_int16_t_rintmode",       "half_to_int16_t_truncmode",
-    "half_to_int32_t_roundmode",      "half_to_int32_t_ceilmode",
-    "half_to_int32_t_floormode",      "half_to_int32_t_rintmode",
-    "half_to_int32_t_truncmode",      "half_to_int4_t_roundmode",
-    "half_to_int4_t_ceilmode",        "half_to_int4_t_floormode",
-    "half_to_int4_t_rintmode",        "half_to_int4_t_truncmode",
-    "half_to_int8_t_roundmode",       "half_to_int8_t_ceilmode",
-    "half_to_int8_t_floormode",       "half_to_int8_t_rintmode",
-    "half_to_int8_t_truncmode",       "half_to_uint8_t_roundmode",
-    "half_to_uint8_t_ceilmode",       "half_to_uint8_t_floormode",
-    "half_to_uint8_t_rintmode",       "half_to_uint8_t_truncmode",
-    "float_to_bfloat16_t_roundmode",  "float_to_bfloat16_t_ceilmode",
-    "float_to_bfloat16_t_floormode",  "float_to_bfloat16_t_rintmode",
-    "float_to_bfloat16_t_truncmode",  "float_to_half_roundmode",
-    "float_to_half_ceilmode",         "float_to_half_floormode",
-    "float_to_half_oddmode",          "float_to_half_rintmode",
-    "float_to_half_truncmode",        "float_to_float_roundmode",
-    "float_to_float_ceilmode",        "float_to_float_floormode",
-    "float_to_float_rintmode",        "float_to_float_truncmode",
-    "float_to_int16_t_roundmode",     "float_to_int16_t_ceilmode",
-    "float_to_int16_t_floormode",     "float_to_int16_t_rintmode",
-    "float_to_int16_t_truncmode",     "float_to_int32_t_roundmode",
-    "float_to_int32_t_ceilmode",      "float_to_int32_t_floormode",
-    "float_to_int32_t_rintmode",      "float_to_int32_t_truncmode",
-    "float_to_int64_t_roundmode",     "float_to_int64_t_ceilmode",
-    "float_to_int64_t_floormode",     "float_to_int64_t_rintmode",
-    "float_to_int64_t_truncmode",     "int16_t_to_half_roundmode",
-    "int16_t_to_half_ceilmode",       "int16_t_to_half_floormode",
-    "int16_t_to_half_rintmode",       "int16_t_to_half_truncmode",
-    "int16_t_to_float_rintmode",      "int16_t_to_float_truncmode",
-    "int32_t_to_float_roundmode",     "int32_t_to_float_ceilmode",
-    "int32_t_to_float_floormode",     "int32_t_to_float_rintmode",
-    "int32_t_to_float_truncmode",     "int32_t_to_int16_t_rintmode",
-    "int32_t_to_int64_t_rintmode",    "int4_t_to_half_rintmode",
-    "int64_t_to_float_roundmode",     "int64_t_to_float_ceilmode",
-    "int64_t_to_float_floormode",     "int64_t_to_float_rintmode",
-    "int64_t_to_float_truncmode",     "int64_t_to_int32_t_rintmode",
-    "int8_t_to_half_rintmode",        "int8_t_to_half_truncmode",
-    "uint8_t_to_half_rintmode",       "half_to_int32_t_rintmode",
-    "half_to_float_truncmode",        "bfloat16_t_to_float_roundmode"};
+    "half_to_float_roundmode", "half_to_float_floormode",
+    "half_to_float_rintmode", "half_to_int16_t_roundmode",
+    "half_to_int16_t_ceilmode", "half_to_int16_t_floormode",
+    "half_to_int16_t_rintmode", "half_to_int16_t_truncmode",
+    "half_to_int32_t_roundmode", "half_to_int32_t_ceilmode",
+    "half_to_int32_t_floormode", "half_to_int32_t_rintmode",
+    "half_to_int32_t_truncmode", "half_to_int4_t_roundmode",
+    "half_to_int4_t_ceilmode", "half_to_int4_t_floormode",
+    "half_to_int4_t_rintmode", "half_to_int4_t_truncmode",
+    "half_to_int8_t_roundmode", "half_to_int8_t_ceilmode",
+    "half_to_int8_t_floormode", "half_to_int8_t_rintmode",
+    "half_to_int8_t_truncmode", "half_to_uint8_t_roundmode",
+    "half_to_uint8_t_ceilmode", "half_to_uint8_t_floormode",
+    "half_to_uint8_t_rintmode", "half_to_uint8_t_truncmode",
+    "float_to_bfloat16_t_roundmode", "float_to_bfloat16_t_ceilmode",
+    "float_to_bfloat16_t_floormode", "float_to_bfloat16_t_rintmode",
+    "float_to_bfloat16_t_truncmode", "float_to_half_roundmode",
+    "float_to_half_ceilmode", "float_to_half_floormode",
+    "float_to_half_oddmode", "float_to_half_rintmode",
+    "float_to_half_truncmode", "float_to_float_roundmode",
+    "float_to_float_ceilmode", "float_to_float_floormode",
+    "float_to_float_rintmode", "float_to_float_truncmode",
+    "float_to_int16_t_roundmode", "float_to_int16_t_ceilmode",
+    "float_to_int16_t_floormode", "float_to_int16_t_rintmode",
+    "float_to_int16_t_truncmode", "float_to_int32_t_roundmode",
+    "float_to_int32_t_ceilmode", "float_to_int32_t_floormode",
+    "float_to_int32_t_rintmode", "float_to_int32_t_truncmode",
+    "float_to_int64_t_roundmode", "float_to_int64_t_ceilmode",
+    "float_to_int64_t_floormode", "float_to_int64_t_rintmode",
+    "float_to_int64_t_truncmode", "int16_t_to_half_roundmode",
+    "int16_t_to_half_ceilmode", "int16_t_to_half_floormode",
+    "int16_t_to_half_rintmode", "int16_t_to_half_truncmode",
+    "int16_t_to_float_rintmode", "int16_t_to_float_truncmode",
+    "int32_t_to_float_roundmode", "int32_t_to_float_ceilmode",
+    "int32_t_to_float_floormode", "int32_t_to_float_rintmode",
+    "int32_t_to_float_truncmode", "int32_t_to_int16_t_rintmode",
+    "int32_t_to_int64_t_rintmode", "int4_t_to_half_rintmode",
+    "int64_t_to_float_roundmode", "int64_t_to_float_ceilmode",
+    "int64_t_to_float_floormode", "int64_t_to_float_rintmode",
+    "int64_t_to_float_truncmode", "int64_t_to_int32_t_rintmode",
+    "int8_t_to_half_rintmode", "int8_t_to_half_truncmode",
+    "uint8_t_to_half_rintmode", "half_to_int32_t_rintmode",
+    "half_to_float_truncmode", "bfloat16_t_to_float_roundmode"};
 
 #endif // MLIR_DIALECT_HIVM_UTILS_UTILS_H
