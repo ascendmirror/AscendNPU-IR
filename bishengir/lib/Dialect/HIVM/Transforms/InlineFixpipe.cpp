@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This pass converts ops to hivm.fixpipe .
+// This pass converts ops to hivm.fixpipe.
 //
 //===----------------------------------------------------------------------===//
 
@@ -140,7 +140,7 @@ public:
     auto res = rewriter.create<FixpipeOp>(
         op.getLoc(), /*result_tensor=*/fixpipeInit.getType(),
         /*src=*/insertAfterOp->getResult(resultIndx),
-        /*dst=*/fixpipeInit, rewriter.getUnitAttr());
+        /*dst=*/fixpipeInit, rewriter.getUnitAttr(), FixpipeDualDstModeAttr{});
     op->setAttr(fixpipeAlreadyInserted, rewriter.getBoolAttr(true));
     rewriter.replaceAllUsesExcept(insertAfterOp->getResult(resultIndx),
                                   res.getResultTensor(), res);
@@ -396,6 +396,7 @@ private:
       auto newFixpipeOp = rewriter.create<FixpipeOp>(
           fixPipeOp.getLoc(), TypeRange{fixpipeInit},
           scfForOp->getResult(idx.value()), fixpipeInit, rewriter.getUnitAttr(),
+          FixpipeDualDstModeAttr{},
           quantModeAttr, reluModeAttr);
       rewriter.replaceAllUsesExcept(scfForOp->getResult(idx.value()),
                                     newFixpipeOp.getResultTensor(),
@@ -447,7 +448,7 @@ public:
     auto fixpipeOp = rewriter.create<FixpipeOp>(
         op.getLoc(), /*result_tensor=*/fixpipeInit.getType(),
         /*src=*/maybeMmadRes,
-        /*dst=*/fixpipeInit, rewriter.getUnitAttr());
+        /*dst=*/fixpipeInit, rewriter.getUnitAttr(), FixpipeDualDstModeAttr{});
 
     rewriter.replaceOpWithNewOp<DebugOp>(
         op, op.getDebugtype(), op.getPrefix(), op.getHex(),

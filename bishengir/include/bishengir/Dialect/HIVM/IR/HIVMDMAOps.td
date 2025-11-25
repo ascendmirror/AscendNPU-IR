@@ -277,6 +277,12 @@ def FixpipeOp : HIVM_DmaOp<"fixpipe", [
     pre-stage ReLU, element-wise add, post-stage ReLU, post-stage quantization.
 
     Additionally, Fixpipe is also capable of layout transform.
+
+    ### Attributes
+
+    #### `dual_dst_mode`
+    HIVM dual destination mode control. dual destination mode can be enabled only when nz2nd or normal data
+    movement mode is enabled, and data movement is being performed from L0C to UB. Only supported on Ascend910_95 series.
   }];
   let arguments = (ins AnyShaped:$src,
                        AnyShaped:$dst,
@@ -285,6 +291,8 @@ def FixpipeOp : HIVM_DmaOp<"fixpipe", [
                         useful if there is a dependency on a for loop to run at least once.
                        }]>:$unit_flag_cond,
                        OptionalAttr<UnitAttr>:$enable_nz2nd,
+                       DefaultValuedOptionalAttr<HIVM_FixpipeDualDstModeAttr,
+                         "FixpipeDualDstMode::NO_DUAL">:$dual_dst_mode,
                        DefaultValuedOptionalAttr<HIVM_FixpipePreQuantModeAttr,
                          "FixpipePreQuantMode::NO_QUANT">:$pre_quant,
                        DefaultValuedOptionalAttr<HIVM_FixpipePreReluModeAttr,
@@ -304,15 +312,29 @@ def FixpipeOp : HIVM_DmaOp<"fixpipe", [
     OpBuilder<(ins "Type":$result, "Value":$src, "Value":$dst,
                     CArg<"UnitAttr", "nullptr">:$enable_nz2nd, CArg<"FixpipePreQuantModeAttr", "nullptr">:$pre_quant,
                     CArg<"FixpipePreReluModeAttr", "nullptr">:$pre_relu, CArg<"BoolAttr", "nullptr">:$channel_split)
+    >,
+    OpBuilder<(ins "TypeRange":$result, "Value":$src, "Value":$dst,
+                    CArg<"UnitAttr", "nullptr">:$enable_nz2nd,
+                    CArg<"FixpipeDualDstModeAttr", "nullptr">:$dual_dst_mode,
+                    CArg<"FixpipePreQuantModeAttr", "nullptr">:$pre_quant,
+                    CArg<"FixpipePreReluModeAttr", "nullptr">:$pre_relu, CArg<"BoolAttr", "nullptr">:$channel_split)
+    >,
+    OpBuilder<(ins "Type":$result, "Value":$src, "Value":$dst,
+                    CArg<"UnitAttr", "nullptr">:$enable_nz2nd,
+                    CArg<"FixpipeDualDstModeAttr", "nullptr">:$dual_dst_mode,
+                    CArg<"FixpipePreQuantModeAttr", "nullptr">:$pre_quant,
+                    CArg<"FixpipePreReluModeAttr", "nullptr">:$pre_relu, CArg<"BoolAttr", "nullptr">:$channel_split)
     >
   ];
   let assemblyFormat = [{
     attr-dict
     `ins` `(` $src `:` type($src) `)`
     `outs` `(` $dst `:` type($dst) `)`
+    (`dual_dst_mode` `=` $dual_dst_mode^)?
     (`unit_flag` `[` $unit_flag_mode^ (`,` $unit_flag_cond^)? `]`)?
     (`->` type($result_tensor)^)?
   }];
+  let hasVerifier = 1; // verify parameter according to hardware version
   let extraClassDeclaration = DmaOpBaseDecl # [{
     int getFixpipeState();
     int needFixpipePreFuse();
