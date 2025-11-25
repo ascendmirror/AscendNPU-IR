@@ -277,6 +277,11 @@ def FixpipeOp : HIVM_DmaOp<"fixpipe", [
     pre-stage ReLU, element-wise add, post-stage ReLU, post-stage quantization.
 
     Additionally, Fixpipe is also capable of layout transform.
+
+    ### Attributes
+
+    #### 'dma_mode'
+    HIVM data movement model from L0C to destination, There are three values: NZ2DN, NZ2ND, and NZ2NZ(normal).
   }];
   let arguments = (ins AnyShaped:$src,
                        AnyShaped:$dst,
@@ -284,7 +289,7 @@ def FixpipeOp : HIVM_DmaOp<"fixpipe", [
                         An optional condition to enable unit-flge mode,
                         useful if there is a dependency on a for loop to run at least once.
                        }]>:$unit_flag_cond,
-                       OptionalAttr<UnitAttr>:$enable_nz2nd,
+                       DefaultValueAttr<HIVM_FixpipeDMAModeAttr, "FixpipeDMAMode::NZ2NZ">:$dma_mode,
                        DefaultValuedOptionalAttr<HIVM_FixpipePreQuantModeAttr,
                          "FixpipePreQuantMode::NO_QUANT">:$pre_quant,
                        DefaultValuedOptionalAttr<HIVM_FixpipePreReluModeAttr,
@@ -298,11 +303,11 @@ def FixpipeOp : HIVM_DmaOp<"fixpipe", [
   let results = (outs Optional<AnyRankedTensor>:$result_tensor);
   let builders = [
     OpBuilder<(ins "TypeRange":$result, "Value":$src, "Value":$dst,
-                    CArg<"UnitAttr", "nullptr">:$enable_nz2nd, CArg<"FixpipePreQuantModeAttr", "nullptr">:$pre_quant,
+                    CArg<"FixpipeDMAModeAttr", "nullptr">:$dma_mode, CArg<"FixpipePreQuantModeAttr", "nullptr">:$pre_quant,
                     CArg<"FixpipePreReluModeAttr", "nullptr">:$pre_relu, CArg<"BoolAttr", "nullptr">:$channel_split)
     >,
     OpBuilder<(ins "Type":$result, "Value":$src, "Value":$dst,
-                    CArg<"UnitAttr", "nullptr">:$enable_nz2nd, CArg<"FixpipePreQuantModeAttr", "nullptr">:$pre_quant,
+                    CArg<"FixpipeDMAModeAttr", "nullptr">:$dma_mode, CArg<"FixpipePreQuantModeAttr", "nullptr">:$pre_quant,
                     CArg<"FixpipePreReluModeAttr", "nullptr">:$pre_relu, CArg<"BoolAttr", "nullptr">:$channel_split)
     >
   ];

@@ -560,20 +560,51 @@ void ND2NZOp::build(OpBuilder &odsBuilder, OperationState &odsState,
 
 void FixpipeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                       TypeRange result, Value src, Value dst,
-                      UnitAttr enable_nz2nd, FixpipePreQuantModeAttr pre_quant,
+                      FixpipeDMAModeAttr dma_mode, FixpipePreQuantModeAttr pre_quant,
                       FixpipePreReluModeAttr pre_relu, BoolAttr channel_split) {
   build(odsBuilder, odsState, result, src, dst, /*unit_flag_cond*/ Value{},
-        enable_nz2nd, pre_quant, pre_relu, channel_split,
+        dma_mode, pre_quant, pre_relu, channel_split,
         /*unit_flag_mode*/ UnitFlagAttr{});
 }
 
 void FixpipeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
-                      Type result, Value src, Value dst, UnitAttr enable_nz2nd,
+                      Type result, Value src, Value dst, FixpipeDMAModeAttr dma_mode,
                       FixpipePreQuantModeAttr pre_quant,
                       FixpipePreReluModeAttr pre_relu, BoolAttr channel_split) {
   build(odsBuilder, odsState, result, src, dst, /*unit_flag_cond*/ Value{},
-        enable_nz2nd, pre_quant, pre_relu, channel_split,
+        dma_mode, pre_quant, pre_relu, channel_split,
         /*unit_flag_mode*/ UnitFlagAttr{});
+}
+
+std::string FixpipeOp::getOpLibraryCallName(std::optional<bool> isOpsAligned) {
+    StringRef baseCallName = this->getOpName();
+    // TODO, support 5HD, and other transform mode
+    FixpipeDMAMode mode = getDmaMode();
+    StringRef modeName;
+    if (mode == FixpipeDMAMode::NZ2DN) {
+        // Assertion is triggered, the program terminates and prints an error message.
+        llvm_unreachable("unsupported fixpipe dma mode");
+    } else {
+        modeName = stringifyFixpipeDMAMode(mode);
+    }
+    Type srcElemType = getElementTypeOrSelf(getSrcOperandType());
+    Type dstElemType = getElementTypeOrSelf(getDstOperandType);
+    int srcRank = getSrcOperandType().getRank();
+    int dstRank = getDstOperandType().getRank();
+
+    Type dstType = getDst().getType();
+    std::string dstScopeName = "";
+    if (auto dstScope = dyn_cast_if_present<AddressSpaceAttr>(dyn_cast<BaseMemRefType>(dstType).getMemorySpace())) {
+        dstScopeName = kAddressSpace2LibraryName.at(dstScope.getAddressSpace());
+    }
+
+    std::stringstream ss;
+    ss << baseCallName.data() << "_" << modeName.data() << "_"
+       << hivm::detail::getTypeName(this->getLoc(), srcElemType) << "_to_"
+       << hivm::detail::getTypeName(this->getLoc(), dstElemType) << "_" << srcRank
+       << "d"
+       << "_to_" << dstRank << "d_" << dstScopeName;
+    return ss.str();
 }
 
 enum FixpipeState {

@@ -725,6 +725,20 @@ def HIVM_FixpipePreReluModeAttr : HIVM_I32EnumAttr<
   let description = "HIVM fixpipe pre_relu mode";
 }
 
+def HIVM_FIXPIPE_DMA_MODE_NZ2ND : I32EnumAttrCase<"NZ2ND", 0, "nz2nd">;
+def HIVM_FIXPIPE_DMA_MODE_NZ2DN : I32EnumAttrCase<"NZ2DN", 1, "nz2dn">;
+def HIVM_FIXPIPE_DMA_MODE_NZ2NZ : I32EnumAttrCase<"NZ2NZ", 2, "normal">;
+
+def HIVM_FixpipeDMAModeEnum : HIVM_I32Enum<
+  "FixpipeDMAMode", "HIVM FixpipeDMA mode with int32_t_storage", [
+    HIVM_FIXPIPE_DMA_MODE_NZ2ND, HIVM_FIXPIPE_DMA_MODE_NZ2ND, HIVM_FIXPIPE_DMA_MODE_NZ2ND
+  ]>;
+
+def HIVM_FixpipeDMAModeAttr : HIVM_I32EnumAttr<
+  "dma_mode", HIVM_FixpipeDMAModeEnum> {
+  let description = "HIVM Fixpipe DMA mode";
+}
+
 //===----------------------------------------------------------------------===//
 // Deinterleave Mode for VDeinterleaveOp
 //===----------------------------------------------------------------------===//

@@ -137,10 +137,15 @@ public:
     Value fixpipeInit =
         utils::createEmptyOp(rewriter, insertAfterOp->getLoc(), mmadLikeOpRes);
     LDBG("Replacing fix pipe for " << op);
+    MLIRContext *ctx = rewriter.getContext();
+    FixpipeDMAModeAttr dmaModeAttr = FixpipeDMAModeAttr::get(
+        ctx,
+        FixpipeDMAMode::NZ2ND
+    );
     auto res = rewriter.create<FixpipeOp>(
         op.getLoc(), /*result_tensor=*/fixpipeInit.getType(),
         /*src=*/insertAfterOp->getResult(resultIndx),
-        /*dst=*/fixpipeInit, rewriter.getUnitAttr());
+        /*dst=*/fixpipeInit, dmaModeAttr);
     op->setAttr(fixpipeAlreadyInserted, rewriter.getBoolAttr(true));
     rewriter.replaceAllUsesExcept(insertAfterOp->getResult(resultIndx),
                                   res.getResultTensor(), res);
@@ -279,9 +284,14 @@ private:
     rewriter.setInsertionPointAfter(castOp);
     Value fixpipeInit =
         utils::createEmptyOp(rewriter, loc, castOp.getResult()[0]);
+    MLIRContext *ctx = rewriter.getContext();
+    FixpipeDMAModeAttr dmaModeAttr = FixpipeDMAModeAttr::get(
+        ctx,
+        FixpipeDMAMode::NZ2ND
+    );
     auto newFixpipeOp = rewriter.create<FixpipeOp>(
         loc, fixpipeInit.getType(), /*src=*/newFixpipeSrcTensor,
-        /*dst=*/fixpipeInit, rewriter.getUnitAttr(), quantModeAttr,
+        /*dst=*/fixpipeInit, dmaModeAttr, quantModeAttr,
         reluModeAttr);
     rewriter.replaceAllUsesWith(castOp.getResult()[0],
                                 newFixpipeOp.getResultTensor());
@@ -335,10 +345,15 @@ private:
     fixpipeInit = utils::createEmptyOpWithTargetElemType(
         rewriter, extractSliceOp.getLoc(), newExtractSliceResult,
         getInitType(newExtractSliceResult, op.getPreQuant(), rewriter));
+    MLIRContext *ctx = rewriter.getContext();
+    FixpipeDMAModeAttr dmaModeAttr = FixpipeDMAModeAttr::get(
+        ctx,
+        FixpipeDMAMode::NZ2ND
+    );
     auto newFixpipeOp = rewriter.create<FixpipeOp>(
         extractSliceOp.getLoc(), fixpipeInit.getType(),
         /*src=*/newExtractSliceResult, /*dst=*/fixpipeInit,
-        rewriter.getUnitAttr(), quantModeAttr, reluModeAttr);
+        dmaModeAttr, quantModeAttr, reluModeAttr);
     rewriter.replaceOp(extractSliceOp, newFixpipeOp.getResultTensor());
     rewriter.eraseOp(op);
     LDBG("InlineFixpipeWithExtractSliceReshape");
@@ -361,10 +376,14 @@ private:
     Value fixpipeInit = utils::createEmptyOpWithTargetElemType(
         rewriter, insertSliceOp.getLoc(), newInsertSliceResult,
         getInitType(newInsertSliceResult, op.getPreQuant(), rewriter));
-
+    MLIRContext *ctx = rewriter.getContext();
+    FixpipeDMAModeAttr dmaModeAttr = FixpipeDMAModeAttr::get(
+        ctx,
+        FixpipeDMAMode::NZ2ND
+    );
     auto newFixpipeOp = rewriter.create<FixpipeOp>(
         insertSliceOp.getLoc(), TypeRange{fixpipeInit}, newInsertSliceResult,
-        fixpipeInit, rewriter.getUnitAttr(), quantModeAttr, reluModeAttr);
+        fixpipeInit, dmaModeAttr, quantModeAttr, reluModeAttr);
     rewriter.replaceOp(insertSliceOp, newFixpipeOp.getResultTensor());
     rewriter.eraseOp(op);
     LDBG("InlineFixpipeWithInsertSliceOpReshape");
@@ -393,9 +412,14 @@ private:
           utils::createEmptyOp(rewriter, scfForOp->getLoc(), fixpipeResTensor);
       auto quantModeAttr = fixPipeOp.getPreQuantAttr();
       auto reluModeAttr = fixPipeOp.getPreReluAttr();
+      MLIRContext *ctx = rewriter.getContext();
+      FixpipeDMAModeAttr dmaModeAttr = FixpipeDMAModeAttr::get(
+        ctx,
+        FixpipeDMAMode::NZ2ND
+      );
       auto newFixpipeOp = rewriter.create<FixpipeOp>(
           fixPipeOp.getLoc(), TypeRange{fixpipeInit},
-          scfForOp->getResult(idx.value()), fixpipeInit, rewriter.getUnitAttr(),
+          scfForOp->getResult(idx.value()), fixpipeInit, dmaModeAttr,
           quantModeAttr, reluModeAttr);
       rewriter.replaceAllUsesExcept(scfForOp->getResult(idx.value()),
                                     newFixpipeOp.getResultTensor(),
@@ -444,10 +468,15 @@ public:
 
     Value fixpipeInit =
         utils::createEmptyOp(rewriter, op->getLoc(), maybeMmadRes);
+    MLIRContext *ctx = rewriter.getContext();
+    FixpipeDMAModeAttr dmaModeAttr = FixpipeDMAModeAttr::get(
+        ctx,
+        FixpipeDMAMode::NZ2ND
+    );
     auto fixpipeOp = rewriter.create<FixpipeOp>(
         op.getLoc(), /*result_tensor=*/fixpipeInit.getType(),
         /*src=*/maybeMmadRes,
-        /*dst=*/fixpipeInit, rewriter.getUnitAttr());
+        /*dst=*/fixpipeInit, dmaModeAttr);
 
     rewriter.replaceOpWithNewOp<DebugOp>(
         op, op.getDebugtype(), op.getPrefix(), op.getHex(),
