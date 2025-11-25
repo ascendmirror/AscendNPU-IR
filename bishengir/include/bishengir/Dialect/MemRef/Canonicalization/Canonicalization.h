@@ -1,4 +1,4 @@
-//===- MemRefImpl.h - MemRef Dialect Implementation -----------------------===//
+//===- Canonicalization.h - MemRef Canonicalization Pattern ---------------===//
 //
 // Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef BISHENGIR_DIALECT_MEMREF_IR_MEMREFIMPL_H
-#define BISHENGIR_DIALECT_MEMREF_IR_MEMREFIMPL_H
+#ifndef BISHENGIR_DIALECT_MEMREF_CANONICALIZATION_CANONICALIZATION_H
+#define BISHENGIR_DIALECT_MEMREF_CANONICALIZATION_CANONICALIZATION_H
 
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Builders.h"
@@ -27,15 +27,9 @@
 namespace mlir {
 namespace memref {
 
-/// Create memref.alloc op with the same type as source
-Value createMemRefAllocOp(OpBuilder &builder, Location loc, Value source);
+void getExtendedCanonicalizationPatterns(mlir::RewritePatternSet &results);
 
-/// Create memref.alloc op with the same shape as source
-/// but with element type targetElemType
-Value createMemRefAllocOpWithTargetElemType(
-    OpBuilder &builder, Location loc, Value source, Type targetElemType,
-    std::optional<MemRefLayoutAttrInterface> layout = std::nullopt);
 } // namespace memref
 } // namespace mlir
 
-#endif // BISHENGIR_DIALECT_MEMREF_IR_MEMREFIMPL_H
+#endif
