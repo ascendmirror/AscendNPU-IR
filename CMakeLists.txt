@@ -186,6 +186,7 @@ if (BISHENGIR_BUILD_STANDALONE_IR_ONLY)
   endforeach()
   # TODO: Math and Utils should be added in STANDALONE_IR_BUILD_DIALECT
   add_subdirectory(bishengir/include/bishengir/Dialect/MathExt)
+  add_subdirectory(bishengir/lib/Dialect/HIVM/Utils)
   add_subdirectory(bishengir/lib/Dialect/Math)
   add_subdirectory(bishengir/lib/Dialect/Utils)
 else()
