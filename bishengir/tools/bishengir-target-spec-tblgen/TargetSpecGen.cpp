@@ -102,7 +102,7 @@ static const char *const stringifyEnumDeclStr = R"(
 ///  {int AiCoreCount = 24;},
 static SmallVector<RecordVal>
 getSpecSuperClassEntries(const Record *derivedClassRecord) {
-  SmallVector<Record *> superClasses;
+  SmallVector<const Record *> superClasses;
   derivedClassRecord->getDirectSuperClasses(superClasses);
   auto *superClass = superClasses.front();
   SmallVector<RecordVal> result = llvm::to_vector(superClass->getValues());
@@ -229,7 +229,7 @@ Attribute TargetSpec::getSpecEntry(DeviceSpec specEntry, OpBuilder& builder) con
 }
 
 /// Emit a function to map string to \c DeviceTarget enum.
-static void emitStrToSymFnForDeviceTarget(const std::vector<Record *> &records,
+static void emitStrToSymFnForDeviceTarget(ArrayRef<const Record *> records,
                                           raw_ostream &OS) {
   const auto *enumName = "TargetDevice";
   OS << formatv("{0} symbolize{0}Enum(::llvm::StringRef str){{\n", enumName);
@@ -244,11 +244,11 @@ static void emitStrToSymFnForDeviceTarget(const std::vector<Record *> &records,
 }
 
 /// Emit a function to map \c DeviceTarget enum to string.
-static void emitSymToStrFnForDeviceTarget(const std::vector<Record *> &records,
+static void emitSymToStrFnForDeviceTarget(ArrayRef<const Record *> records,
                                           raw_ostream &OS) {
   const auto *enumName = "TargetDevice";
   OS << formatv("::llvm::StringRef stringify{0}Enum({0} val){{\n", enumName);
-  OS << formatv("  switch (val) {{\n", enumName);
+  OS << "  switch (val) {\n";
   for (auto [idx, record] : llvm::enumerate(records)) {
     auto deviceName = record->getValueAsString("Name");
     OS << formatv("    case {0}::{1}: return \"{2}\";\n", enumName, deviceName,

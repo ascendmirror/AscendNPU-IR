@@ -17,6 +17,7 @@
 
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
 #include "bishengir/Dialect/HIVM/IR/HIVMImpl.h"
+#include "bishengir/Dialect/HIVM/IR/HIVMIRUtils.h"
 #include "bishengir/Dialect/HIVM/Transforms/AlignBuffer/Util.h"
 #include "bishengir/Dialect/Utils/Util.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -964,7 +965,7 @@ decomposeUnalignTransposeOp(VTransposeOp op, OpBuilder &builder) {
   }
 
   std::vector<std::unique_ptr<OperAlignInfo>> alignList;
-  if (getUnAlignSizeInfo(op, &alignList).failed()) {
+  if (util::getUnAlignSizeInfo(op, &alignList).failed()) {
     return failure();
   }
 

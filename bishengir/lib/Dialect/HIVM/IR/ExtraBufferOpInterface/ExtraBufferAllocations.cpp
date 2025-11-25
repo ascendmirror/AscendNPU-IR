@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "bishengir/Dialect/HIVM/IR/HIVMImpl.h"
-#include "bishengir/Dialect/HIVM/Utils/Utils.h"
+#include "bishengir/Dialect/HIVM/IR/HIVMIRUtils.h"
 #include "bishengir/Dialect/Utils/Util.h"
 
 #include "mlir/IR/Builders.h"

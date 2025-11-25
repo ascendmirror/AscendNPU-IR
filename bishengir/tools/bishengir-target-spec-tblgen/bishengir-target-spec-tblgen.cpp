@@ -44,7 +44,7 @@ static mlir::GenRegistration
                    return false;
                  });
 
-static bool bishengirTargetSpecGenMain(raw_ostream &os, RecordKeeper &records) {
+static bool bishengirTargetSpecGenMain(raw_ostream &os, const RecordKeeper &records) {
   if (!generator) {
     os << records;
     return false;
@@ -60,4 +60,4 @@ int main(int argc, char **argv) {
   cl::ParseCommandLineOptions(argc, argv, "BiShengIR Target Spec Generator");
 
   return TableGenMain(argv[0], &bishengirTargetSpecGenMain);
-}
+} 

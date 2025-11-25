@@ -17,7 +17,7 @@
 
 #include "bishengir/Dialect/Annotation/IR/Annotation.h"
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
-#include "bishengir/Dialect/HIVM/Utils/Utils.h"
+#include "bishengir/Dialect/HIVM/IR/HIVMIRUtils.h"
 #include "bishengir/Interfaces/AggregatedOpInterface.h"
 
 #include "mlir/Dialect/Linalg/IR/Linalg.h"

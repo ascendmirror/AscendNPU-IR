@@ -17,8 +17,7 @@
 
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
 #include "bishengir/Dialect/HIVM/IR/HIVMImpl.h"
-#include "bishengir/Dialect/HIVM/Transforms/AlignBuffer/Util.h"
-#include "bishengir/Dialect/HIVM/Utils/Utils.h"
+#include "bishengir/Dialect/HIVM/IR/HIVMIRUtils.h"
 #include "bishengir/Dialect/Utils/Util.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 
@@ -723,7 +722,7 @@ LogicalResult VTransposeOp::verify() {
   }
 
   if (getDisableAlign()) {
-    if (!isLastTwoAxesTranspose(*this)) {
+    if (!util::isLastTwoAxesTranspose(*this)) {
       return emitOpError()
              << "Disabled allign mode supports only last 2 axes transpose";
     }
@@ -735,7 +734,7 @@ LogicalResult VTransposeOp::verify() {
       auto dstMemSpaceAttr = dstMemRefType.getMemorySpace();
       if (srcMemSpaceAttr && dstMemSpaceAttr) {
         std::vector<std::unique_ptr<OperAlignInfo>> alignList;
-        if (getUnAlignSizeInfo(*this, &alignList).failed()) {
+        if (util::getUnAlignSizeInfo(*this, &alignList).failed()) {
           return failure();
         }
 

@@ -25,6 +25,7 @@ add_bishengir_dialect_library(BiShengIRHIVMDialect
   HIVMDMAOps.cpp
   HIVMImpl.cpp
   HIVMInterfaces.cpp
+  HIVMIRUtils.cpp
   HIVMMacroOps.cpp
   HIVMOps.cpp
   HIVMSynchronizationOps.cpp

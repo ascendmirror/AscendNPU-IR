@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "bishengir/Dialect/HIVM/Utils/Utils.h"
+#include "bishengir/Dialect/HIVM/IR/HIVMIRUtils.h"
 #include "bishengir/Dialect/Utils/Util.h"
 
 #include "mlir/IR/Builders.h"
@@ -119,7 +119,7 @@ int64_t getLastAxisInlineBrcBuffSize(MemRefType srcVecType,
                                      int64_t upperLimit) {
   unsigned int srcWidth = srcVecType.getElementType().getIntOrFloatBitWidth();
   int64_t numPerBlock =
-      (util::INTR_BYTES_PER_BLOCK * utils::INTR_BITS_PER_BYTE) / srcWidth;
+      (utils::INTR_BYTES_PER_BLOCK * utils::INTR_BITS_PER_BYTE) / srcWidth;
   auto srcSizes = srcVecType.getShape();
   int rank = srcVecType.getRank();
   assert(rank >= 1 && "rank must be >= 1.");
@@ -166,7 +166,7 @@ std::optional<int64_t> getExtraBufferSizeForBinaryOp(HIVMOP op) {
   MemRefType dstVecType = cast<MemRefType>(op.getDst()[0].getType());
   unsigned int dstWidth = dstVecType.getElementType().getIntOrFloatBitWidth();
   int64_t numPerBlock =
-      (util::INTR_BYTES_PER_BLOCK * utils::INTR_BITS_PER_BYTE) / dstWidth;
+      (utils::INTR_BYTES_PER_BLOCK * utils::INTR_BITS_PER_BYTE) / dstWidth;
 
   int64_t baseBuffSize = 0;
   bool src0ScalarType = op.getSrc()[0].getType().isIntOrFloat();
@@ -296,8 +296,8 @@ std::optional<int64_t> VSelOp::getExtraBufferSize() {
   } else {
     dstSize = utils::traceToAllocMaxSize(this->getDst()[0]).value();
   }
-  uint64_t numI32PerBlock = util::INTR_BYTES_PER_BLOCK / sizeof(int32_t);
-  uint64_t numHalfPerBlock = util::INTR_BYTES_PER_BLOCK / sizeof(int16_t);
+  uint64_t numI32PerBlock = utils::INTR_BYTES_PER_BLOCK / sizeof(int32_t);
+  uint64_t numHalfPerBlock = utils::INTR_BYTES_PER_BLOCK / sizeof(int16_t);
   const int i32Factor = sizeof(int64_t) / sizeof(int32_t);
   const int halfFactor = sizeof(int64_t) / sizeof(int16_t);
   int64_t i32AlignSize =

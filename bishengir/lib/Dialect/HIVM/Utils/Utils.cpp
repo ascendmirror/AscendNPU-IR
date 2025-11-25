@@ -648,27 +648,6 @@ void removeMarkOpAttr(annotation::MarkOp markOp, StringRef attrName,
   }
 }
 
-uint32_t getHWAlignBytes(Attribute spaceAttr) {
-  auto hivmSpace = dyn_cast<hivm::AddressSpaceAttr>(spaceAttr);
-  assert(hivmSpace && "Empty address space attr");
-  switch (hivmSpace.getAddressSpace()) {
-  case hivm::AddressSpace::UB:
-  case hivm::AddressSpace::L1:
-    return hivm::util::BL;
-  default:
-    llvm_unreachable("Unsupported address space");
-  }
-}
-
-std::optional<uint32_t> getHWAlignBytes(Type t) {
-  auto memrefType = dyn_cast<MemRefType>(t);
-  if (!memrefType) {
-    return std::nullopt;
-  }
-  auto hwAlignBytes = getHWAlignBytes(memrefType.getMemorySpace());
-  return hwAlignBytes;
-}
-
 Value createTmpBufferOrTensorWithShape(PatternRewriter &rewriter, Location loc,
                                        Value source,
                                        SmallVector<int64_t> targetShape) {

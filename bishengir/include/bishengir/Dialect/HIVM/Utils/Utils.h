@@ -73,24 +73,11 @@ const std::string Ascend910BCubeTriple = "ascend_910b_cube-unknown-cce-unknown";
 const std::string Ascend910BDataLayout =
     "e-i1:8:32-i8:8:32-i16:16:32-i64:64-f16:16:32-v16:16-v32:32-n64-S64";
 
-// The amount of data processed by the VBITSORT instruction in one repeat.
-constexpr const int VBITSORT_NUM_PER_REPEAT = 32;
-
 const std::set<hivm::AddressSpace> LocalBufferSpace{
     hivm::AddressSpace::UB, hivm::AddressSpace::L1, hivm::AddressSpace::L0C};
 
-const std::map<TFuncCoreType, TCoreType> kTFuncCoreType2TCoreType = {
-    {TFuncCoreType::AIC, TCoreType::CUBE},
-    {TFuncCoreType::AIV, TCoreType::VECTOR},
-    {TFuncCoreType::MIX, TCoreType::CUBE_OR_VECTOR},
-};
-
 /// Set the input type's memory scope to the input HIVM Address Space.
 void setBaseMemRefTypeScope(Value val, AddressSpaceAttr targetMemScope);
-
-// New helper function to get the updated BaseMemRefType
-BaseMemRefType getBaseMemRefTypeWithNewScope(BaseMemRefType type,
-                                             AddressSpaceAttr targetMemScope);
 
 /// Get the root MemRef AllocOp for the input operand, return failure if there
 /// is unsupported Ops on the search path or if the defining op is not a MemRef
@@ -179,72 +166,12 @@ Value createNestedIndexModular(OpBuilder &builder, LoopLikeOpInterface loopOp,
 
 Value createNestedIndexForOp(OpBuilder &builder, Operation *operation);
 
-/// Create nested loops by choosing `loopDims` of `target`.
-/// For example:
-///  `target` = memref<Ax16xBxf32>
-///  `loopDims` = {0, 1}
-/// The generated loops are:
-///   scf.for 0 ... A
-///     scf.for 0 ... 16
-/// The optional `lowBound` can be used to specify the lower bound.
-/// The optional `forInitArgs` can be used to specify the iter arg's initial
-/// value.
-/// For example:
-///   scf.for lowBound ... A iter_arg(%iter1 = forInitArgs[0])
-///     scf.for lowBound ... 16 iter_arg(%iter2 = forInitArgs[1])
-template <typename Func>
-std::vector<scf::ForOp> createNestedLoops(
-    OpBuilder &rewriter, Location loc, Value target, std::set<int> loopDims,
-    Func buildLoopBody, int lowBound = 0,
-    std::optional<SmallVector<Value>> forInitArgs = std::nullopt) {
-  std::vector<scf::ForOp> nestedFor;
-  llvm::SmallVector<Value> indexes;
-  if (forInitArgs.has_value())
-    assert(loopDims.size() == 1 &&
-           "Only support non-nested loop to use iterator arg");
-
-  auto index = [&rewriter, &loc](int i) {
-    return rewriter.create<arith::ConstantIndexOp>(loc, i);
-  };
-  ShapedType dstType = dyn_cast<ShapedType>(target.getType());
-  assert(dstType != nullptr);
-  for (int dim = 0; dim < dstType.getRank(); dim++) {
-    if (!loopDims.count(dim))
-      continue;
-    Value upperBound;
-    if (dstType.isDynamicDim(dim)) {
-      upperBound = rewriter.create<memref::DimOp>(loc, target, dim);
-    } else {
-      upperBound = index(dstType.getDimSize(dim));
-    }
-    scf::ForOp forOp =
-        forInitArgs.has_value()
-            ? rewriter.create<scf::ForOp>(loc, index(lowBound), upperBound,
-                                          index(1), forInitArgs.value())
-            : rewriter.create<scf::ForOp>(loc, index(lowBound), upperBound,
-                                          index(1));
-    nestedFor.push_back(forOp);
-    indexes.push_back(forOp.getInductionVar());
-    rewriter.setInsertionPointToStart(forOp.getBody());
-  }
-  if constexpr (std::is_invocable_v<Func, SmallVector<Value>>)
-    buildLoopBody(indexes);
-  else
-    buildLoopBody(indexes, nestedFor[0].getRegionIterArgs());
-
-  return nestedFor;
-}
-
 // Util func `traceForPotentialMatrixC` aims to judge whether current operand
 // value of store-related operation could come from matmul result MatrixC.
 //
 // And it should be used with fixpipe optimization.
 FailureOr<SmallVector<Operation *>> traceForPotentialMatrixC(Value v,
                                                              Block *storeBlock);
-
-// TODO: move to platform info
-uint32_t getHWAlignBytes(Attribute spaceAttr);
-std::optional<uint32_t> getHWAlignBytes(Type t);
 
 bool isMarkedAsHIVMElementwiseOp(Operation *op);
 
@@ -330,15 +257,6 @@ LogicalResult traceHIVMOpUntil(RewriterBase &rewriter, Operation *op,
 }
 
 namespace util {
-constexpr static unsigned int VL = 256;
-constexpr static unsigned int BL = VL / 8;
-const static int vectorBlockSizeBit = 256;
-const static int srcNumPerRepeatOfVBRCBIntrin = 8;
-
-constexpr static unsigned int INTR_BYTES_PER_BLOCK = 32;
-constexpr static unsigned int INTR_BYTES_PER_REPEAT = 256;
-constexpr static unsigned int VNCHWCONV_INTR_BYTES_PER_REPEAT = 512;
-
 // Returns if the given source MemRef type is collapsible with the specified
 // reassociation indices. This function works as a strict extension based
 // on `memref::CollapseShapeOp::isGuaranteedCollapsible`, which has weak
@@ -352,67 +270,13 @@ SmallVector<MemRefType> getMemRefTypes(TypeRange types);
 /// Judge if all MemRefTypes has same rank value
 bool isAllSameRank(const SmallVectorImpl<MemRefType> &memrefTypes);
 
-inline int64_t ceilFactor(int64_t x, int64_t y) { return (x + y - 1) / y * y; }
-
 bool isLastDimContiguous(Value operand);
 
 /// Check if the operation is hivm::PointerCastOp with GM space
 /// Used to check if it is lowered from triton::IntToPtrOp
 bool isGMPointerCastOp(Operation *op);
-
-bool isArgminOrArgmax(ReduceOperation op);
-
 } // namespace util
 } // namespace hivm
 } // namespace mlir
-
-// TODO : move to platform file
-const std::set<std::string> HWSupportedCast{
-    "bfloat16_t_to_float_rintmode",   "bfloat16_t_to_int32_t_roundmode",
-    "bfloat16_t_to_int32_t_ceilmode", "bfloat16_t_to_int32_t_floormode",
-    "bfloat16_t_to_int32_t_rintmode", "bfloat16_t_to_int32_t_truncmode",
-    "half_to_float_roundmode",        "half_to_float_floormode",
-    "half_to_float_rintmode",         "half_to_int16_t_roundmode",
-    "half_to_int16_t_ceilmode",       "half_to_int16_t_floormode",
-    "half_to_int16_t_rintmode",       "half_to_int16_t_truncmode",
-    "half_to_int32_t_roundmode",      "half_to_int32_t_ceilmode",
-    "half_to_int32_t_floormode",      "half_to_int32_t_rintmode",
-    "half_to_int32_t_truncmode",      "half_to_int4_t_roundmode",
-    "half_to_int4_t_ceilmode",        "half_to_int4_t_floormode",
-    "half_to_int4_t_rintmode",        "half_to_int4_t_truncmode",
-    "half_to_int8_t_roundmode",       "half_to_int8_t_ceilmode",
-    "half_to_int8_t_floormode",       "half_to_int8_t_rintmode",
-    "half_to_int8_t_truncmode",       "half_to_uint8_t_roundmode",
-    "half_to_uint8_t_ceilmode",       "half_to_uint8_t_floormode",
-    "half_to_uint8_t_rintmode",       "half_to_uint8_t_truncmode",
-    "float_to_bfloat16_t_roundmode",  "float_to_bfloat16_t_ceilmode",
-    "float_to_bfloat16_t_floormode",  "float_to_bfloat16_t_rintmode",
-    "float_to_bfloat16_t_truncmode",  "float_to_half_roundmode",
-    "float_to_half_ceilmode",         "float_to_half_floormode",
-    "float_to_half_oddmode",          "float_to_half_rintmode",
-    "float_to_half_truncmode",        "float_to_float_roundmode",
-    "float_to_float_ceilmode",        "float_to_float_floormode",
-    "float_to_float_rintmode",        "float_to_float_truncmode",
-    "float_to_int16_t_roundmode",     "float_to_int16_t_ceilmode",
-    "float_to_int16_t_floormode",     "float_to_int16_t_rintmode",
-    "float_to_int16_t_truncmode",     "float_to_int32_t_roundmode",
-    "float_to_int32_t_ceilmode",      "float_to_int32_t_floormode",
-    "float_to_int32_t_rintmode",      "float_to_int32_t_truncmode",
-    "float_to_int64_t_roundmode",     "float_to_int64_t_ceilmode",
-    "float_to_int64_t_floormode",     "float_to_int64_t_rintmode",
-    "float_to_int64_t_truncmode",     "int16_t_to_half_roundmode",
-    "int16_t_to_half_ceilmode",       "int16_t_to_half_floormode",
-    "int16_t_to_half_rintmode",       "int16_t_to_half_truncmode",
-    "int16_t_to_float_rintmode",      "int16_t_to_float_truncmode",
-    "int32_t_to_float_roundmode",     "int32_t_to_float_ceilmode",
-    "int32_t_to_float_floormode",     "int32_t_to_float_rintmode",
-    "int32_t_to_float_truncmode",     "int32_t_to_int16_t_rintmode",
-    "int32_t_to_int64_t_rintmode",    "int4_t_to_half_rintmode",
-    "int64_t_to_float_roundmode",     "int64_t_to_float_ceilmode",
-    "int64_t_to_float_floormode",     "int64_t_to_float_rintmode",
-    "int64_t_to_float_truncmode",     "int64_t_to_int32_t_rintmode",
-    "int8_t_to_half_rintmode",        "int8_t_to_half_truncmode",
-    "uint8_t_to_half_rintmode",       "half_to_int32_t_rintmode",
-    "half_to_float_truncmode",        "bfloat16_t_to_float_roundmode"};
 
 #endif // MLIR_DIALECT_HIVM_UTILS_UTILS_H
