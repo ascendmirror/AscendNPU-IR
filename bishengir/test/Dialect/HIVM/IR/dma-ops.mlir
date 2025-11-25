@@ -59,6 +59,12 @@ func.func @test_fixpipe() {
   // NZ2ND data movement
   hivm.hir.fixpipe {enable_nz2nd} ins(%l0c : memref<256x128xf16>)
                                   outs(%gmCSubview : memref<256x128xf16, strided<[2048, 1], offset: 0>>)
+  // DUAL DST data movement
+  %l0c1 = memref.alloc() : memref<256x128xf16, #hivm.address_space<cc>>
+  %ub = memref.alloc() : memref<256x128xf16, #hivm.address_space<ub>>
+  hivm.hir.fixpipe ins(%l0c1 : memref<256x128xf16, #hivm.address_space<cc>>)
+                   outs(%ub : memref<256x128xf16, #hivm.address_space<ub>>)
+                   dual_dst_mode = #hivm.fixpipe_dual_dst_mode<NO_DUAL>
   return
 }
 
@@ -76,13 +82,19 @@ func.func @test_fixpipe_tensor() {
   // NZ2ND data movement
   %ret1 = hivm.hir.fixpipe {enable_nz2nd} ins(%l0c : tensor<256x128xf16>)
                                           outs(%gmCSubview : tensor<256x128xf16>) -> tensor<256x128xf16>
+  // DUAL DST data movement
+  %l0c1 = tensor.empty() : tensor<256x128xf16>
+  %ub = tensor.empty() : tensor<256x128xf16>
+  %ret2 = hivm.hir.fixpipe ins(%l0c1 : tensor<256x128xf16>)
+                           outs(%ub : tensor<256x128xf16>) -> tensor<256x128xf16>
+                           dual_dst_mode = #hivm.fixpipe_dual_dst_mode<ROW_SPLIT> 
   // f322f16 pre quant on the fly
-  %l0c1 = tensor.empty() : tensor<256x128xf32>
-  %ret2 = hivm.hir.fixpipe {pre_quant = #hivm.fixpipe_pre_quant_mode<F322F16>}
-                           ins(%l0c1 : tensor<256x128xf32>)
+  %l0c2 = tensor.empty() : tensor<256x128xf32>
+  %ret3 = hivm.hir.fixpipe {pre_quant = #hivm.fixpipe_pre_quant_mode<F322F16>}
+                           ins(%l0c2 : tensor<256x128xf32>)
                            outs(%gmCSubview : tensor<256x128xf16>) -> tensor<256x128xf16>
   // leaky relu on the fly
-  %ret3 = hivm.hir.fixpipe {pre_relu = #hivm.fixpipe_pre_relu_mode<LEAKY_RELU>}
+  %ret4 = hivm.hir.fixpipe {pre_relu = #hivm.fixpipe_pre_relu_mode<LEAKY_RELU>}
                            ins(%l0c : tensor<256x128xf16>)
                            outs(%gmCSubview : tensor<256x128xf16>) -> tensor<256x128xf16>
   return
