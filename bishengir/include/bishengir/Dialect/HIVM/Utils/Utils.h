@@ -329,6 +329,60 @@ LogicalResult traceHIVMOpUntil(RewriterBase &rewriter, Operation *op,
   return failure();
 }
 
+struct AlignInfo {
+  llvm::SmallVector<int32_t> alignDims;
+  llvm::SmallVector<int32_t> alignBytes;
+
+  AlignInfo(ArrayRef<int32_t> alignDims_, ArrayRef<int32_t> alignBytes_) {
+    alignDims = SmallVector<int32_t>(alignDims_);
+    alignBytes = SmallVector<int32_t>(alignBytes_);
+  }
+
+  AlignInfo(llvm::SmallVector<int32_t> alignDims_,
+            llvm::SmallVector<int32_t> alignBytes_) {
+    alignDims = alignDims_;
+    alignBytes = alignBytes_;
+  }
+
+  AlignInfo(AlignInfo &&other) {
+    alignDims = other.alignDims;
+    alignBytes = other.alignBytes;
+  }
+
+  bool operator==(const AlignInfo &other);
+  bool operator!=(const AlignInfo &other);
+
+  void dump();
+};
+
+struct OperAlignInfo : public AlignInfo {
+  Value operand;
+
+  OperAlignInfo(Value operand_, ArrayRef<int32_t> alignDims_,
+                ArrayRef<int32_t> alignBytes_)
+      : AlignInfo(alignDims_, alignBytes_) {
+    operand = operand_;
+  }
+
+  OperAlignInfo(Value operand_, llvm::SmallVector<int32_t> alignDims_,
+                llvm::SmallVector<int32_t> alignBytes_)
+      : AlignInfo(alignDims_, alignBytes_) {
+    operand = operand_;
+  }
+};
+
+LogicalResult getUnAlignSizeInfo(
+  VTransposeOp op,
+  std::vector<std::unique_ptr<OperAlignInfo>> *operAlignInfoList);
+
+LogicalResult getUnAlignSizeInfo(
+  VCastOp op,
+  std::vector<std::unique_ptr<OperAlignInfo>> *operAlignInfoList);
+
+LogicalResult getUnAlignSizeInfo(
+  VSortOp op,
+  std::vector<std::unique_ptr<OperAlignInfo>> *operAlignInfoList);
+
 namespace util {
 constexpr static unsigned int VL = 256;
 constexpr static unsigned int BL = VL / 8;
