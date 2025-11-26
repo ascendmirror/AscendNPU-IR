@@ -125,8 +125,8 @@ bool DimensionAnalyzer::processOperation(Operation *op, Value current) {
     processVCumOp(vCumprodOp);
   } else if (auto yieldOp = dyn_cast<scf::YieldOp>(op)) {
     processYieldOp(yieldOp);
-  } else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
-    processForOp(forOp);
+  } else if (auto loopOp = dyn_cast<LoopLikeOpInterface>(op)) {
+    processForOp(loopOp);
   } else if (auto expandShapeOp = dyn_cast<tensor::ExpandShapeOp>(op)) {
     processReshapeOp(expandShapeOp);
   } else if (auto collapseShapeOp = dyn_cast<tensor::CollapseShapeOp>(op)) {
@@ -302,8 +302,7 @@ void DimensionAnalyzer::processVPadOp(hivm::VPadOp op) {
   mergeValues({input}, outputs, paddedIndices);
 }
 
-template <typename T, typename>
-void DimensionAnalyzer::processVCumOp(T op) {
+template <typename T, typename> void DimensionAnalyzer::processVCumOp(T op) {
   if constexpr (std::is_same_v<T, hivm::VCumsumOp>) {
     LDBG("Processing VCumsumOp " << op);
   } else {
@@ -333,17 +332,16 @@ void DimensionAnalyzer::processYieldOp(scf::YieldOp op) {
   }
 }
 
-void DimensionAnalyzer::processForOp(scf::ForOp op) {
-  LDBG("Processing ForOp " << op);
+void DimensionAnalyzer::processForOp(LoopLikeOpInterface op) {
+  LDBG("Processing LoopLikeOpInterface " << op);
   for (const auto &[regionArg, initArg] :
-       zip_equal(op.getRegionIterArgs(), op.getInitArgs())) {
+       zip_equal(op.getRegionIterArgs(), op.getInits())) {
     createDummyRefIfNotExist({regionArg, initArg});
     processValue(regionArg, initArg);
   }
 }
 
-template <typename T, typename>
-void DimensionAnalyzer::processReshapeOp(T op) {
+template <typename T, typename> void DimensionAnalyzer::processReshapeOp(T op) {
   if constexpr (std::is_same_v<T, tensor::ExpandShapeOp>) {
     LDBG("Processing ExpandShapeOp " << op);
   } else {
