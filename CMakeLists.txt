@@ -181,6 +181,7 @@ if (BISHENGIR_BUILD_STANDALONE_IR_ONLY)
   HIVM
   MemRef
   MemRefExt
+  Scope
   Symbol
   Tensor
   )
