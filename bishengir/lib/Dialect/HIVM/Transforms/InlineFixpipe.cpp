@@ -75,7 +75,8 @@ Operation *getInsertPoint(Operation *op, int &resultIndx) {
   for (auto *user : users) {
     // TODO: add auto tracedDownUser = traceDown(user) and use tracedDownUser to
     // judge
-    if (!isa<scf::YieldOp>(user) || !isa<scf::ForOp>(user->getParentOp())) {
+    if (!isa<scf::YieldOp>(user) ||
+        !isa<LoopLikeOpInterface>(user->getParentOp())) {
       continue;
     } else {
       yieldOperands.emplace(user);
