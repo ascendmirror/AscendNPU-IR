@@ -308,21 +308,21 @@ static bool isPerChannelPattern(OpOperand &mmOut) {
 static bool isPerChannelSplitKPattern(OpOperand &mmOut) {
   Operation *localMatmulOp = mmOut.getOwner();
   if (auto blockArg = dyn_cast_if_present<BlockArgument>(mmOut.get())) {
-    if (auto scfForOp = dyn_cast_if_present<scf::ForOp>(
+    if (auto loopOp = dyn_cast_if_present<LoopLikeOpInterface>(
             blockArg.getOwner()->getParentOp())) {
-      auto correspondForRes = scfForOp.getTiedLoopResult(blockArg);
+      auto correspondLoopRes = loopOp.getTiedLoopResult(blockArg);
       if (!(localMatmulOp->getResults()[0].hasOneUse() &&
             isa<scf::YieldOp>(*(localMatmulOp->getResults()[0].user_begin())) &&
-            correspondForRes.hasOneUse() &&
-            isa<hivm::VAddOp>(*(correspondForRes.user_begin()))))
+            correspondLoopRes.hasOneUse() &&
+            isa<hivm::VAddOp>(*(correspondLoopRes.user_begin()))))
         return false;
-      auto vaddOp = dyn_cast<hivm::VAddOp>(*(correspondForRes.user_begin()));
+      auto vaddOp = dyn_cast<hivm::VAddOp>(*(correspondLoopRes.user_begin()));
       assert(vaddOp.getSrc().size() == 2);
       for (Value src : vaddOp.getSrc()) {
         auto vbrcOp = src.getDefiningOp<hivm::VBrcOp>();
         // While anchor is vaddOp after matmul in perChannelSplitK pattern,
-        // here use forOp to verify whether bias is defined before matmul
-        if (vbrcOp && isSatisfiedBrcForPerChannel(vbrcOp, scfForOp))
+        // here use loopOp to verify whether bias is defined before matmul
+        if (vbrcOp && isSatisfiedBrcForPerChannel(vbrcOp, loopOp))
           return true;
       }
     }

@@ -360,10 +360,10 @@ decomposeMatmulWithPerChannelAddWithSplitKAdd(PatternRewriter &rewriter, T op) {
   auto matmulOutput = op.getC();
   auto blockArg = dyn_cast_if_present<BlockArgument>(matmulOutput);
   assert(blockArg && "blockArg is not nullptr for split k");
-  auto scfForOp =
-      dyn_cast_if_present<scf::ForOp>(blockArg.getOwner()->getParentOp());
-  assert(scfForOp && "scfForOp is not nullptr for split k");
-  Value scfRes = scfForOp->getResults()[blockArg.getArgNumber() - 1];
+  auto loopOp = dyn_cast_if_present<LoopLikeOpInterface>(
+      blockArg.getOwner()->getParentOp());
+  assert(loopOp && "loopOp is not nullptr for split k");
+  Value scfRes = loopOp->getResults()[blockArg.getArgNumber() - 1];
   auto addOp = cast<hivm::VAddOp>(*scfRes.getUsers().begin());
   int64_t brcInputIndex = -1;
   int64_t matmulInputIndex = -1;
