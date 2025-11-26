@@ -481,8 +481,7 @@ struct DuplicateTensorExtractForCube
           hasCubeUser = true;
           return WalkResult::interrupt();
         } else if (getCoreType(nestedOp) == TCoreType::VECTOR) {
-          hasCubeUser = false;
-          return WalkResult::interrupt();
+          return WalkResult::skip();
         }
         return WalkResult::advance();
       });
