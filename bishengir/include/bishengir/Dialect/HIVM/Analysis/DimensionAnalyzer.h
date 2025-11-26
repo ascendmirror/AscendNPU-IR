@@ -20,6 +20,7 @@
 
 #include "bishengir/Dialect/Analysis/DimensionAnalyzer.h"
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
+#include "mlir/Interfaces/LoopLikeInterface.h"
 
 namespace mlir {
 namespace hivm {
@@ -115,7 +116,7 @@ protected:
                                         std::is_same_v<T, hivm::VCumprodOp>>>
   void processVCumOp(T op);
   void processYieldOp(scf::YieldOp op);
-  void processForOp(scf::ForOp op);
+  void processForOp(LoopLikeOpInterface op);
   template <typename T, typename = std::enable_if_t<
                             std::is_same_v<T, tensor::ExpandShapeOp> ||
                             std::is_same_v<T, tensor::CollapseShapeOp>>>
