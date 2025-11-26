@@ -289,7 +289,12 @@ def FixpipeOp : HIVM_DmaOp<"fixpipe", [
                         An optional condition to enable unit-flge mode,
                         useful if there is a dependency on a for loop to run at least once.
                        }]>:$unit_flag_cond,
-                       DefaultValueAttr<HIVM_FixpipeDMAModeAttr, "FixpipeDMAMode::NZ2NZ">:$dma_mode,
+                       DefaultValueAttr<HIVM_FixpipeDMAModeAttr,
+                       #ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
+                       "FixpipeDMAMode::NZ2NZ">:$dma_mode,
+                       #else
+                       OptionalAttr<UnitAttr>:$enable_nz2nd,
+                       #endif
                        DefaultValuedOptionalAttr<HIVM_FixpipePreQuantModeAttr,
                          "FixpipePreQuantMode::NO_QUANT">:$pre_quant,
                        DefaultValuedOptionalAttr<HIVM_FixpipePreReluModeAttr,
@@ -303,11 +308,21 @@ def FixpipeOp : HIVM_DmaOp<"fixpipe", [
   let results = (outs Optional<AnyRankedTensor>:$result_tensor);
   let builders = [
     OpBuilder<(ins "TypeRange":$result, "Value":$src, "Value":$dst,
-                    CArg<"FixpipeDMAModeAttr", "nullptr">:$dma_mode, CArg<"FixpipePreQuantModeAttr", "nullptr">:$pre_quant,
+                    #ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
+                    CArg<"FixpipeDMAModeAttr", "nullptr">:$dma_mode,
+                    #else
+                    CArg<"UnitAttr", "nullptr">:$enable_nz2nd,
+                    #endif
+                    CArg<"FixpipePreQuantModeAttr", "nullptr">:$pre_quant,
                     CArg<"FixpipePreReluModeAttr", "nullptr">:$pre_relu, CArg<"BoolAttr", "nullptr">:$channel_split)
     >,
     OpBuilder<(ins "Type":$result, "Value":$src, "Value":$dst,
-                    CArg<"FixpipeDMAModeAttr", "nullptr">:$dma_mode, CArg<"FixpipePreQuantModeAttr", "nullptr">:$pre_quant,
+                    #endif
+                    CArg<"FixpipeDMAModeAttr", "nullptr">:$dma_mode,
+                    #else
+                    CArg<"UnitAttr", "nullptr">:$enable_nz2nd,
+                    #endif
+                    CArg<"FixpipePreQuantModeAttr", "nullptr">:$pre_quant,
                     CArg<"FixpipePreReluModeAttr", "nullptr">:$pre_relu, CArg<"BoolAttr", "nullptr">:$channel_split)
     >
   ];

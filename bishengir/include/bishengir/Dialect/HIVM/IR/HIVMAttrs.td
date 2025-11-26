@@ -707,6 +707,7 @@ def HIVM_FixpipePreQuantModeAttr : HIVM_I32EnumAttr<
   let description = "HIVM fixpipe pre_quant mode";
 }
 
+#ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
 def HIVM_FIXPIPEPRERELU_NO_RELU : I32EnumAttrCase<"NO_RELU", 0>;
 def HIVM_FIXPIPEPRERELU_NORMAL_RELU : I32EnumAttrCase<"NORMAL_RELU", 1>;
 def HIVM_FIXPIPEPRERELU_LEAKY_RELU : I32EnumAttrCase<"LEAKY_RELU", 2>;
@@ -719,6 +720,7 @@ def HIVM_FixpipePreReluModeEnum : HIVM_I32Enum<
     HIVM_FIXPIPEPRERELU_LEAKY_RELU,
     HIVM_FIXPIPEPRERELU_P_RELU
   ]>;
+#endif
 
 def HIVM_FixpipePreReluModeAttr : HIVM_I32EnumAttr<
   "fixpipe_pre_relu_mode", HIVM_FixpipePreReluModeEnum> {

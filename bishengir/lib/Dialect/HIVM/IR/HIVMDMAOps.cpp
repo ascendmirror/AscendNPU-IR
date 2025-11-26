@@ -560,22 +560,43 @@ void ND2NZOp::build(OpBuilder &odsBuilder, OperationState &odsState,
 
 void FixpipeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                       TypeRange result, Value src, Value dst,
-                      FixpipeDMAModeAttr dma_mode, FixpipePreQuantModeAttr pre_quant,
+                      #ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
+                      FixpipeDMAModeAttr dma_mode,
+                      #else
+                      UnitAttr enable_nz2nd,
+                      #endif
+                      FixpipePreQuantModeAttr pre_quant,
                       FixpipePreReluModeAttr pre_relu, BoolAttr channel_split) {
   build(odsBuilder, odsState, result, src, dst, /*unit_flag_cond*/ Value{},
-        dma_mode, pre_quant, pre_relu, channel_split,
+        #ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
+        dma_mode,
+        #else
+        enable_nz2nd,
+        #endif
+        pre_quant, pre_relu, channel_split,
         /*unit_flag_mode*/ UnitFlagAttr{});
 }
 
 void FixpipeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
-                      Type result, Value src, Value dst, FixpipeDMAModeAttr dma_mode,
+                      Type result, Value src, Value dst,
+                      #ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
+                      FixpipeDMAModeAttr dma_mode,
+                      #else
+                      UnitAttr enable_nz2nd,
+                      #endif
                       FixpipePreQuantModeAttr pre_quant,
                       FixpipePreReluModeAttr pre_relu, BoolAttr channel_split) {
   build(odsBuilder, odsState, result, src, dst, /*unit_flag_cond*/ Value{},
-        dma_mode, pre_quant, pre_relu, channel_split,
+        #ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
+        dma_mode,
+        #else
+        enable_nz2nd,
+        #endif
+        pre_quant, pre_relu, channel_split,
         /*unit_flag_mode*/ UnitFlagAttr{});
 }
 
+#ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
 std::string FixpipeOp::getOpLibraryCallName(std::optional<bool> isOpsAligned) {
     StringRef baseCallName = this->getOpName();
     // TODO, support 5HD, and other transform mode
@@ -606,6 +627,7 @@ std::string FixpipeOp::getOpLibraryCallName(std::optional<bool> isOpsAligned) {
        << "_to_" << dstRank << "d_" << dstScopeName;
     return ss.str();
 }
+#endif
 
 enum FixpipeState {
   Init = -1,
