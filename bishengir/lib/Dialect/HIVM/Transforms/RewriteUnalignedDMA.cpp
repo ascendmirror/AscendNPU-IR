@@ -125,7 +125,7 @@ static Value createAlignedTempBuffer(Value srcMemref, OpBuilder& builder, Locati
     }
   }
 
-  auto alignAttr = builder.getI32IntegerAttr(dmaRequiredAlign);
+  auto alignAttr = builder.getI64IntegerAttr(dmaRequiredAlign);
   auto alloc = builder.create<memref::AllocOp>(loc, tmpType, dynSizes, alignAttr);
 
   return alloc;
