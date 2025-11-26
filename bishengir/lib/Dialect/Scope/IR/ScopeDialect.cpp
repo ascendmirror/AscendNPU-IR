@@ -19,9 +19,6 @@
 #include "mlir/IR/Builders.h"
 #include "llvm/ADT/TypeSwitch.h"
 
-using namespace mlir;
-using namespace mlir::scope;
-
 #define GET_OP_CLASSES
 #include "bishengir/Dialect/Scope/IR/ScopeOps.cpp.inc"
 
