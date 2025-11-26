@@ -76,7 +76,8 @@ Operation *getInsertPoint(Operation *op, int &resultIndx) {
   for (auto *user : users) {
     // TODO: add auto tracedDownUser = traceDown(user) and use tracedDownUser to
     // judge
-    if (!isa<scf::YieldOp>(user) || !isa<scf::ForOp>(user->getParentOp())) {
+    if (!isa<scf::YieldOp>(user) ||
+        !isa<LoopLikeOpInterface>(user->getParentOp())) {
       continue;
     } else {
       yieldOperands.emplace(user);
@@ -267,11 +268,12 @@ private:
         swapFixpipeAndInsertSliceOp(rewriter, loc, op, insertSliceOp);
       }
     } else if (isa<scf::YieldOp>(curOp) &&
-               isa<scf::ForOp>(curOp->getParentOp())) {
-      // move fixpipe out of scf.for
+               isa<LoopLikeOpInterface>(curOp->getParentOp())) {
+      // move fixpipe out of loop
       matched = true;
-      auto scfForOp = dyn_cast_if_present<scf::ForOp>(curOp->getParentOp());
-      moveFixpipeOutOfScfFor(rewriter, loc, op, scfForOp, op.getResultTensor());
+      auto loopOp =
+          dyn_cast_if_present<LoopLikeOpInterface>(curOp->getParentOp());
+      moveFixpipeOutOfScfFor(rewriter, loc, op, loopOp, op.getResultTensor());
     }
     return matched ? success() : failure();
   }
@@ -386,38 +388,38 @@ private:
   }
 
   void moveFixpipeOutOfScfFor(PatternRewriter &rewriter, Location loc,
-                              hivm::FixpipeOp fixPipeOp, scf::ForOp scfForOp,
+                              hivm::FixpipeOp fixPipeOp,
+                              LoopLikeOpInterface loopOp,
                               Value fixpipeResTensor) const {
-    SmallVector<Value> yieldValues =
-        llvm::to_vector(scfForOp.getYieldedValues());
+    SmallVector<Value> yieldValues = llvm::to_vector(loopOp.getYieldedValues());
     auto idx = findIdx(yieldValues, fixpipeResTensor);
     if (idx.has_value()) {
       LDBG("InlineFixpipeWithYield");
       rewriter.replaceAllUsesWith(fixpipeResTensor,
                                   fixPipeOp.getDpsInputOperand(0)->get());
 
-      rewriter.setInsertionPointAfter(scfForOp);
+      rewriter.setInsertionPointAfter(loopOp);
       auto fixpipeInit =
-          utils::createEmptyOp(rewriter, scfForOp->getLoc(), fixpipeResTensor);
+          utils::createEmptyOp(rewriter, loopOp->getLoc(), fixpipeResTensor);
       auto quantModeAttr = fixPipeOp.getPreQuantAttr();
       auto reluModeAttr = fixPipeOp.getPreReluAttr();
 #if (!BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES)
       auto newFixpipeOp = rewriter.create<FixpipeOp>(	
           fixPipeOp.getLoc(), TypeRange{fixpipeInit},	
-          scfForOp->getResult(idx.value()), fixpipeInit, rewriter.getUnitAttr(),
+          loopOp->getResult(idx.value()), fixpipeInit, rewriter.getUnitAttr(),
           quantModeAttr, reluModeAttr);
 #else
       auto newFixpipeOp = rewriter.create<FixpipeOp>(
           fixPipeOp.getLoc(), TypeRange{fixpipeInit},
-          scfForOp->getResult(idx.value()), fixpipeInit, rewriter.getUnitAttr(),
+          loopOp->getResult(idx.value()), fixpipeInit, rewriter.getUnitAttr(),
           FixpipeDualDstModeAttr{},
           quantModeAttr, reluModeAttr);
 #endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
-      rewriter.replaceAllUsesExcept(scfForOp->getResult(idx.value()),
+      rewriter.replaceAllUsesExcept(loopOp->getResult(idx.value()),
                                     newFixpipeOp.getResultTensor(),
                                     newFixpipeOp);
     }
-    LDBG("moveFixpipeOutOfScfFor");
+    LDBG("moveFixpipeOutOfLoop");
   }
 };
 
