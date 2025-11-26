@@ -278,11 +278,6 @@ def FixpipeOp : HIVM_DmaOp<"fixpipe", [
     pre-stage ReLU, element-wise add, post-stage ReLU, post-stage quantization.
 
     Additionally, Fixpipe is also capable of layout transform.
-
-    ### Attributes
-
-    #### 'dma_mode'
-    HIVM data movement model from L0C to destination, There are three values: NZ2DN, NZ2ND, and NZ2NZ(normal).
   }];
 #else
   let description = [{
@@ -293,6 +288,9 @@ def FixpipeOp : HIVM_DmaOp<"fixpipe", [
     Additionally, Fixpipe is also capable of layout transform.
 
     ### Attributes
+
+    #### 'dma_mode'
+    HIVM data movement model from L0C to destination, There are three values: NZ2DN, NZ2ND, and NZ2NZ(normal).
 
     #### `dual_dst_mode`
     HIVM dual destination mode control. dual destination mode can be enabled only when nz2nd or normal data
@@ -305,14 +303,13 @@ def FixpipeOp : HIVM_DmaOp<"fixpipe", [
                         An optional condition to enable unit-flge mode,
                         useful if there is a dependency on a for loop to run at least once.
                        }]>:$unit_flag_cond,
-                       DefaultValueAttr<HIVM_FixpipeDMAModeAttr,
-                       #ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
-                       "FixpipeDMAMode::NZ2NZ">:$dma_mode,
-                       #else
-                       OptionalAttr<UnitAttr>:$enable_nz2nd,
+
 #ifdef BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
+                       DefaultValueAttr<HIVM_FixpipeDMAModeAttr,
+                       "FixpipeDMAMode::NZ2NZ">:$dma_mode,
                        DefaultValuedOptionalAttr<HIVM_FixpipeDualDstModeAttr,
                          "FixpipeDualDstMode::NO_DUAL">:$dual_dst_mode,
+#else OptionalAttr<UnitAttr>:$enable_nz2nd,
 #endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
                        DefaultValuedOptionalAttr<HIVM_FixpipePreQuantModeAttr,
                          "FixpipePreQuantMode::NO_QUANT">:$pre_quant,
@@ -327,36 +324,24 @@ def FixpipeOp : HIVM_DmaOp<"fixpipe", [
   let results = (outs Optional<AnyRankedTensor>:$result_tensor);
   let builders = [
     OpBuilder<(ins "TypeRange":$result, "Value":$src, "Value":$dst,
-                    #ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
-                    CArg<"FixpipeDMAModeAttr", "nullptr">:$dma_mode,
-                    #else
-                    CArg<"UnitAttr", "nullptr">:$enable_nz2nd,
-                    #endif
-                    CArg<"FixpipePreQuantModeAttr", "nullptr">:$pre_quant,
-                    CArg<"FixpipePreReluModeAttr", "nullptr">:$pre_relu, CArg<"BoolAttr", "nullptr">:$channel_split)
-    >,
-    OpBuilder<(ins "Type":$result, "Value":$src, "Value":$dst,
-                    #endif
-                    CArg<"FixpipeDMAModeAttr", "nullptr">:$dma_mode,
-                    #else
-                    CArg<"UnitAttr", "nullptr">:$enable_nz2nd,
-                    #endif
-                    CArg<"FixpipePreQuantModeAttr", "nullptr">:$pre_quant,
-                    CArg<"FixpipePreReluModeAttr", "nullptr">:$pre_relu, CArg<"BoolAttr", "nullptr">:$channel_split)
 #ifdef BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
-    >,
-    OpBuilder<(ins "TypeRange":$result, "Value":$src, "Value":$dst,
-                    CArg<"UnitAttr", "nullptr">:$enable_nz2nd,
+                    CArg<"FixpipeDMAModeAttr", "nullptr">:$dma_mode,
                     CArg<"FixpipeDualDstModeAttr", "nullptr">:$dual_dst_mode,
+#else
+                    CArg<"UnitAttr", "nullptr">:$enable_nz2nd,
+#endif
                     CArg<"FixpipePreQuantModeAttr", "nullptr">:$pre_quant,
                     CArg<"FixpipePreReluModeAttr", "nullptr">:$pre_relu, CArg<"BoolAttr", "nullptr">:$channel_split)
     >,
     OpBuilder<(ins "Type":$result, "Value":$src, "Value":$dst,
-                    CArg<"UnitAttr", "nullptr">:$enable_nz2nd,
+#ifdef BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
+                    CArg<"FixpipeDMAModeAttr", "nullptr">:$dma_mode,
                     CArg<"FixpipeDualDstModeAttr", "nullptr">:$dual_dst_mode,
+#else
+                    CArg<"UnitAttr", "nullptr">:$enable_nz2nd,
+#endif
                     CArg<"FixpipePreQuantModeAttr", "nullptr">:$pre_quant,
                     CArg<"FixpipePreReluModeAttr", "nullptr">:$pre_relu, CArg<"BoolAttr", "nullptr">:$channel_split)
-#endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
     >
   ];
 #ifndef BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES

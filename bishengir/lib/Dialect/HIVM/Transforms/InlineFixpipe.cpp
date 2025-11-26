@@ -144,10 +144,15 @@ public:
         /*src=*/insertAfterOp->getResult(resultIndx),	
         /*dst=*/fixpipeInit, rewriter.getUnitAttr());
 #else
+    MLIRContext *ctx = rewriter.getContext();
+    FixpipeDMAModeAttr dmaModeAttr = FixpipeDMAModeAttr::get(
+        ctx,
+        FixpipeDMAMode::NZ2ND
+    );
     auto res = rewriter.create<FixpipeOp>(
         op.getLoc(), /*result_tensor=*/fixpipeInit.getType(),
         /*src=*/insertAfterOp->getResult(resultIndx),
-        /*dst=*/fixpipeInit, rewriter.getUnitAttr(), FixpipeDualDstModeAttr{});
+        /*dst=*/fixpipeInit, dmaModeAttr, FixpipeDualDstModeAttr{});
 #endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
     op->setAttr(fixpipeAlreadyInserted, rewriter.getBoolAttr(true));
     rewriter.replaceAllUsesExcept(insertAfterOp->getResult(resultIndx),
@@ -287,23 +292,22 @@ private:
     rewriter.setInsertionPointAfter(castOp);
     Value fixpipeInit =
         utils::createEmptyOp(rewriter, loc, castOp.getResult()[0]);
-    #ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
+    #if (!BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES)
+    auto newFixpipeOp = rewriter.create<FixpipeOp>(
+        loc, fixpipeInit.getType(), /*src=*/newFixpipeSrcTensor,
+        /*dst=*/fixpipeInit, rewriter.getUnitAttr(), quantModeAttr,
+        reluModeAttr);
+    #else
     MLIRContext *ctx = rewriter.getContext();
     FixpipeDMAModeAttr dmaModeAttr = FixpipeDMAModeAttr::get(
         ctx,
         FixpipeDMAMode::NZ2ND
     );
-    #endif
     auto newFixpipeOp = rewriter.create<FixpipeOp>(
         loc, fixpipeInit.getType(), /*src=*/newFixpipeSrcTensor,
-        /*dst=*/fixpipeInit,
-        #ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
-        dmaModeAttr,
-        #else
-        rewriter.getUnitAttr(),
-        #endif
-        quantModeAttr,
+        /*dst=*/fixpipeInit, dmaModeAttr, quantModeAttr,
         reluModeAttr);
+    #endif
     rewriter.replaceAllUsesWith(castOp.getResult()[0],
                                 newFixpipeOp.getResultTensor());
     rewriter.eraseOp(castOp);
@@ -356,22 +360,23 @@ private:
     fixpipeInit = utils::createEmptyOpWithTargetElemType(
         rewriter, extractSliceOp.getLoc(), newExtractSliceResult,
         getInitType(newExtractSliceResult, op.getPreQuant(), rewriter));
-    #ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
+
+    #if (!BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES)
+    auto newFixpipeOp = rewriter.create<FixpipeOp>(
+        extractSliceOp.getLoc(), fixpipeInit.getType(),
+        /*src=*/newExtractSliceResult, /*dst=*/fixpipeInit,
+        rewriter.getUnitAttr(), quantModeAttr, reluModeAttr);
+    #else
     MLIRContext *ctx = rewriter.getContext();
     FixpipeDMAModeAttr dmaModeAttr = FixpipeDMAModeAttr::get(
         ctx,
         FixpipeDMAMode::NZ2ND
     );
-    #endif
     auto newFixpipeOp = rewriter.create<FixpipeOp>(
         extractSliceOp.getLoc(), fixpipeInit.getType(),
         /*src=*/newExtractSliceResult, /*dst=*/fixpipeInit,
-        #ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
-        dmaModeAttr,
-        #else
-        rewriter.getUnitAttr(),
-        #endif
-        quantModeAttr, reluModeAttr);
+        dmaModeAttr, quantModeAttr, reluModeAttr);
+    #endif
     rewriter.replaceOp(extractSliceOp, newFixpipeOp.getResultTensor());
     rewriter.eraseOp(op);
     LDBG("InlineFixpipeWithExtractSliceReshape");
@@ -394,22 +399,20 @@ private:
     Value fixpipeInit = utils::createEmptyOpWithTargetElemType(
         rewriter, insertSliceOp.getLoc(), newInsertSliceResult,
         getInitType(newInsertSliceResult, op.getPreQuant(), rewriter));
-    #ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
+    #if (!BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES)
+    auto newFixpipeOp = rewriter.create<FixpipeOp>(
+        insertSliceOp.getLoc(), TypeRange{fixpipeInit}, newInsertSliceResult,
+        fixpipeInit, rewriter.getUnitAttr(), quantModeAttr, reluModeAttr);
+    #else
     MLIRContext *ctx = rewriter.getContext();
     FixpipeDMAModeAttr dmaModeAttr = FixpipeDMAModeAttr::get(
         ctx,
         FixpipeDMAMode::NZ2ND
     );
-    #endif
     auto newFixpipeOp = rewriter.create<FixpipeOp>(
         insertSliceOp.getLoc(), TypeRange{fixpipeInit}, newInsertSliceResult,
-        fixpipeInit,
-        #ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
-        dmaModeAttr,
-        #else
-        rewriter.getUnitAttr(),
-        #endif
-        quantModeAttr, reluModeAttr);
+        fixpipeInit, dmaModeAttr, quantModeAttr, reluModeAttr);
+    #endif
     rewriter.replaceOp(insertSliceOp, newFixpipeOp.getResultTensor());
     rewriter.eraseOp(op);
     LDBG("InlineFixpipeWithInsertSliceOpReshape");
@@ -444,9 +447,14 @@ private:
           scfForOp->getResult(idx.value()), fixpipeInit, rewriter.getUnitAttr(),
           quantModeAttr, reluModeAttr);
 #else
+      MLIRContext *ctx = rewriter.getContext();
+      FixpipeDMAModeAttr dmaModeAttr = FixpipeDMAModeAttr::get(
+        ctx,
+        FixpipeDMAMode::NZ2ND
+      );
       auto newFixpipeOp = rewriter.create<FixpipeOp>(
           fixPipeOp.getLoc(), TypeRange{fixpipeInit},
-          scfForOp->getResult(idx.value()), fixpipeInit, rewriter.getUnitAttr(),
+          scfForOp->getResult(idx.value()), fixpipeInit, dmaModeAttr,
           FixpipeDualDstModeAttr{},
           quantModeAttr, reluModeAttr);
 #endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
@@ -497,23 +505,22 @@ public:
 
     Value fixpipeInit =
         utils::createEmptyOp(rewriter, op->getLoc(), maybeMmadRes);
-    #ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
-    MLIRContext *ctx = rewriter.getContext();
-    FixpipeDMAModeAttr dmaModeAttr = FixpipeDMAModeAttr::get(
-        ctx,
-        FixpipeDMAMode::NZ2ND
-    );
-    #endif
-    auto fixpipeOp = rewriter.create<FixpipeOp>(
+#if (!BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES)
+      auto fixpipeOp = rewriter.create<FixpipeOp>(
         op.getLoc(), /*result_tensor=*/fixpipeInit.getType(),
         /*src=*/maybeMmadRes,
-        /*dst=*/fixpipeInit,
-        #ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
-        dmaModeAttr
-        #else
-        rewriter.getUnitAttr()
-        #endif
-        );
+        /*dst=*/fixpipeInit, rewriter.getUnitAttr());
+#else
+      MLIRContext *ctx = rewriter.getContext();
+      FixpipeDMAModeAttr dmaModeAttr = FixpipeDMAModeAttr::get(
+        ctx,
+        FixpipeDMAMode::NZ2ND
+      );
+      auto fixpipeOp = rewriter.create<FixpipeOp>(
+        op.getLoc(), /*result_tensor=*/fixpipeInit.getType(),
+        /*src=*/maybeMmadRes,
+        /*dst=*/fixpipeInit, dmaModeAttr);
+#endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
 
     rewriter.replaceOpWithNewOp<DebugOp>(
         op, op.getDebugtype(), op.getPrefix(), op.getHex(),
