@@ -17,8 +17,8 @@
 
 #include "bishengir/Config/bishengir-config.h"
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
-#include "bishengir/Dialect/Tensor/IR/TensorImpl.h"
 #include "bishengir/Dialect/HIVM/Utils/Utils.h"
+#include "bishengir/Dialect/Tensor/IR/TensorImpl.h"
 #include "bishengir/Dialect/Utils/Util.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -26,6 +26,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/LoopLikeInterface.h"
 
 using namespace mlir;
 using namespace mlir::hivm;
@@ -262,9 +263,9 @@ struct RedudantVReduceInitOp : public OpRewritePattern<VReduceOp> {
       auto blockArg = cast<BlockArgument>(v);
       auto parentOp = blockArg.getOwner()->getParentOp();
       auto blockIndx = blockArg.getArgNumber();
-      if (auto forOp = dyn_cast<scf::ForOp>(parentOp)) {
-        auto forInitVal = forOp.getInitArgs()[blockIndx];
-        return isFillByConst(forInitVal, cstAttr);
+      if (auto loopOp = dyn_cast<LoopLikeOpInterface>(parentOp)) {
+        auto initVal = loopOp.getInits()[blockIndx];
+        return isFillByConst(initVal, cstAttr);
       }
       return false;
     }
@@ -507,9 +508,10 @@ void VReduceOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,
                                             ::mlir::MLIRContext *context) {
   results.add<RedudantVReduceOp
 #if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
-  , RedudantVReduceInitOp
+              ,
+              RedudantVReduceInitOp
 #endif // BISHENGIR_BUILD_STANDALONE_IR_ONLY
-  >(context);
+              >(context);
 }
 
 void VCumsumOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,
