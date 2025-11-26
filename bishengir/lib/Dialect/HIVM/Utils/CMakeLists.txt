@@ -6,7 +6,6 @@ add_bishengir_dialect_library(BiShengIRHIVMUtils
 
   LINK_LIBS PUBLIC
   MLIRBufferizationDialect
-  BiShengIRHACCDialect
   BiShengIRHIVMDialect
   MLIRMemRefDialect
   BiShengIRMemRefExtDialect
