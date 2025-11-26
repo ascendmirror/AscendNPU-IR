@@ -112,31 +112,32 @@ public:
     }
 
     // Verify that castop is in for loop
-    if (!isa<scf::ForOp>(castOp->getParentOp()))
+    if (!isa<LoopLikeOpInterface>(castOp->getParentOp()))
       return failure();
-    scf::ForOp parentFor = llvm::cast<scf::ForOp>(castOp->getParentOp());
-    assert(parentFor.getRegion().hasOneBlock());
+    LoopLikeOpInterface parentLoop =
+        llvm::cast<LoopLikeOpInterface>(castOp->getParentOp());
+    assert(parentLoop.getRegion().hasOneBlock());
 
     // Verify that an iter_arg is only used in this cast
     BlockArgument castSrc = dyn_cast<BlockArgument>(castOp.getInputs().front());
     if (!castSrc || !castSrc.hasOneUse() ||
-        llvm::find(parentFor.getRegionIterArgs(), castSrc) ==
-            parentFor.getRegionIterArgs().end())
+        llvm::find(parentLoop.getRegionIterArgs(), castSrc) ==
+            parentLoop.getRegionIterArgs().end())
       return failure();
 
     // Get the yield op and yielded value of this for loop
-    assert(
-        isa<scf::YieldOp>(parentFor.getRegion().getBlocks().front().back()) &&
-        "For loop doesn't terminates with yieldOp");
+    assert(isa<scf::YieldOp>(
+               parentLoop->getRegion(0).getBlocks().front().back()) &&
+           "For loop doesn't terminates with yieldOp");
     scf::YieldOp yieldOp =
-        cast<scf::YieldOp>(parentFor.getRegion().getBlocks().front().back());
-    OpOperand *yieldedValue = parentFor.getTiedLoopYieldedValue(castSrc);
+        cast<scf::YieldOp>(parentLoop->getRegion(0).getBlocks().front().back());
+    OpOperand *yieldedValue = parentLoop.getTiedLoopYieldedValue(castSrc);
     assert(yieldedValue);
     assert(yieldedValue->get().getType() == castSrc.getType() &&
            "Yielded value type doesn't match loop's iter_arg type");
-    OpOperand *loopInit = parentFor.getTiedLoopInit(castSrc);
+    OpOperand *loopInit = parentLoop.getTiedLoopInit(castSrc);
     assert(loopInit);
-    OpResult loopResult = parentFor.getTiedLoopResult(castSrc);
+    OpResult loopResult = parentLoop.getTiedLoopResult(castSrc);
     assert(loopResult);
 
     // Verify that the yielded value is produced with another cast with source
@@ -151,7 +152,7 @@ public:
 
     // move current cast before the for loop, using init value of iter_arg as
     // src
-    rewriter.moveOpBefore(castOp, parentFor);
+    rewriter.moveOpBefore(castOp, parentLoop);
     rewriter.setInsertionPoint(castOp);
     Operation *castOutput = castOp.getOutputs()[0].getDefiningOp();
     assert(castOutput && "Cast op output is null!");
@@ -168,7 +169,7 @@ public:
         yieldOp, [&]() { yieldedValue->assign(lastCast.getInputs()[0]); });
 
     // move last cast after the for loop. using forOp result as src
-    rewriter.moveOpAfter(lastCast, parentFor);
+    rewriter.moveOpAfter(lastCast, parentLoop);
     rewriter.setInsertionPoint(lastCast);
     Operation *lastCastOp = lastCast.getOutputs()[0].getDefiningOp();
     assert(lastCastOp && "Last cast op is null!");
@@ -180,7 +181,7 @@ public:
     });
 
     // update for op with new iter_arg type equal to casted type
-    rewriter.modifyOpInPlace(parentFor, [&]() {
+    rewriter.modifyOpInPlace(parentLoop, [&]() {
       castSrc.setType(castOp->getResultTypes()[0]);
       loopInit->set(castOp->getResults()[0]);
       loopResult.setType(castOp->getResultTypes()[0]);
