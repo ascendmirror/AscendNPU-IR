@@ -16,7 +16,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "bishengir/Dialect/MemRef/IR/MemRefImpl.h"
+#if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
 #include "mlir/Dialect/Utils/ExpandShapeUtils.h"
+#endif
 #include "mlir/IR/TypeUtilities.h"
 
 namespace {
@@ -224,7 +226,9 @@ void getExtendedCanonicalizationPatterns(mlir::RewritePatternSet &results) {
       ReinterpretCastCanonicalizer>>(context,
                                      "ReinterpretCastConstantArgumentFolder");
   results.add<FoldRedundantCopy>(context);
+#if (!BISHENGIR_BUILD_STANDALONE_IR_ONLY)
   results.add<FoldConstantDimOfOutputShape<ExpandShapeOp, CastOp>>(context);
+#endif
 }
 
 } // namespace memref
