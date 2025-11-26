@@ -136,8 +136,8 @@ void SyncCodegen::updatePlaceHolderOpInsertSync(
       }
     }
   } else if (auto *loopOp = dyn_cast<LoopInstanceElement>(parentScope)) {
-    if (auto forOp = dyn_cast<scf::ForOp>(loopOp->elementOp)) {
-      terminatorOp = forOp.getRegion().front().getTerminator();
+    if (auto Op = dyn_cast<LoopLikeOpInterface>(loopOp->elementOp)) {
+      terminatorOp = Op->getRegion(0).front().getTerminator();
     }
   }
   assert(terminatorOp != nullptr);
