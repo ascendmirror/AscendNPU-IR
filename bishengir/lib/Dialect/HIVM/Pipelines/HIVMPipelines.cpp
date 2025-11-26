@@ -234,6 +234,13 @@ alignStoragePipeline(OpPassManager &pm,
   pm.nest<func::FuncOp>().addPass(createEnableStrideAlignPass());
 }
 
+static void hivmRunWithAnnotatedMemrefAlignment(
+    OpPassManager& pm, std::function<void()> action) {
+  pm.nest<func::FuncOp>().addPass(createInferMemrefAlignmentPass());
+  action();
+  pm.nest<func::FuncOp>().addPass(createEraseMemrefAlignmentMarksPass());
+}
+
 static void hivmPostBufferizationOptimizationPipeline(
     OpPassManager &pm, const HIVMPipelineOptions &hivmPipelineOptions) {
   pm.nest<func::FuncOp>().addPass(createLiftZeroRankPass());
@@ -301,6 +308,9 @@ static void hivmPostBufferizationOptimizationPipeline(
       createHIVMAggregatedDecomposeOpPass(decomposeOption));
   pm.nest<func::FuncOp>().addPass(createReduceRankSubviewPass());
   pm.nest<func::FuncOp>().addPass(createLiftLowestStridePass());
+  hivmRunWithAnnotatedMemrefAlignment(pm, [&]() {
+    pm.nest<func::FuncOp>().addPass(createRewriteUnalignedDMAPass());
+  });
   pm.nest<func::FuncOp>().addPass(createAllocExtraBufferPass());
   // Infer memory scope for newly allocated extra buffer
   pm.addPass(createInferHIVMMemScopePass());

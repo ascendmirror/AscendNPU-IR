@@ -179,6 +179,24 @@ def InjectSync : Pass<"hivm-inject-sync", "func::FuncOp"> {
   ];
 }
 
+def InferMemrefAlignment : Pass<"hivm-infer-alignment", "func::FuncOp"> {
+  let summary = "infer memrefs alignment";
+  let constructor = "mlir::hivm::createInferMemrefAlignmentPass()";
+  let dependentDialects = ["hivm::HIVMDialect", ];
+}
+
+def RewriteUnalignedDMA : Pass<"hivm-rewrite-unaligned-dma", "func::FuncOp"> {
+  let summary = "rewrite unaligned hivm.hir.{store, load, copy}";
+  let constructor = "mlir::hivm::createRewriteUnalignedDMAPass()";
+  let dependentDialects = ["hivm::HIVMDialect", "scf::SCFDialect", ];
+}
+
+def EraseMemrefAlignmentMarks : Pass<"hivm-erase-alignment-marks", "func::FuncOp"> {
+  let summary = "erase assume_alignment ops inserted by hivm-infer-alignment to not bother other passes such as memory planning";
+  let constructor = "mlir::hivm::createEraseMemrefAlignmentMarksPass()";
+  let dependentDialects = ["hivm::HIVMDialect", ];
+}
+
 def InjectBlockSync : Pass<"hivm-inject-block-sync", "func::FuncOp"> {
   let summary = "auto inject block sync";
   let constructor = "mlir::hivm::createInjectBlockSyncPass()";
