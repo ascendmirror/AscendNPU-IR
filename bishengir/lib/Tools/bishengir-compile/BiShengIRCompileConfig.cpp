@@ -148,7 +148,7 @@ handleOpt(const cl::opt<MultiBufferStrategy, ExternalStorage> &opt) {
 }
 } // namespace option_handler
 
-void BiShengIRCompileMainConfig::collectHIVMCompileArgs() {
+void BiShengIRCompileMainConfig::collectHIVMCArgs() {
   std::vector<std::string> collectedArgs;
   auto &opts = cl::getRegisteredOptions();
   // Warning: please do not modify this part unless you know what you're doing.
@@ -164,7 +164,7 @@ void BiShengIRCompileMainConfig::collectHIVMCompileArgs() {
     collectedArgs.push_back(optStr.str() + "=" + optValue);
   }
 
-  for (auto &args : clOptionsConfig->getHivmCompileArgs()) {
+  for (auto &args : clOptionsConfig->getHIVMCArgs()) {
     if (args.empty())
       continue;
 
@@ -172,7 +172,7 @@ void BiShengIRCompileMainConfig::collectHIVMCompileArgs() {
       collectedArgs.push_back(arg.str());
   }
 
-  clOptionsConfig->setHivmCompileArgs(collectedArgs);
+  clOptionsConfig->setHIVMCArgs(collectedArgs);
 }
 
 void BiShengIRCompileMainConfig::registerCLOptions() {
@@ -181,6 +181,6 @@ void BiShengIRCompileMainConfig::registerCLOptions() {
 }
 
 BiShengIRCompileMainConfig BiShengIRCompileMainConfig::createFromCLOptions() {
-  BiShengIRCompileMainConfig::collectHIVMCompileArgs();
+  BiShengIRCompileMainConfig::collectHIVMCArgs();
   return *clOptionsConfig;
 }

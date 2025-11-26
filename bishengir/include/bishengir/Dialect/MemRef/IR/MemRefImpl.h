@@ -18,6 +18,8 @@
 #ifndef BISHENGIR_DIALECT_MEMREF_IR_MEMREFIMPL_H
 #define BISHENGIR_DIALECT_MEMREF_IR_MEMREFIMPL_H
 
+#include "bishengir/Config/bishengir-config.h"
+
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Location.h"

@@ -15,10 +15,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This pass converts ops to hivm.fixpipe .
+// This pass converts ops to hivm.fixpipe.
 //
 //===----------------------------------------------------------------------===//
 
+#include "bishengir/Config/bishengir-config.h"
 #include "bishengir/Conversion/Passes.h"
 #include "bishengir/Dialect/HIVM/IR/HIVMImpl.h"
 #include "bishengir/Dialect/HIVM/Transforms/Passes.h"
@@ -137,23 +138,17 @@ public:
     Value fixpipeInit =
         utils::createEmptyOp(rewriter, insertAfterOp->getLoc(), mmadLikeOpRes);
     LDBG("Replacing fix pipe for " << op);
-    #ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
-    MLIRContext *ctx = rewriter.getContext();
-    FixpipeDMAModeAttr dmaModeAttr = FixpipeDMAModeAttr::get(
-        ctx,
-        FixpipeDMAMode::NZ2ND
-    );
-    #endif
+#if (!BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES)
+    auto res = rewriter.create<FixpipeOp>(	
+        op.getLoc(), /*result_tensor=*/fixpipeInit.getType(),	
+        /*src=*/insertAfterOp->getResult(resultIndx),	
+        /*dst=*/fixpipeInit, rewriter.getUnitAttr());
+#else
     auto res = rewriter.create<FixpipeOp>(
         op.getLoc(), /*result_tensor=*/fixpipeInit.getType(),
         /*src=*/insertAfterOp->getResult(resultIndx),
-        /*dst=*/fixpipeInit,
-        #ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
-        dmaModeAttr
-        #else
-        rewriter.getUnitAttr()
-        #endif
-        );
+        /*dst=*/fixpipeInit, rewriter.getUnitAttr(), FixpipeDualDstModeAttr{});
+#endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
     op->setAttr(fixpipeAlreadyInserted, rewriter.getBoolAttr(true));
     rewriter.replaceAllUsesExcept(insertAfterOp->getResult(resultIndx),
                                   res.getResultTensor(), res);
@@ -443,22 +438,18 @@ private:
           utils::createEmptyOp(rewriter, scfForOp->getLoc(), fixpipeResTensor);
       auto quantModeAttr = fixPipeOp.getPreQuantAttr();
       auto reluModeAttr = fixPipeOp.getPreReluAttr();
-      #ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
-      MLIRContext *ctx = rewriter.getContext();
-      FixpipeDMAModeAttr dmaModeAttr = FixpipeDMAModeAttr::get(
-        ctx,
-        FixpipeDMAMode::NZ2ND
-      );
-      #endif
+#if (!BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES)
+      auto newFixpipeOp = rewriter.create<FixpipeOp>(	
+          fixPipeOp.getLoc(), TypeRange{fixpipeInit},	
+          scfForOp->getResult(idx.value()), fixpipeInit, rewriter.getUnitAttr(),
+          quantModeAttr, reluModeAttr);
+#else
       auto newFixpipeOp = rewriter.create<FixpipeOp>(
           fixPipeOp.getLoc(), TypeRange{fixpipeInit},
-          scfForOp->getResult(idx.value()), fixpipeInit,
-          #ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
-          dmaModeAttr
-          #else
-          rewriter.getUnitAttr()
-          #endif
+          scfForOp->getResult(idx.value()), fixpipeInit, rewriter.getUnitAttr(),
+          FixpipeDualDstModeAttr{},
           quantModeAttr, reluModeAttr);
+#endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
       rewriter.replaceAllUsesExcept(scfForOp->getResult(idx.value()),
                                     newFixpipeOp.getResultTensor(),
                                     newFixpipeOp);

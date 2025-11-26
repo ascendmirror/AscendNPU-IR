@@ -20,7 +20,9 @@
 #include "bishengir/Dialect/HACC/Transforms/Passes.h"
 #include "bishengir/Dialect/HFusion/Pipelines/Passes.h"
 #include "bishengir/Dialect/HIVM/Pipelines/ConvertToHIVMPipeline.h"
+#include "bishengir/Dialect/HIVM/Pipelines/Passes.h"
 #include "bishengir/Tools/bishengir-compile/BiShengIRCompile.h"
+#include "bishengir/Tools/bishengir-hivm-compile/BiShengIRHIVMCompile.h"
 #include "bishengir/Transforms/Passes.h"
 
 #if BISHENGIR_ENABLE_TORCH_CONVERSIONS
@@ -40,6 +42,13 @@ void setupHFusionPipelineOptions(hfusion::HFusionPipelineOptions &options,
                                  const BiShengIRCompileMainConfig &config) {
 #define GEN_HFUSION_OPTION_SETUP
 #include "bishengir/Tools/bishengir-compile/ConfigUtils.cpp.inc"
+}
+
+void setupHIVMPipelineOptions(hivm::HIVMPipelineOptions &options,
+                              const BiShengIRCompileMainConfig &config) {
+// TODO: Delete bishengir/Tools/bishengir-hivm-compile
+#define GEN_HIVM_OPTION_SETUP
+#include "bishengir/Tools/bishengir-hivm-compile/HIVMConfigUtils.cpp.inc"
 }
 
 void buildBiShengHIRPipeline(OpPassManager &pm,
@@ -69,6 +78,9 @@ void buildBiShengHIRPipeline(OpPassManager &pm,
     convertToHIVMOptions.enableTritonKernelCompile =
         config.getEnableTritonKernelCompile();
     hivm::buildConvertToHIVMPipeline(pm, convertToHIVMOptions);
+    hivm::HIVMPipelineOptions options;
+    setupHIVMPipelineOptions(options, config);
+    hivm::buildOptimizeHIVMPipeline(pm, options);
   }
 }
 
@@ -127,28 +139,28 @@ public:
         .setCubeTilingTuning(cubeTilingTuning);
 
     SmallVector<Pass::Option<bool> *> sharedWithHIVMCompileBool = {
-        &enableAutoBindSubBlock,
-        &enableAutoBlockifyLoop,
-        &enableHIVMAutoCVBalance,
-        &enableAutoMultiBuffer,
-        &enableHIVMAutoStorageAlign,
-        &enableBinRelocation,
-        &enableCodeMotion,
+      &enableAutoBindSubBlock,
+      &enableAutoBlockifyLoop,
+      &enableHIVMAutoCVBalance,
+      &enableAutoMultiBuffer,
+      &enableHIVMAutoStorageAlign,
+      &enableBinRelocation,
+      &enableCodeMotion,
 #if (!BISHENGIR_PUBLISH)
-        &enableCpuTraceIntrinsic,
-        &enableLIRCompile,
+      &enableCpuTraceIntrinsic,
+      &enableLIRCompile,
 #endif
-        &enableDebugInfo,
-        &enableHIVMGlobalWorkspaceReuse,
-        &enableHIVMCompile,
-        &enableHIVMInjectBarrierAllSync,
-        &enableHIVMInjectBlockAllSync,
-        &enableHivmNd2nzOnVector,
-        &enableSanitizer,
-        &enableStaticBarePtr,
-        &enableTritonKernelCompile,
-        &enableHIVMUnitFlagSync,
-        &enableHIVMAssumeAliveLoops,
+      &enableDebugInfo,
+      &enableHIVMGlobalWorkspaceReuse,
+      &enableHIVMCompile,
+      &enableHIVMInjectBarrierAllSync,
+      &enableHIVMInjectBlockAllSync,
+      &enableHivmNd2nzOnVector,
+      &enableSanitizer,
+      &enableStaticBarePtr,
+      &enableTritonKernelCompile,
+      &enableHIVMUnitFlagSync,
+      &enableHIVMAssumeAliveLoops,
     };
 
     SmallVector<Pass::Option<unsigned> *> sharedWithHIVMCompileUnsigned = {
@@ -195,11 +207,11 @@ public:
                         hacc::stringifyTargetDeviceEnum(opt->getValue()).str();
       collectedArgs.push_back(arg);
     }
-    for (const std::string &arg : this->hivmCompileArgs) {
+    for (const std::string &arg : this->hIVMCArgs) {
       collectedArgs.push_back(arg);
     }
 
-    config.setHivmCompileArgs(collectedArgs);
+    config.setHIVMCArgs(collectedArgs);
     auto cloned = moduleOp.clone();
     auto res = runBiShengIRPipeline(cloned, config);
     if (failed(res)) {

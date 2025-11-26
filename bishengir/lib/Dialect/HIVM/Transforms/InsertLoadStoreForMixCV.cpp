@@ -116,7 +116,7 @@ Value inertLoadStoreOperation(PatternRewriter &rewriter, Location loc,
 
 LogicalResult
 insertLoadStoreOp(PatternRewriter &rewriter, Location loc,
-                  const llvm::SmallVector<OpOperand *> &consumerOperands,
+    const llvm::SmallVector<OpOperand *> &consumerOperands,
                   InsertMode insertMode,
                   std::optional<Value> insertInit = std::nullopt) {
   if (consumerOperands.empty()) {
@@ -496,6 +496,50 @@ struct DuplicateTensorExtractForCube
         mlir::hivm::TCoreTypeMarkerAttr::get(markOp->getContext(), tCoreType));
   }
 
+  bool findCubeUser(tensor::ExtractOp extractOp) const {
+    bool hasCubeUser = false;
+    SmallVector<Operation *> worklist;
+    
+    if (extractOp->getNumResults() > 0) {
+      for (Operation *userOp : extractOp->getResult(0).getUsers()) {
+        worklist.push_back(userOp);
+      }
+    } else {
+      return false; 
+    }
+
+    SmallPtrSet<Operation *, 16> visited;
+    while (!worklist.empty()) {
+      Operation *currentOp = worklist.pop_back_val();
+
+      if (!visited.insert(currentOp).second) {
+        continue;
+      }
+
+      currentOp->walk([&hasCubeUser](Operation *nestedOp) {
+        if (getCoreType(nestedOp) == TCoreType::CUBE) {
+          hasCubeUser = true;
+          return WalkResult::interrupt();
+        } else if (getCoreType(nestedOp) == TCoreType::VECTOR) {
+          return WalkResult::skip();
+        }
+        return WalkResult::advance();
+      });
+
+      if (hasCubeUser) {
+        return true;
+      }
+
+      for (Value result : currentOp->getResults()) {
+        for (Operation *userOp : result.getUsers()) {
+          worklist.push_back(userOp);
+        }
+      }
+    }
+
+    return false;
+  }
+
   LogicalResult matchAndRewrite(tensor::ExtractOp extractOp,
                                 PatternRewriter &rewriter) const override {
     // check if it has already been visited
@@ -554,22 +598,8 @@ struct DuplicateTensorExtractForCube
       }
     }
 
-    // only process cases with non-vector users
-    bool hasNonVectorUser = false;
-    for (Operation *userOp : extractOp.getResult().getUsers()) {
-      userOp->walk(
-          [&hasNonVectorUser](Operation *nestedOp) { // including this one
-            if (getCoreType(nestedOp) != TCoreType::VECTOR) {
-              hasNonVectorUser = true;
-              return WalkResult::interrupt();
-            }
-            return WalkResult::advance();
-          });
-      if (hasNonVectorUser) {
-        break;
-      }
-    }
-    if (!hasNonVectorUser) {
+    // only process cases with cube users
+    if (!findCubeUser(extractOp)) {
       return failure();
     }
 

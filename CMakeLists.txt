@@ -34,6 +34,10 @@ endif()
 option(BISHENGIR_BUILD_STANDALONE_IR_ONLY
   "Experimental feature. If set, only build IR definitions." OFF)
 
+# The BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES option is used to enable A5 features that are currently unpublished.
+option(BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
+  "Experimental feature. If set, enable A5 unpublished features." OFF)
+
 # Only enable execution engine if the native target is available.
 if (${LLVM_NATIVE_ARCH} IN_LIST LLVM_TARGETS_TO_BUILD)
   set(MLIR_ENABLE_EXECUTION_ENGINE 1)
@@ -177,6 +181,7 @@ if (BISHENGIR_BUILD_STANDALONE_IR_ONLY)
   HIVM
   MemRef
   MemRefExt
+  Scope
   Symbol
   Tensor
   )
@@ -186,6 +191,7 @@ if (BISHENGIR_BUILD_STANDALONE_IR_ONLY)
   endforeach()
   # TODO: Math and Utils should be added in STANDALONE_IR_BUILD_DIALECT
   add_subdirectory(bishengir/include/bishengir/Dialect/MathExt)
+  add_subdirectory(bishengir/lib/Dialect/HIVM/Utils)
   add_subdirectory(bishengir/lib/Dialect/Math)
   add_subdirectory(bishengir/lib/Dialect/Utils)
 else()

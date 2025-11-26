@@ -727,19 +727,33 @@ def HIVM_FixpipePreReluModeAttr : HIVM_I32EnumAttr<
   let description = "HIVM fixpipe pre_relu mode";
 }
 
-def HIVM_FIXPIPE_DMA_MODE_NZ2ND : I32EnumAttrCase<"NZ2ND", 0, "nz2nd">;
-def HIVM_FIXPIPE_DMA_MODE_NZ2DN : I32EnumAttrCase<"NZ2DN", 1, "nz2dn">;
-def HIVM_FIXPIPE_DMA_MODE_NZ2NZ : I32EnumAttrCase<"NZ2NZ", 2, "normal">;
+#ifdef BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
+def HIVM_FIXPIPEDUALDST_NO_DUAL : I32EnumAttrCase<"NO_DUAL", 0>;
+def HIVM_FIXPIPEDUALDST_ROW_SPLIT : I32EnumAttrCase<"ROW_SPLIT", 1>;
+def HIVM_FIXPIPEDUALDST_COLUMN_SPLIT : I32EnumAttrCase<"COLUMN_SPLIT", 2>;
 
-def HIVM_FixpipeDMAModeEnum : HIVM_I32Enum<
-  "FixpipeDMAMode", "HIVM FixpipeDMA mode with int32_t_storage", [
-    HIVM_FIXPIPE_DMA_MODE_NZ2ND, HIVM_FIXPIPE_DMA_MODE_NZ2ND, HIVM_FIXPIPE_DMA_MODE_NZ2ND
+def HIVM_FixpipeDualDstModeEnum : HIVM_I32Enum<
+  "FixpipeDualDstMode", "HIVM fixpipe dual_dst mode", [
+    HIVM_FIXPIPEDUALDST_NO_DUAL,
+    HIVM_FIXPIPEDUALDST_ROW_SPLIT,
+    HIVM_FIXPIPEDUALDST_COLUMN_SPLIT
   ]>;
 
-def HIVM_FixpipeDMAModeAttr : HIVM_I32EnumAttr<
-  "dma_mode", HIVM_FixpipeDMAModeEnum> {
-  let description = "HIVM Fixpipe DMA mode";
+def HIVM_FixpipeDualDstModeAttr : HIVM_Attr<
+  "FixpipeDualDstMode", "fixpipe_dual_dst_mode"> {
+  let parameters = (ins EnumParameter<HIVM_FixpipeDualDstModeEnum>:$dual_dst_mode);
+  let assemblyFormat = "`<` params `>`";
+  let description = [{
+    HIVM fixpipe dual destination mode control. For a M x N matrix in L0C, supports the following modes:
+    - `NO_DUAL`: single destination mode, write the whole matrix to the target UB indicating by SUB BLOCKID.
+    - `ROW_SPLIT`: split in M dimension, M/2 x N is written to each UB, M must be multiples of 2.
+    - `COLUMN_SPLIT`: split in N dimension, M x N/2 is written to each UB, N must be multiples of 32.
+  }];
+  let constBuilderCall =
+      "::mlir::hivm::FixpipeDualDstModeAttr::get($_builder.getContext(), "
+      "::mlir::hivm::FixpipeDualDstMode::NO_DUAL)";
 }
+#endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
 
 //===----------------------------------------------------------------------===//
 // Deinterleave Mode for VDeinterleaveOp
