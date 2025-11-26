@@ -46,6 +46,24 @@ void CloneNewTensorEmpty(HIVMStructuredOp op, PatternRewriter &rewriter) {
   }
 }
 
+void cloneNewTensorEmptyForInsert(tensor::InsertOp op,
+                                  PatternRewriter &rewriter) {
+  Value dst = op.getDest();
+
+  auto dstDef = dst.getDefiningOp();
+  if (!dstDef)
+    return;
+
+  if (!isa<TensorType>(dst.getType()))
+    return;
+
+  if (isa<tensor::EmptyOp>(dstDef)) {
+    rewriter.setInsertionPoint(op);
+    Operation *clonedEmpty = rewriter.clone(*dstDef);
+    op.getOperation()->replaceUsesOfWith(dst, clonedEmpty->getResult(0));
+  }
+}
+
 template <typename OpTy>
 struct CloneTensorEmptyHIVMStructuredOpPattern : public OpRewritePattern<OpTy> {
   using OpRewritePattern<OpTy>::OpRewritePattern;
@@ -92,6 +110,16 @@ struct CloneTensorEmptySCFForPattern : public OpRewritePattern<scf::ForOp> {
   }
 };
 
+struct CloneTensorInsert : public OpRewritePattern<tensor::InsertOp> {
+  using OpRewritePattern<tensor::InsertOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::InsertOp op,
+                                PatternRewriter &rewriter) const override {
+    cloneNewTensorEmptyForInsert(op, rewriter);
+    return success();
+  }
+};
+
 /// This pass Output clones to different empty tensors based on hivmOp.
 struct CloneTensorEmptyPass
     : public impl::CloneTensorEmptyBase<CloneTensorEmptyPass> {
@@ -117,7 +145,8 @@ void populateCloneTensorEmptyPattern(RewritePatternSet &patterns) {
                CloneTensorEmptyHIVMStructuredOpPattern<hivm::StoreOp>,
                CloneTensorEmptyHIVMStructuredOpPattern<hivm::FixpipeOp>,
                CloneTensorEmptyHIVMStructuredOpPattern<hivm::MmadL1Op>,
-               CloneTensorEmptySCFForPattern>(patterns.getContext());
+               CloneTensorInsert, CloneTensorEmptySCFForPattern>(
+      patterns.getContext());
   registerAll<
 #define GET_OP_LIST
 #include "bishengir/Dialect/HIVM/IR/HIVMVectorOps.cpp.inc"
