@@ -751,7 +751,6 @@ def HIVM_FixpipeDualDstModeAttr : HIVM_Attr<
       "::mlir::hivm::FixpipeDualDstModeAttr::get($_builder.getContext(), "
       "::mlir::hivm::FixpipeDualDstMode::NO_DUAL)";
 }
-#endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
 
 def HIVM_FIXPIPE_DMA_MODE_NZ2ND : I32EnumAttrCase<"NZ2ND", 0, "nz2nd">;
 def HIVM_FIXPIPE_DMA_MODE_NZ2DN : I32EnumAttrCase<"NZ2DN", 1, "nz2dn">;
@@ -766,7 +765,7 @@ def HIVM_FixpipeDMAModeAttr : HIVM_I32EnumAttr<
   "dma_mode", HIVM_FixpipeDMAModeEnum> {
   let description = "HIVM Fixpipe DMA mode";
 }
-
+#endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
 
 //===----------------------------------------------------------------------===//
 // Deinterleave Mode for VDeinterleaveOp

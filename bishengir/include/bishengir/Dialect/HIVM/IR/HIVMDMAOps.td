@@ -297,20 +297,17 @@ def FixpipeOp : HIVM_DmaOp<"fixpipe", [
     movement mode is enabled, and data movement is being performed from L0C to UB. Only supported on Ascend910_95 series.
   }];
 #endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
+#ifdef BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
   let arguments = (ins AnyShaped:$src,
                        AnyShaped:$dst,
                        Arg<Optional<I1>, [{
                         An optional condition to enable unit-flge mode,
                         useful if there is a dependency on a for loop to run at least once.
                        }]>:$unit_flag_cond,
-
-#ifdef BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
                        DefaultValueAttr<HIVM_FixpipeDMAModeAttr,
                        "FixpipeDMAMode::NZ2NZ">:$dma_mode,
                        DefaultValuedOptionalAttr<HIVM_FixpipeDualDstModeAttr,
                          "FixpipeDualDstMode::NO_DUAL">:$dual_dst_mode,
-#else OptionalAttr<UnitAttr>:$enable_nz2nd,
-#endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
                        DefaultValuedOptionalAttr<HIVM_FixpipePreQuantModeAttr,
                          "FixpipePreQuantMode::NO_QUANT">:$pre_quant,
                        DefaultValuedOptionalAttr<HIVM_FixpipePreReluModeAttr,
@@ -321,6 +318,27 @@ def FixpipeOp : HIVM_DmaOp<"fixpipe", [
                         managed by inject-sync passes.
                        }]>:$unit_flag_mode
   );
+#else
+    let arguments = (ins AnyShaped:$src,
+                       AnyShaped:$dst,
+                       Arg<Optional<I1>, [{
+                        An optional condition to enable unit-flge mode,
+                        useful if there is a dependency on a for loop to run at least once.
+                       }]>:$unit_flag_cond,
+                       OptionalAttr<UnitAttr>:$enable_nz2nd,
+                       DefaultValuedOptionalAttr<HIVM_FixpipePreQuantModeAttr,
+                         "FixpipePreQuantMode::NO_QUANT">:$pre_quant,
+                       DefaultValuedOptionalAttr<HIVM_FixpipePreReluModeAttr,
+                         "FixpipePreReluMode::NO_RELU">:$pre_relu,
+                       DefaultValuedOptionalAttr<BoolAttr, "false">:$channel_split,
+                       Arg<OptionalAttr<HIVM_UnitFlagAttr>, [{
+                        Enable unit-flag for synchronization, it is
+                        managed by inject-sync passes.
+                       }]>:$unit_flag_mode
+  );
+
+
+#endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
   let results = (outs Optional<AnyRankedTensor>:$result_tensor);
   let builders = [
     OpBuilder<(ins "TypeRange":$result, "Value":$src, "Value":$dst,
