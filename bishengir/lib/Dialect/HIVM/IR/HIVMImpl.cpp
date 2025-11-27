@@ -182,6 +182,12 @@ createEltwiseOpByAtomicKind(OpBuilder &builder, Location loc,
                             TypeRange resTypeRange, ValueRange src,
                             ValueRange dst, hivm::AtomicKind atomicKind) {
   switch (atomicKind) {
+  case hivm::AtomicKind::ADD:
+    return builder.create<hivm::VAddOp>(loc, resTypeRange, src, dst);
+  case hivm::AtomicKind::MIN:
+    return builder.create<hivm::VMinOp>(loc, resTypeRange, src, dst);
+  case hivm::AtomicKind::MAX:
+    return builder.create<hivm::VMaxOp>(loc, resTypeRange, src, dst);
   case hivm::AtomicKind::AND:
     return builder.create<hivm::VAndOp>(loc, resTypeRange, src, dst);
   case hivm::AtomicKind::OR:
