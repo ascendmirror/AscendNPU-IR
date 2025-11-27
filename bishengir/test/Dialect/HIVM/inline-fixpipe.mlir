@@ -1231,3 +1231,19 @@ func.func @test_mmadL1_fixpipe_no_quant(%ma : tensor<256x128xi8>, %mb : tensor<1
   hivm.hir.store ins(%casted : tensor<256x256xf32>) outs(%dst : memref<256x256xf32>)
   return
 }
+
+// -----
+// CHECK-LABEL: func.func @test_mmadL1_fixpipe_atomic
+func.func @test_mmadL1_fixpipe_atomic(%ma : tensor<256x128xi8>, %mb : tensor<128x256xi8>, %dst : memref<256x256xi32>){
+  %mc = tensor.empty() : tensor<256x256xi32>
+  %true = arith.constant true
+  %M = arith.constant 256 : index
+  %K = arith.constant 128 : index
+  %N = arith.constant 256 : index
+  %ret = hivm.hir.mmadL1 ins(%ma, %mb, %true, %M, %K, %N: tensor<256x128xi8>, tensor<128x256xi8>, i1, index, index, index)
+                              outs(%mc: tensor<256x256xi32>) -> tensor<256x256xi32>
+  %0 = bufferization.to_memref %ret : memref<256x256xi32>
+  // CHECK: hivm.hir.fixpipe {enable_nz2nd} ins(%[[IN:.*]] : memref<256x256xi32>) outs(%[[OUT:.*]] : memref<256x256xi32>) atomic = <add>
+  hivm.hir.store ins(%0 : memref<256x256xi32>) outs(%dst : memref<256x256xi32>) atomic = <add>
+  return
+}
