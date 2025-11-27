@@ -707,7 +707,6 @@ def HIVM_FixpipePreQuantModeAttr : HIVM_I32EnumAttr<
   let description = "HIVM fixpipe pre_quant mode";
 }
 
-#ifndef BISHENGIR_BUILD_STANDALONE_IR_ONLY
 def HIVM_FIXPIPEPRERELU_NO_RELU : I32EnumAttrCase<"NO_RELU", 0>;
 def HIVM_FIXPIPEPRERELU_NORMAL_RELU : I32EnumAttrCase<"NORMAL_RELU", 1>;
 def HIVM_FIXPIPEPRERELU_LEAKY_RELU : I32EnumAttrCase<"LEAKY_RELU", 2>;
@@ -720,7 +719,6 @@ def HIVM_FixpipePreReluModeEnum : HIVM_I32Enum<
     HIVM_FIXPIPEPRERELU_LEAKY_RELU,
     HIVM_FIXPIPEPRERELU_P_RELU
   ]>;
-#endif
 
 def HIVM_FixpipePreReluModeAttr : HIVM_I32EnumAttr<
   "fixpipe_pre_relu_mode", HIVM_FixpipePreReluModeEnum> {
@@ -752,6 +750,20 @@ def HIVM_FixpipeDualDstModeAttr : HIVM_Attr<
   let constBuilderCall =
       "::mlir::hivm::FixpipeDualDstModeAttr::get($_builder.getContext(), "
       "::mlir::hivm::FixpipeDualDstMode::NO_DUAL)";
+}
+
+def HIVM_FIXPIPE_DMA_MODE_NZ2ND : I32EnumAttrCase<"NZ2ND", 0, "nz2nd">;
+def HIVM_FIXPIPE_DMA_MODE_NZ2DN : I32EnumAttrCase<"NZ2DN", 1, "nz2dn">;
+def HIVM_FIXPIPE_DMA_MODE_NZ2NZ : I32EnumAttrCase<"NZ2NZ", 2, "normal">;
+
+def HIVM_FixpipeDMAModeEnum : HIVM_I32Enum<
+  "FixpipeDMAMode", "HIVM FixpipeDMA mode with int32_t_storage", [
+    HIVM_FIXPIPE_DMA_MODE_NZ2ND, HIVM_FIXPIPE_DMA_MODE_NZ2DN, HIVM_FIXPIPE_DMA_MODE_NZ2NZ
+  ]>;
+
+def HIVM_FixpipeDMAModeAttr : HIVM_I32EnumAttr<
+  "dma_mode", HIVM_FixpipeDMAModeEnum> {
+  let description = "HIVM Fixpipe DMA mode";
 }
 #endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
 
