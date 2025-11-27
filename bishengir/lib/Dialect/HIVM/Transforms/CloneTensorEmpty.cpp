@@ -92,6 +92,29 @@ struct CloneTensorEmptySCFForPattern : public OpRewritePattern<scf::ForOp> {
   }
 };
 
+struct CloneTensorInsert : public OpRewritePattern<tensor::InsertOp> {
+  using OpRewritePattern<tensor::InsertOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::InsertOp op,
+                                PatternRewriter &rewriter) const override {
+    Value dst = op.getDest();
+
+    auto emptyOp = dst.getDefiningOp<tensor::EmptyOp>();
+    if (!emptyOp)
+      return failure();
+
+    if (!isa<TensorType>(dst.getType()))
+      return failure();
+
+    rewriter.setInsertionPoint(op);
+    Operation *clonedEmpty = rewriter.clone(*emptyOp);
+    op->replaceUsesOfWith(dst, clonedEmpty->getResult(0));
+
+    return success();
+  }
+};
+
+
 /// This pass Output clones to different empty tensors based on hivmOp.
 struct CloneTensorEmptyPass
     : public impl::CloneTensorEmptyBase<CloneTensorEmptyPass> {
@@ -117,7 +140,8 @@ void populateCloneTensorEmptyPattern(RewritePatternSet &patterns) {
                CloneTensorEmptyHIVMStructuredOpPattern<hivm::StoreOp>,
                CloneTensorEmptyHIVMStructuredOpPattern<hivm::FixpipeOp>,
                CloneTensorEmptyHIVMStructuredOpPattern<hivm::MmadL1Op>,
-               CloneTensorEmptySCFForPattern>(patterns.getContext());
+               CloneTensorInsert, CloneTensorEmptySCFForPattern>(
+      patterns.getContext());
   registerAll<
 #define GET_OP_LIST
 #include "bishengir/Dialect/HIVM/IR/HIVMVectorOps.cpp.inc"
