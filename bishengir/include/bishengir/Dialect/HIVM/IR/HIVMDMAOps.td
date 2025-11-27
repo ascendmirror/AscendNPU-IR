@@ -336,8 +336,6 @@ def FixpipeOp : HIVM_DmaOp<"fixpipe", [
                         managed by inject-sync passes.
                        }]>:$unit_flag_mode
   );
-
-
 #endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
   let results = (outs Optional<AnyRankedTensor>:$result_tensor);
   let builders = [
