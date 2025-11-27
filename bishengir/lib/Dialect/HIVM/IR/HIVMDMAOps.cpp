@@ -559,58 +559,46 @@ void ND2NZOp::build(OpBuilder &odsBuilder, OperationState &odsState,
 // FixpipeOp
 //===----------------------------------------------------------------------===//
 
+#if (!BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES)
 void FixpipeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                       TypeRange result, Value src, Value dst,
-                      UnitAttr enable_nz2nd, FixpipePreQuantModeAttr pre_quant,
-                      FixpipePreReluModeAttr pre_relu, BoolAttr channel_split) {
 #if (!BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES)
-  build(odsBuilder, odsState, result, src, dst, /*unit_flag_cond=*/nullptr,
-        enable_nz2nd, pre_quant, pre_relu, channel_split,	
-        /*unit_flag_mode=*/nullptr);
-#else
-  build(odsBuilder, odsState, result, src, dst, /*unit_flag_cond=*/nullptr,
-        enable_nz2nd, /*dual_dst_mode=*/nullptr, pre_quant, pre_relu, channel_split,
-        /*unit_flag_mode=*/nullptr);
-#endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
-}
-
-void FixpipeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
-                      Type result, Value src, Value dst, UnitAttr enable_nz2nd,
-                      FixpipePreQuantModeAttr pre_quant,
-                      FixpipePreReluModeAttr pre_relu, BoolAttr channel_split) {
-#if (!BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES)
-  build(odsBuilder, odsState, result, src, dst, /*unit_flag_cond=*/nullptr,
-        enable_nz2nd, pre_quant, pre_relu, channel_split,	
-        /*unit_flag_mode=*/nullptr);
-#else
-  build(odsBuilder, odsState, result, src, dst, /*unit_flag_cond=*/nullptr,
-        enable_nz2nd, /*dual_dst_mode=*/nullptr, pre_quant, pre_relu, channel_split,
-        /*unit_flag_mode=*/nullptr);
-#endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
-}
-
-#if BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
-void FixpipeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
-                      TypeRange result, Value src, Value dst,
                       UnitAttr enable_nz2nd,
-                      FixpipeDualDstModeAttr dual_dst_mode,
+#else
+                      FixpipeDMAModeAttr  dma_mode,
+#endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
                       FixpipePreQuantModeAttr pre_quant,
                       FixpipePreReluModeAttr pre_relu, BoolAttr channel_split) {
+#if (!BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES)
+  build(odsBuilder, odsState, result, src, dst, /*unit_flag_cond*/ Value{},
+        enable_nz2nd, pre_quant, pre_relu, channel_split,
+        /*unit_flag_mode*/ UnitFlagAttr{});
+#else
   build(odsBuilder, odsState, result, src, dst, /*unit_flag_cond=*/nullptr,
-        enable_nz2nd, dual_dst_mode, pre_quant, pre_relu, channel_split,
+        dma_mode, /*dual_dst_mode=*/nullptr, pre_quant, pre_relu, channel_split,
         /*unit_flag_mode=*/nullptr);
+#endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
 }
 
 void FixpipeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
-                      Type result, Value src, Value dst, UnitAttr enable_nz2nd,
-                      FixpipeDualDstModeAttr dual_dst_mode,
+                      Type result, Value src, Value dst,
+#if (!BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES)
+                      UnitAttr enable_nz2nd,
+#else
+                      FixpipeDMAModeAttr  dma_mode,
+#endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
                       FixpipePreQuantModeAttr pre_quant,
                       FixpipePreReluModeAttr pre_relu, BoolAttr channel_split) {
+#if (!BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES)
   build(odsBuilder, odsState, result, src, dst, /*unit_flag_cond=*/nullptr,
-        enable_nz2nd, dual_dst_mode, pre_quant, pre_relu, channel_split,
+        enable_nz2nd, pre_quant, pre_relu, channel_split,
         /*unit_flag_mode=*/nullptr);
-}
+#else
+  build(odsBuilder, odsState, result, src, dst, /*unit_flag_cond=*/nullptr,
+        dma_mode, /*dual_dst_mode=*/nullptr, pre_quant, pre_relu, channel_split,
+        /*unit_flag_mode=*/nullptr);
 #endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
+}
 
 enum FixpipeState {
   Init = -1,
