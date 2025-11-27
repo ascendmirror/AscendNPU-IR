@@ -951,11 +951,13 @@ class AtomicStoreOpLowering : public OpRewritePattern<hivm::StoreOp> {
   using OpRewritePattern<hivm::StoreOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(hivm::StoreOp op,
                                 PatternRewriter &rewriter) const override {
+    auto loc = op.getLoc();
+    if (op.isAtomic() && getElementTypeOrSelf(op.getDstOperandType()) == rewriter.getI64Type()) {
+      return decomposeEltwiseAtomic(op, rewriter, loc);
+    }
     if (!op.isSWAtomic()) {
       return failure();
     }
-
-    auto loc = op.getLoc();
     switch (op.getAtomicKind().value()) {
     case hivm::AtomicKind::AND:
     case hivm::AtomicKind::OR:
