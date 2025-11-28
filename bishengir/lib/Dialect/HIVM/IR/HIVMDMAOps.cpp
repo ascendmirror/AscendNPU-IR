@@ -578,7 +578,8 @@ void FixpipeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
         /*unit_flag_mode*/ UnitFlagAttr{});
 #else
   build(odsBuilder, odsState, result, src, dst, /*unit_flag_cond=*/nullptr,
-        dma_mode, /*dual_dst_mode=*/nullptr, pre_quant, pre_relu, channel_split,
+        dma_mode, /*dual_dst_mode=*/dual_mode, pre_quant, pre_relu,
+        channel_split,
         /*unit_flag_mode=*/nullptr);
 #endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
 }
@@ -599,7 +600,8 @@ void FixpipeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
         /*unit_flag_mode=*/nullptr);
 #else
   build(odsBuilder, odsState, result, src, dst, /*unit_flag_cond=*/nullptr,
-        dma_mode, /*dual_dst_mode=*/nullptr, pre_quant, pre_relu, channel_split,
+        dma_mode, /*dual_dst_mode=*/dual_mode, pre_quant, pre_relu,
+        channel_split,
         /*unit_flag_mode=*/nullptr);
 #endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
 }
