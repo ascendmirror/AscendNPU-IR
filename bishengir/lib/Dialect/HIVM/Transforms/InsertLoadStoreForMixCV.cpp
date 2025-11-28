@@ -372,10 +372,9 @@ struct InsertLoadStoreOpBetweenVectorAndCube<bufferization::ToTensorOp>
           llvm::cast<bufferization::ToTensorOp>(toTensorOpDef.value());
       auto maybeAnnotateOp = utils::getAnnotateOpWithAttr(
           toTensorOp->getResult(0), "MayImplicitTransposeWithLastAxis");
-      if (maybeAnnotateOp.has_value()) {
-        consumerOperands.push_back(&operand);
-      }
-
+      
+      
+      
       if (maybeAnnotateOp.has_value()) {
         consumerOperands.push_back(&operand);
       } else if (toTensorOp->getAttr("gather_load") != nullptr) {
