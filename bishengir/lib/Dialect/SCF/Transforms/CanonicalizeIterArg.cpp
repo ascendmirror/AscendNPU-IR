@@ -131,8 +131,19 @@ static bool isIterArgUnchanged(LoopLikeOpInterface loop, BlockArgument arg,
 
     // Add values defined by the loop to tentative list, and trace values used
     // by the loop
-    if (opResult)
-      innerArg = innerLoop.getTiedLoopRegionIterArg(opResult);
+    if (opResult) {
+      if (auto whileLoop = dyn_cast<scf::WhileOp>(defining)) {
+        auto loopRes = whileLoop.getResults();
+        auto it = llvm::find(loopRes, opResult);
+        innerArg = whileLoop.getAfterArguments()[std::distance(loopRes.begin(), it)];
+      } else {
+        innerArg = innerLoop.getTiedLoopRegionIterArg(opResult);
+      }
+      if (!innerArg) {
+        LLVM_DEBUG(llvm::dbgs() << "\tNot Supported scf\n");
+        return false;
+      }
+    }
 
     handleLoops(innerLoop, innerArg, equivalenceSet, dfsStack);
   }
@@ -161,7 +172,7 @@ static bool isInLoopBody(Value x, Block *body) {
 
 static LogicalResult
 isIterationIndependent(Value yield, Block *body, BlockArgument allowedIterArg,
-                  SmallPtrSetImpl<Operation *> &tobeDeletedOps) {
+                       SmallPtrSetImpl<Operation *> &tobeDeletedOps) {
   SmallVector<Value, 8> worklist;
   SmallPtrSet<Value, 16> visitedVals;
   worklist.push_back(yield);
@@ -293,7 +304,8 @@ public:
       Value yielded = yield.getOperand(i);
 
       SmallPtrSet<Operation *, 8> tobeDeletedOps;
-      if (failed(isIterationIndependent(yielded, body, iterArg, tobeDeletedOps)))
+      if (failed(
+              isIterationIndependent(yielded, body, iterArg, tobeDeletedOps)))
         continue;
 
       removableIdxs.push_back(i);
