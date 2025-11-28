@@ -23,43 +23,44 @@ include "mlir/Pass/PassBase.td"
 def OutlineScope : Pass<"outline-scope", "mlir::ModuleOp"> {
   let summary = "Outline scope region within ScopeOp.";
   let description = [{
-    Propagate scopes bound for argument by replacing the usage of 
-    `tensor.dim`, to make the relationships between tensor dynamic 
-    dims more explicit.
+    Convert `scope.scope` into a `func.func`.
 
     Example:
 
     ```mlir
-    %dim0 = tensor.dim %arg0, %c0 : tensor<?x640xf16>
-    %out0 = tensor.empty(%dim0) : tensor<?x640xf16>
-    %add0 = linalg.elemwise_binary ins(%arg0, %arg0) outs(%out0)
-    %concat = tensor.concat dim(0) %add0, %add0 : tensor<?x640xf16>
-    %dim1 = tensor.dim %concat, %c0 : tensor<?x640xf16>
-    %out1 = tensor.empty(%dim1) : tensor<?x640xf16>
-    %add1 = linalg.elemwise_binary ins(%concat, %concat) outs(%out1)
+    module {
+      func.func @test() {
+        scope.scope : () -> () {
+          ...
+          scope.return
+        } {tcore_type = #hivm.tcore_type<CUBE>, ...}
+        scope.scope : () -> () {
+          ...
+          scope.return
+        } {tcore_type = #hivm.tcore_type<VECTOR>, ...}
+        return
+      }
+    }
     ```
 
     will be transformed into:
 
     ```mlir
-    %S0 = scope.scopeic_int @S0 : index
-    %S1 = scope.scopeic_int @S1 [%S0, %S0], affine_map<()[s0, s1] -> (s0 + s1)>
-    scope.bind_scopeic_shape %arg0, [%S0]
-    
-    %out0 = tensor.empty(%S0) : tensor<?x640xf16>
-    scope.bind_scopeic_shape %0, [%S0]
-    %add0 = linalg.elemwise_binary ins(%arg0, %arg0) outs(%out0)
-    scope.bind_scopeic_shape %add0, [%S0]
-
-    // result dim for concat will be reified to an `affine.apply` op.
-    // this pass keeps the affine map in `%S1`
-    %concat = tensor.concat dim(0) %add0, %add0 : tensor<?x640xf16>
-    scope.bind_scopeic_shape %concat, [%S1]
-
-    %out1 = tensor.empty(%S1) : tensor<?x640xf16>
-    scope.bind_scopeic_shape %out1, [%S1]
-    %add1 = linalg.elemwise_binary ins(%concat, %concat) outs(%out1)
-    scope.bind_scopeic_shape %add1, [%S1]
+    module {
+      func.func @test_scope_0() attributes {tcore_type = #hivm.tcore_type<CUBE>, ...} {
+        ...
+        return
+      }
+      func.func @test_scope_1() attributes {tcore_type = #hivm.tcore_type<VECTOR>, ...} {
+        ...
+        return
+      }
+      func.func @test() {
+        call @test_scope_scope_scope_0() : () -> ()
+        call @test_scope_scope_scope_1() : () -> ()
+        return
+      }
+    }
     ```
   }];
   let constructor = "mlir::scope::createOutlineScopePass()";
