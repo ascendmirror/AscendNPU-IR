@@ -568,6 +568,7 @@ void FixpipeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                       UnitAttr enable_nz2nd,
 #else
                       FixpipeDMAModeAttr dma_mode,
+                      FixpipeDualDstModeAttr dual_mode,
 #endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
                       FixpipePreQuantModeAttr pre_quant,
                       FixpipePreReluModeAttr pre_relu, BoolAttr channel_split) {
@@ -588,6 +589,7 @@ void FixpipeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                       UnitAttr enable_nz2nd,
 #else
                       FixpipeDMAModeAttr dma_mode,
+                      FixpipeDualDstModeAttr dual_mode,
 #endif // BISHENGIR_ENABLE_A5_UNPUBLISHED_FEATURES
                       FixpipePreQuantModeAttr pre_quant,
                       FixpipePreReluModeAttr pre_relu, BoolAttr channel_split) {
