@@ -1067,6 +1067,43 @@ bool areReassociationsCompatible(
   return true;
 }
 
+SmallVector<SmallVector<int64_t, 2>>
+getReAssociation(ArrayRef<int64_t> expandDims, int64_t outRank) {
+  std::set<int> expandDimsSet;
+  expandDimsSet.insert(expandDims.begin(), expandDims.end());
+
+  SmallVector<SmallVector<int64_t, 2>> retVecVec;
+  SmallVector<int64_t, 2> vec;
+
+  // push contiguous expand dims in the head of seq into vec
+  int i = 0;
+  for (; i < outRank; i++) {
+    bool isExpandDim = expandDimsSet.count(i);
+    if (isExpandDim) {
+      vec.push_back(i);
+    } else {
+      break;
+    }
+  }
+
+  // cut the vec if next is unexpand dim or unexisted
+  for (; i < outRank; ++i) {
+    vec.push_back(i);
+
+    bool nextIsUnExpand = !expandDimsSet.count(i + 1);
+    if (nextIsUnExpand) {
+      // unexpanded dim
+      retVecVec.push_back(vec);
+      vec.clear();
+    }
+  }
+
+  if (!vec.empty()) {
+    retVecVec.push_back(vec);
+  }
+  return retVecVec;
+}
+
 } // namespace reshape_utils
 
 BitVector utils::arrayToMask(ArrayRef<int64_t> elements, int maskSize) {

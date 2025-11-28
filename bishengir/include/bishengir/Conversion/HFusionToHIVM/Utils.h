@@ -19,6 +19,7 @@
 #define BISHENGIR_CONVERSION_HFUSIONTOHIVM_UTILS_H
 
 #include "bishengir/Dialect/HFusion/IR/HFusion.h"
+#include "bishengir/Dialect/Utils/Util.h"
 
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -26,15 +27,6 @@
 
 namespace mlir {
 namespace hfusion_conversion_utils {
-
-/// Get reassociation of expandShapeOp
-/// eg.
-///   tensor.expand_shape %arg0 [[0, 1], [2], [3, 4]] : tensor<4x5x3xf32> into
-///                                                     tensor<4x1x5x3x1f32>
-/// here outRank = 5, expandDims = {1, 4},
-/// the result reassociation=[[0, 1], [2], [3, 4]]
-SmallVector<SmallVector<int64_t, 2>>
-getReAssociation(ArrayRef<int64_t> expandDims, int64_t outRank);
 
 /// Use ins shapedType of linalg op to expand.
 /// Insert 1 into shape in axis of dimsArr, and update strides if stridedLayout
@@ -59,7 +51,7 @@ createExpandShapeOp(ConcreteOp op, PatternRewriter &rewriter, Value expandSrc,
     // This is not a rank-0 case. Thus turn to the normal case.
     outRank = targetType.getRank();
   }
-  auto reassociation = getReAssociation(dims, outRank);
+  auto reassociation = reshape_utils::getReAssociation(dims, outRank);
 
   const bool hasPureBuffer = op.hasPureBufferSemantics();
   assert(expandSrc && "expandSrc shouldn't null.");
