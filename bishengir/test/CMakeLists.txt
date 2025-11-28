@@ -28,6 +28,15 @@ set(BISHENGIR_TEST_DEPENDS
   opt llc llvm-dis
 )
 
+if(MLIR_ENABLE_EXECUTION_ENGINE)
+  list(APPEND BISHENGIR_TEST_DEPENDS
+    bishengir-cpu-runner
+    mlir_c_runner_utils
+    mlir_runner_utils
+    bishengir_runner_utils
+  )
+endif()
+
 if(MLIR_ENABLE_BINDINGS_PYTHON)
   list(APPEND BISHENGIR_TEST_DEPENDS
     MLIRPythonModules
