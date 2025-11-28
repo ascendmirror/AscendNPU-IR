@@ -70,7 +70,6 @@ inline void registerAllPasses() {
   mlir::tensor::registerBiShengIRTensorPasses();
   mlir::scf::registerBiShengIRSCFPasses();
   mlir::hacc::registerHACCPasses();
-  // mlir::scope::registerScopePasses();
   mlir::symbol::registerSymbolPasses();
   mlir::scope::registerScopePasses();
 
