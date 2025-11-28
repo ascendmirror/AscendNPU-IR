@@ -23,6 +23,7 @@
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -46,16 +47,6 @@ public:
 };
 
 class OutlineScopeOp : public OpRewritePattern<scope::ScopeOp> {
-  std::string
-  getExcludedFunctionName(ModuleOp moduleOp,
-                          const std::string prefixFunctionName) const {
-    size_t mex = 0;
-    while (moduleOp.lookupSymbol(prefixFunctionName + std::to_string(mex)) !=
-           nullptr)
-      ++mex;
-    return prefixFunctionName + std::to_string(mex);
-  }
-
   SmallVector<Value> getInputs(const SetVector<Operation *> &ops) const {
     SmallVector<Value> inputs;
     // if operands are not resulted Operands of ops. then, it's an input
@@ -83,8 +74,8 @@ class OutlineScopeOp : public OpRewritePattern<scope::ScopeOp> {
     return ops;
   }
 
-  func::FuncOp outlineScope(scope::ScopeOp scopeOp,
-                            PatternRewriter &rewriter) const {
+  FailureOr<func::FuncOp> outlineScope(scope::ScopeOp scopeOp,
+                                       PatternRewriter &rewriter) const {
     assert(scopeOp->getNumResults() == 0 &&
            "unhandled case for scopeOp with results");
 
@@ -94,8 +85,7 @@ class OutlineScopeOp : public OpRewritePattern<scope::ScopeOp> {
     rewriter.setInsertionPoint(parF);
 
     const std::string prefixFunctionName =
-        scopeOp->getParentOfType<func::FuncOp>().getSymName().str() +
-        "__scope__";
+        scopeOp->getParentOfType<func::FuncOp>().getSymName().str() + "_scope";
 
     SetVector<Operation *> ops = getOpsOfScopeOp(scopeOp);
     SmallVector<Value> inputs = getInputs(ops);
@@ -104,9 +94,12 @@ class OutlineScopeOp : public OpRewritePattern<scope::ScopeOp> {
     FunctionType funcTy =
         FunctionType::get(moduleOp.getContext(), TypeRange(inputs), {});
     func::FuncOp newFuncOp = rewriter.create<func::FuncOp>(
-        moduleOp->getLoc(),
-        getExcludedFunctionName(moduleOp, prefixFunctionName), funcTy,
-        scopeOp->getAttrs());
+        moduleOp->getLoc(), prefixFunctionName, funcTy, scopeOp->getAttrs());
+    SymbolTable symbolTable(moduleOp);
+    FailureOr<StringAttr> scopeFuncName =
+        symbolTable.renameToUnique(newFuncOp, SmallVector<SymbolTable *>());
+    if (failed(scopeFuncName))
+      return failure();
 
     // Create function body
     Block *entryBB = newFuncOp.addEntryBlock();
@@ -161,8 +154,10 @@ public:
       return failure();
     }
 
-    func::FuncOp newFuncOp = outlineScope(scopeOp, rewriter);
-    if (failed(replaceScopeWithInvoke(scopeOp, newFuncOp, rewriter))) {
+    FailureOr<func::FuncOp> newFuncOp = outlineScope(scopeOp, rewriter);
+    if (failed(newFuncOp))
+      return failure();
+    if (failed(replaceScopeWithInvoke(scopeOp, newFuncOp.value(), rewriter))) {
       return failure();
     }
     return success();
