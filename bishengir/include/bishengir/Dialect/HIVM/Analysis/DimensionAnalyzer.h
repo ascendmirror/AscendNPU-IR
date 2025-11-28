@@ -115,7 +115,7 @@ protected:
                                         std::is_same_v<T, hivm::VCumprodOp>>>
   void processVCumOp(T op);
   void processYieldOp(scf::YieldOp op);
-  void processForOp(scf::ForOp op);
+  void processLoopOp(LoopLikeOpInterface op);
   template <typename T, typename = std::enable_if_t<
                             std::is_same_v<T, tensor::ExpandShapeOp> ||
                             std::is_same_v<T, tensor::CollapseShapeOp>>>
