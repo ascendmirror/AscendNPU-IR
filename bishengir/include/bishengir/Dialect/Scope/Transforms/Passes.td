@@ -64,7 +64,7 @@ def OutlineScope : Pass<"outline-scope", "mlir::ModuleOp"> {
     ```
   }];
   let constructor = "mlir::scope::createOutlineScopePass()";
-  let dependentDialects = [];
+  let dependentDialects = ["mlir::func::FuncDialect"];
 }
 
 #endif // BISHENGIR_DIALECT_SCOPE_TRANSFORMS_PASSES_TD

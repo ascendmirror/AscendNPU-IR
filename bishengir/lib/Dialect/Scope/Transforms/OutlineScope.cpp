@@ -21,6 +21,7 @@
 
 #include "bishengir/Dialect/Scope/IR/Scope.h"
 
+#include "bishengir/Dialect/Scope/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/IR/SymbolTable.h"

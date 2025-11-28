@@ -19,6 +19,7 @@
 #define BISHENGIR_DIALECT_SCOPE_IR_SCOPE_H
 
 #include "bishengir/Dialect/HIVM/IR/HIVM.h"
+
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
