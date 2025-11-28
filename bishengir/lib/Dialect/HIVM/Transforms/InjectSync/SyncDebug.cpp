@@ -163,12 +163,9 @@ void SyncDebug::PrintCompoundIR(const InstanceElement *e, raw_ostream &os) {
   os << "useVec: ";
   for (const auto *memInfo : ptr->useVec) {
     os << "((";
-    if (auto forOp = llvm::dyn_cast_if_present<scf::ForOp>(
+    if (auto loopOp = llvm::dyn_cast_if_present<LoopLikeOpInterface>(
             memInfo->baseBuffer.getDefiningOp())) {
-      forOp->print(os, mlir::OpPrintingFlags().skipRegions(true));
-    } else if (auto whileOp = llvm::dyn_cast_if_present<scf::WhileOp>(
-                   memInfo->baseBuffer.getDefiningOp())) {
-      whileOp->print(os, mlir::OpPrintingFlags().skipRegions(true));
+      loopOp->print(os, mlir::OpPrintingFlags().skipRegions(true));
     } else if (auto ifOp = llvm::dyn_cast_if_present<scf::IfOp>(
                    memInfo->baseBuffer.getDefiningOp())) {
       ifOp->print(os, mlir::OpPrintingFlags().skipRegions(true));
