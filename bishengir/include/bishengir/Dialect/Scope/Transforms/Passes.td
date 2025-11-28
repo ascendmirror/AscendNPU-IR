@@ -1,4 +1,4 @@
-//===- Passes.td - Pass pass definition file ---------------*- tablegen -*-===//
+//===- Passes.td - Scope pass definition file --------------*- tablegen -*-===//
 //
 // Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
 // Licensed under the Apache License, Version 2.0 (the "License");
