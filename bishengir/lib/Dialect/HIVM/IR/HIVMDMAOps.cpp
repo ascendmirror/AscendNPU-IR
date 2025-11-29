@@ -363,9 +363,11 @@ bool StoreOp::isAtomic() {
 bool StoreOp::isHWAtomic() {
   if (getAtomicKind().has_value()) {
     auto atomicKind = getAtomicKind().value();
-    return (atomicKind == hivm::AtomicKind::ADD) ||
-           (atomicKind == hivm::AtomicKind::MAX) ||
-           (atomicKind == hivm::AtomicKind::MIN);
+    auto operandType = getSrcOperandType().getElementType();
+    return ((atomicKind == hivm::AtomicKind::ADD) ||
+            (atomicKind == hivm::AtomicKind::MAX) ||
+            (atomicKind == hivm::AtomicKind::MIN)) &&
+           !operandType.isBF16();
   }
 
   return false;

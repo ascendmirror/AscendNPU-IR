@@ -188,6 +188,12 @@ createEltwiseOpByAtomicKind(OpBuilder &builder, Location loc,
     return builder.create<hivm::VOrOp>(loc, resTypeRange, src, dst);
   case hivm::AtomicKind::XOR:
     return builder.create<hivm::VXorOp>(loc, resTypeRange, src, dst);
+  case hivm::AtomicKind::ADD:
+    return builder.create<hivm::VAddOp>(loc, resTypeRange, src, dst);
+  case hivm::AtomicKind::MAX:
+    return builder.create<hivm::VMaxOp>(loc, resTypeRange, src, dst);
+  case hivm::AtomicKind::MIN:
+    return builder.create<hivm::VMinOp>(loc, resTypeRange, src, dst);
   default:
     return std::nullopt;
   }

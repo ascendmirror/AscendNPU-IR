@@ -960,6 +960,9 @@ class AtomicStoreOpLowering : public OpRewritePattern<hivm::StoreOp> {
     case hivm::AtomicKind::AND:
     case hivm::AtomicKind::OR:
     case hivm::AtomicKind::XOR:
+    case hivm::AtomicKind::ADD:
+    case hivm::AtomicKind::MAX:
+    case hivm::AtomicKind::MIN:
       return decomposeEltwiseAtomic(op, rewriter, loc);
     default:
       return failure();
@@ -987,10 +990,20 @@ private:
 
     // 2. create tmp memref alloc and load dst to tmp
     auto src = op.getSrc();
-    auto tmpUB = createTmpBufferOrTensorWithTargetType(rewriter, loc, src);
-
     auto dst = op.getDst();
+
+    auto tmpUB = createTmpBufferOrTensorWithTargetType(rewriter, loc, src);
     rewriter.create<hivm::LoadOp>(loc, TypeRange{}, dst, tmpUB);
+
+    auto elementType = getElementTypeOrSelf(src);
+    auto roundingAttr = rewriter.getAttr<hivm::RoundModeAttr>(hivm::RoundMode::RINT);
+
+    if (elementType.isBF16()) {
+      VCastOp castSrc = castTo(rewriter, op.getLoc(), src, roundingAttr, rewriter.getF32Type());
+      VCastOp castTmp = castTo(rewriter, op.getLoc(), tmpUB, roundingAttr, rewriter.getF32Type());
+      src = castSrc.getSingleDst();
+      tmpUB = castTmp.getSingleDst();
+    }
 
     // 3. do eltwise vv between src and tmp(and/or/xor)
     auto resUB = createTmpBufferOrTensorWithTargetType(rewriter, loc, src);
@@ -999,6 +1012,11 @@ private:
         op.getAtomicKind().value());
     if (!eltwiseOp.has_value()) {
       return op.emitError("not support block-sync atomic kind!!");
+    }
+
+    if (elementType.isBF16()) {
+      VCastOp castRes = castTo(rewriter, op.getLoc(), resUB, roundingAttr, rewriter.getBF16Type());
+      resUB = castRes.getSingleDst();
     }
 
     // 4. store tmp to dst
