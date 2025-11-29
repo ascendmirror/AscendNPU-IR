@@ -308,7 +308,7 @@ getExtraBufferSizeForReduceOpSingleDim(Operation *op, BufferSizeUnit unit,
   std::optional<int64_t> srcAllocTotalSize =
       utils::traceToAllocMaxSize(op->getOpOperand(0).get());
   assert(srcAllocTotalSize);
-  if (isArgminOrArgmax(arithOp)) {
+  if (VReduceOp::isArgminOrArgmax(arithOp)) {
     // * R/AR: 1 ub_block_unit
     // * RA: r * sizeof(Index) aligned to ub_block_unit + 1 extra ub_block_unit
     int64_t rank = srcType.getRank();
