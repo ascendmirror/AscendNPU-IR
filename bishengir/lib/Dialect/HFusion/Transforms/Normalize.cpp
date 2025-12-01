@@ -56,6 +56,7 @@ namespace mlir {
 using namespace mlir;
 using namespace mlir::hfusion;
 
+const std::string ANNOTATION_TENSOR_DTYPE = "tensor_dtype";
 // norm(x,x_round,offset) = x-x_round*(pi1+pi2+pi3+pi4+pi5)+offset
 // (pi1+pi2+pi3+pi4+pi5) approximates pi
 static Value norm(PatternRewriter &rewriter, Location loc, Value x,
@@ -2783,7 +2784,8 @@ static void replaceI1ResultsWithTargetType(const SmallVector<Value> &oldResults,
 static void replaceI8ResultsWithTargetType(const SmallVector<Value> &oldResults,
                                            const SmallVector<Value> &newResults,
                                            PatternRewriter &rewriter,
-                                           bool enableOverflow = true) {
+                                           bool enableOverflow = true,
+                                           bool isUnsigned = false) {
   assert(oldResults.size() == newResults.size() &&
          "result sizes mismatch when replace op results");
   for (const auto [idx, oldResult] : llvm::enumerate(oldResults)) {
@@ -2794,7 +2796,8 @@ static void replaceI8ResultsWithTargetType(const SmallVector<Value> &oldResults,
     }
 
     Value castResult = castTo(rewriter, newResult, rewriter.getI8Type(),
-                              hfusion::RoundMode::TRUNC, hfusion::TypeFn{},
+                              hfusion::RoundMode::TRUNC,
+                              isUnsigned ? hfusion::TypeFn::cast_unsigned : hfusion::TypeFn::cast_signed,
                               std::nullopt, enableOverflow);
     rewriter.replaceAllUsesWith(oldResult, castResult);
   }
@@ -2825,12 +2828,12 @@ template <typename targetType,
                                      std::is_same_v<int8_t, targetType>)>>
 static void replaceResultsWithTargetType(const SmallVector<Value> &oldResults,
                                          const SmallVector<Value> &newResults,
-                                         PatternRewriter &rewriter) {
+                                         PatternRewriter &rewriter, bool isUnsigned) {
   if constexpr (std::is_same_v<bool, targetType>) {
     replaceI1ResultsWithTargetType(oldResults, newResults, rewriter);
   }
   if constexpr (std::is_same_v<int8_t, targetType>) {
-    replaceI8ResultsWithTargetType(oldResults, newResults, rewriter);
+    replaceI8ResultsWithTargetType(oldResults, newResults, rewriter, true, isUnsigned);
   }
 }
 
@@ -3026,17 +3029,58 @@ Operation *createNewReduceOp(linalg::ReduceOp op, PatternRewriter &rewriter,
   return newOp;
 }
 
+template <typename OpType>
+void clearOpTensorDTypeAnnotation(OpType op, PatternRewriter &rewriter) {
+  for (Value operand : op.getOperands()) {
+    std::optional<Operation *> tensorDType = utils::getAnnotateOpWithAttr(operand, ANNOTATION_TENSOR_DTYPE);
+    if (tensorDType.has_value()) {
+      annotation::MarkOp markOp = dyn_cast<annotation::MarkOp>(tensorDType.value());
+      rewriter.eraseOp(markOp);
+    }
+  }
+}
+
+template <typename OpType>
+bool isUnsignedOp(OpType op) {
+  if constexpr (std::is_same_v<OpType, linalg::ElemwiseBinaryOp>) {
+    // some ops can determin the signed info from func name
+    auto binOp = cast<linalg::ElemwiseBinaryOp>(op);
+    linalg::BinaryFn func = binOp.getFun();
+    static DenseSet<linalg::BinaryFn> binarySet = {
+        linalg::BinaryFn::max_unsigned,
+        linalg::BinaryFn::min_unsigned,
+        linalg::BinaryFn::div_unsigned
+    };
+    if (binarySet.contains(func)) {
+      return true;
+    }
+
+    // other ops should check the signed info from annotation
+    std::optional<Operation *> tensorDType =
+        utils::getAnnotateOpWithAttr(op.getOperand(0), ANNOTATION_TENSOR_DTYPE);
+    if (tensorDType.has_value()) {
+      auto tensorDTypeValue = tensorDType.value()->getAttrOfType<StringAttr>(ANNOTATION_TENSOR_DTYPE);
+      if (tensorDTypeValue.getValue() == "ui8") {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 template <typename ElemType>
 SmallVector<Value> normalizeToTargetType(PatternRewriter &rewriter,
                                          const SmallVector<Value> &values,
-                                         Type targetType) {
+                                         Type targetType,
+                                         bool isUnsigned) {
   SmallVector<Value> result;
   for (Value v : values) {
     if (!isElemType<ElemType>(v.getType())) {
       result.push_back(v);
       continue;
     }
-    Value castResult = castTo(rewriter, v, targetType);
+    Value castResult = castTo(rewriter, v, targetType, 
+       isUnsigned ? hfusion::TypeFn::cast_unsigned : hfusion::TypeFn::cast_signed);
     result.push_back(castResult);
   }
   return result;
@@ -3068,6 +3112,10 @@ public:
       return failure();
     }
 
+    bool isUnsigned = isUnsignedOp(op);
+    // the tenser_dtype annotation is useless now, delete it if exists
+    clearOpTensorDTypeAnnotation(op, rewriter);
+
     Type targetType;
     if (computeByF16) {
       targetType = rewriter.getF16Type();
@@ -3077,9 +3125,9 @@ public:
       llvm_unreachable("Unsupported Op.");
     }
     SmallVector<Value> newInputs =
-        normalizeToTargetType<ElemType>(rewriter, op.getInputs(), targetType);
+        normalizeToTargetType<ElemType>(rewriter, op.getInputs(), targetType, isUnsigned);
     SmallVector<Value> newOutputs =
-        normalizeToTargetType<ElemType>(rewriter, op.getOutputs(), targetType);
+        normalizeToTargetType<ElemType>(rewriter, op.getOutputs(), targetType, isUnsigned);
     Operation *newOp = createBodyOp(op, newInputs, newOutputs, rewriter);
     if (std::is_same_v<OpType, hfusion::SelectOp>) {
       replaceI8ResultsWithTargetType(op->getResults(), newOp->getResults(),
@@ -3088,7 +3136,7 @@ public:
       // TODO: set argument enableOverflow = false inside for all non-arithmatic
       // op type
       replaceResultsWithTargetType<ElemType>(op->getResults(),
-                                             newOp->getResults(), rewriter);
+                                             newOp->getResults(), rewriter, isUnsigned);
     }
     return success();
   }

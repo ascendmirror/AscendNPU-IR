@@ -1,0 +1,1774 @@
+// -----// IR Dump After CanonicalizeModule (canonicalize-module) //----- //
+#map = affine_map<(d0) -> (d0)>
+module {
+  func.func @triton_argmax_1d_bool(%arg0: memref<?xi8>, %arg1: memref<?xi8>, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, global_kernel = "local", mix_mode = "aiv", parallel_mode = "simd"} {
+    %c0 = arith.constant 0 : index
+    %c-1_i32 = arith.constant -1 : i32
+    %false = arith.constant false
+    %c0_i8 = arith.constant 0 : i8
+    %0 = tensor.empty() : tensor<256xi8>
+    %1 = linalg.fill ins(%c0_i8 : i8) outs(%0 : tensor<256xi8>) -> tensor<256xi8>
+    %2 = tensor.empty() : tensor<256xi32>
+    %3 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel"]} outs(%2 : tensor<256xi32>) {
+    ^bb0(%out: i32):
+      %12 = linalg.index 0 : index
+      %13 = arith.index_cast %12 : index to i32
+      linalg.yield %13 : i32
+    } -> tensor<256xi32>
+    %4 = arith.index_cast %arg8 : i32 to index
+    %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%4], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+    %alloc = memref.alloc() : memref<256xi8>
+    memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+    %5 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+    %6 = arith.cmpi ne, %5, %1 : tensor<256xi8>
+    %7 = tensor.empty() : tensor<i1>
+    %8 = linalg.fill ins(%false : i1) outs(%7 : tensor<i1>) -> tensor<i1>
+    %9 = tensor.empty() : tensor<i32>
+    %10 = linalg.fill ins(%c-1_i32 : i32) outs(%9 : tensor<i32>) -> tensor<i32>
+    %reduced:2 = linalg.reduce ins(%6, %3 : tensor<256xi1>, tensor<256xi32>) outs(%8, %10 : tensor<i1>, tensor<i32>) dimensions = [0] 
+      (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+        %12 = arith.cmpi ugt, %in, %init : i1
+        %13 = arith.cmpi eq, %in, %init : i1
+        %14 = arith.cmpi slt, %in_1, %init_2 : i32
+        %15 = arith.andi %13, %14 : i1
+        %16 = arith.ori %12, %15 : i1
+        %17 = arith.select %16, %in, %init : i1
+        %18 = arith.select %16, %in_1, %init_2 : i32
+        linalg.yield %17, %18 : i1, i32
+      }
+    %extracted = tensor.extract %reduced#1[] : tensor<i32>
+    %11 = tensor.empty() : tensor<1xi32>
+    %inserted = tensor.insert %extracted into %11[%c0] : tensor<1xi32>
+    %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+    bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+    return
+  }
+}
+
+
+// -----// IR Dump After AppendTargetDeviceSpec (hacc-append-device-spec) //----- //
+#map = affine_map<(d0) -> (d0)>
+module attributes {dlti.target_system_spec = #dlti.target_system_spec<"NPU" : #hacc.target_device_spec<#dlti.dl_entry<"AI_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"CUBE_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"VECTOR_CORE_COUNT", 48 : i32>, #dlti.dl_entry<"UB_SIZE", 1572864 : i32>, #dlti.dl_entry<"L1_SIZE", 4194304 : i32>, #dlti.dl_entry<"L0A_SIZE", 524288 : i32>, #dlti.dl_entry<"L0B_SIZE", 524288 : i32>, #dlti.dl_entry<"L0C_SIZE", 1048576 : i32>, #dlti.dl_entry<"UB_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L1_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L0C_ALIGN_SIZE", 4096 : i32>>>} {
+  func.func @triton_argmax_1d_bool(%arg0: memref<?xi8>, %arg1: memref<?xi8>, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, global_kernel = "local", mix_mode = "aiv", parallel_mode = "simd"} {
+    %c0 = arith.constant 0 : index
+    %c-1_i32 = arith.constant -1 : i32
+    %false = arith.constant false
+    %c0_i8 = arith.constant 0 : i8
+    %0 = tensor.empty() : tensor<256xi8>
+    %1 = linalg.fill ins(%c0_i8 : i8) outs(%0 : tensor<256xi8>) -> tensor<256xi8>
+    %2 = tensor.empty() : tensor<256xi32>
+    %3 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel"]} outs(%2 : tensor<256xi32>) {
+    ^bb0(%out: i32):
+      %12 = linalg.index 0 : index
+      %13 = arith.index_cast %12 : index to i32
+      linalg.yield %13 : i32
+    } -> tensor<256xi32>
+    %4 = arith.index_cast %arg8 : i32 to index
+    %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%4], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+    %alloc = memref.alloc() : memref<256xi8>
+    memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+    %5 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+    %6 = arith.cmpi ne, %5, %1 : tensor<256xi8>
+    %7 = tensor.empty() : tensor<i1>
+    %8 = linalg.fill ins(%false : i1) outs(%7 : tensor<i1>) -> tensor<i1>
+    %9 = tensor.empty() : tensor<i32>
+    %10 = linalg.fill ins(%c-1_i32 : i32) outs(%9 : tensor<i32>) -> tensor<i32>
+    %reduced:2 = linalg.reduce ins(%6, %3 : tensor<256xi1>, tensor<256xi32>) outs(%8, %10 : tensor<i1>, tensor<i32>) dimensions = [0] 
+      (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+        %12 = arith.cmpi ugt, %in, %init : i1
+        %13 = arith.cmpi eq, %in, %init : i1
+        %14 = arith.cmpi slt, %in_1, %init_2 : i32
+        %15 = arith.andi %13, %14 : i1
+        %16 = arith.ori %12, %15 : i1
+        %17 = arith.select %16, %in, %init : i1
+        %18 = arith.select %16, %in_1, %init_2 : i32
+        linalg.yield %17, %18 : i1, i32
+      }
+    %extracted = tensor.extract %reduced#1[] : tensor<i32>
+    %11 = tensor.empty() : tensor<1xi32>
+    %inserted = tensor.insert %extracted into %11[%c0] : tensor<1xi32>
+    %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+    bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+    return
+  }
+}
+
+
+// -----// IR Dump After EraseSymbol (erase-symbol) //----- //
+func.func @triton_argmax_1d_bool(%arg0: memref<?xi8>, %arg1: memref<?xi8>, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, global_kernel = "local", mix_mode = "aiv", parallel_mode = "simd"} {
+  %c0 = arith.constant 0 : index
+  %c-1_i32 = arith.constant -1 : i32
+  %false = arith.constant false
+  %c0_i8 = arith.constant 0 : i8
+  %0 = tensor.empty() : tensor<256xi8>
+  %1 = linalg.fill ins(%c0_i8 : i8) outs(%0 : tensor<256xi8>) -> tensor<256xi8>
+  %2 = tensor.empty() : tensor<256xi32>
+  %3 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} outs(%2 : tensor<256xi32>) {
+  ^bb0(%out: i32):
+    %12 = linalg.index 0 : index
+    %13 = arith.index_cast %12 : index to i32
+    linalg.yield %13 : i32
+  } -> tensor<256xi32>
+  %4 = arith.index_cast %arg8 : i32 to index
+  %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%4], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+  %alloc = memref.alloc() : memref<256xi8>
+  memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+  %5 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+  %6 = arith.cmpi ne, %5, %1 : tensor<256xi8>
+  %7 = tensor.empty() : tensor<i1>
+  %8 = linalg.fill ins(%false : i1) outs(%7 : tensor<i1>) -> tensor<i1>
+  %9 = tensor.empty() : tensor<i32>
+  %10 = linalg.fill ins(%c-1_i32 : i32) outs(%9 : tensor<i32>) -> tensor<i32>
+  %reduced:2 = linalg.reduce ins(%6, %3 : tensor<256xi1>, tensor<256xi32>) outs(%8, %10 : tensor<i1>, tensor<i32>) dimensions = [0] 
+    (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+      %12 = arith.cmpi ugt, %in, %init : i1
+      %13 = arith.cmpi eq, %in, %init : i1
+      %14 = arith.cmpi slt, %in_1, %init_2 : i32
+      %15 = arith.andi %13, %14 : i1
+      %16 = arith.ori %12, %15 : i1
+      %17 = arith.select %16, %in, %init : i1
+      %18 = arith.select %16, %in_1, %init_2 : i32
+      linalg.yield %17, %18 : i1, i32
+    }
+  %extracted = tensor.extract %reduced#1[] : tensor<i32>
+  %11 = tensor.empty() : tensor<1xi32>
+  %inserted = tensor.insert %extracted into %11[%c0] : tensor<1xi32>
+  %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+  bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+  return
+}
+
+// -----// IR Dump After ConvertArithToHFusion (convert-arith-to-hfusion) //----- //
+#map = affine_map<(d0) -> (d0)>
+module attributes {dlti.target_system_spec = #dlti.target_system_spec<"NPU" : #hacc.target_device_spec<#dlti.dl_entry<"AI_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"CUBE_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"VECTOR_CORE_COUNT", 48 : i32>, #dlti.dl_entry<"UB_SIZE", 1572864 : i32>, #dlti.dl_entry<"L1_SIZE", 4194304 : i32>, #dlti.dl_entry<"L0A_SIZE", 524288 : i32>, #dlti.dl_entry<"L0B_SIZE", 524288 : i32>, #dlti.dl_entry<"L0C_SIZE", 1048576 : i32>, #dlti.dl_entry<"UB_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L1_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L0C_ALIGN_SIZE", 4096 : i32>>>} {
+  func.func @triton_argmax_1d_bool(%arg0: memref<?xi8>, %arg1: memref<?xi8>, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, global_kernel = "local", mix_mode = "aiv", parallel_mode = "simd"} {
+    %c0 = arith.constant 0 : index
+    %c-1_i32 = arith.constant -1 : i32
+    %false = arith.constant false
+    %c0_i8 = arith.constant 0 : i8
+    %0 = tensor.empty() : tensor<256xi8>
+    %1 = linalg.fill ins(%c0_i8 : i8) outs(%0 : tensor<256xi8>) -> tensor<256xi8>
+    %2 = tensor.empty() : tensor<256xi32>
+    %3 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel"]} outs(%2 : tensor<256xi32>) {
+    ^bb0(%out: i32):
+      %13 = linalg.index 0 : index
+      %14 = arith.index_cast %13 : index to i32
+      linalg.yield %14 : i32
+    } -> tensor<256xi32>
+    %4 = arith.index_cast %arg8 : i32 to index
+    %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%4], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+    %alloc = memref.alloc() : memref<256xi8>
+    memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+    %5 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+    %6 = tensor.empty() : tensor<256xi1>
+    %7 = hfusion.compare {compare_fn = #hfusion.compare_fn<vne>} ins(%5, %1 : tensor<256xi8>, tensor<256xi8>) outs(%6 : tensor<256xi1>) -> tensor<256xi1>
+    %8 = tensor.empty() : tensor<i1>
+    %9 = linalg.fill ins(%false : i1) outs(%8 : tensor<i1>) -> tensor<i1>
+    %10 = tensor.empty() : tensor<i32>
+    %11 = linalg.fill ins(%c-1_i32 : i32) outs(%10 : tensor<i32>) -> tensor<i32>
+    %reduced:2 = linalg.reduce ins(%7, %3 : tensor<256xi1>, tensor<256xi32>) outs(%9, %11 : tensor<i1>, tensor<i32>) dimensions = [0] 
+      (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+        %13 = arith.cmpi ugt, %in, %init : i1
+        %14 = arith.cmpi eq, %in, %init : i1
+        %15 = arith.cmpi slt, %in_1, %init_2 : i32
+        %16 = arith.andi %14, %15 : i1
+        %17 = arith.ori %13, %16 : i1
+        %18 = arith.select %17, %in, %init : i1
+        %19 = arith.select %17, %in_1, %init_2 : i32
+        linalg.yield %18, %19 : i1, i32
+      }
+    %extracted = tensor.extract %reduced#1[] : tensor<i32>
+    %12 = tensor.empty() : tensor<1xi32>
+    %inserted = tensor.insert %extracted into %12[%c0] : tensor<1xi32>
+    %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+    bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+    return
+  }
+}
+
+
+// -----// IR Dump After ConvertMathToHFusion (convert-math-to-hfusion) //----- //
+#map = affine_map<(d0) -> (d0)>
+module attributes {dlti.target_system_spec = #dlti.target_system_spec<"NPU" : #hacc.target_device_spec<#dlti.dl_entry<"AI_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"CUBE_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"VECTOR_CORE_COUNT", 48 : i32>, #dlti.dl_entry<"UB_SIZE", 1572864 : i32>, #dlti.dl_entry<"L1_SIZE", 4194304 : i32>, #dlti.dl_entry<"L0A_SIZE", 524288 : i32>, #dlti.dl_entry<"L0B_SIZE", 524288 : i32>, #dlti.dl_entry<"L0C_SIZE", 1048576 : i32>, #dlti.dl_entry<"UB_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L1_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L0C_ALIGN_SIZE", 4096 : i32>>>} {
+  func.func @triton_argmax_1d_bool(%arg0: memref<?xi8>, %arg1: memref<?xi8>, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, global_kernel = "local", mix_mode = "aiv", parallel_mode = "simd"} {
+    %c0 = arith.constant 0 : index
+    %c-1_i32 = arith.constant -1 : i32
+    %false = arith.constant false
+    %c0_i8 = arith.constant 0 : i8
+    %0 = tensor.empty() : tensor<256xi8>
+    %1 = linalg.fill ins(%c0_i8 : i8) outs(%0 : tensor<256xi8>) -> tensor<256xi8>
+    %2 = tensor.empty() : tensor<256xi32>
+    %3 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel"]} outs(%2 : tensor<256xi32>) {
+    ^bb0(%out: i32):
+      %13 = linalg.index 0 : index
+      %14 = arith.index_cast %13 : index to i32
+      linalg.yield %14 : i32
+    } -> tensor<256xi32>
+    %4 = arith.index_cast %arg8 : i32 to index
+    %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%4], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+    %alloc = memref.alloc() : memref<256xi8>
+    memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+    %5 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+    %6 = tensor.empty() : tensor<256xi1>
+    %7 = hfusion.compare {compare_fn = #hfusion.compare_fn<vne>} ins(%5, %1 : tensor<256xi8>, tensor<256xi8>) outs(%6 : tensor<256xi1>) -> tensor<256xi1>
+    %8 = tensor.empty() : tensor<i1>
+    %9 = linalg.fill ins(%false : i1) outs(%8 : tensor<i1>) -> tensor<i1>
+    %10 = tensor.empty() : tensor<i32>
+    %11 = linalg.fill ins(%c-1_i32 : i32) outs(%10 : tensor<i32>) -> tensor<i32>
+    %reduced:2 = linalg.reduce ins(%7, %3 : tensor<256xi1>, tensor<256xi32>) outs(%9, %11 : tensor<i1>, tensor<i32>) dimensions = [0] 
+      (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+        %13 = arith.cmpi ugt, %in, %init : i1
+        %14 = arith.cmpi eq, %in, %init : i1
+        %15 = arith.cmpi slt, %in_1, %init_2 : i32
+        %16 = arith.andi %14, %15 : i1
+        %17 = arith.ori %13, %16 : i1
+        %18 = arith.select %17, %in, %init : i1
+        %19 = arith.select %17, %in_1, %init_2 : i32
+        linalg.yield %18, %19 : i1, i32
+      }
+    %extracted = tensor.extract %reduced#1[] : tensor<i32>
+    %12 = tensor.empty() : tensor<1xi32>
+    %inserted = tensor.insert %extracted into %12[%c0] : tensor<1xi32>
+    %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+    bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+    return
+  }
+}
+
+
+// -----// IR Dump After ConvertLinalgToHFusion (convert-linalg-to-hfusion) //----- //
+module attributes {dlti.target_system_spec = #dlti.target_system_spec<"NPU" : #hacc.target_device_spec<#dlti.dl_entry<"AI_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"CUBE_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"VECTOR_CORE_COUNT", 48 : i32>, #dlti.dl_entry<"UB_SIZE", 1572864 : i32>, #dlti.dl_entry<"L1_SIZE", 4194304 : i32>, #dlti.dl_entry<"L0A_SIZE", 524288 : i32>, #dlti.dl_entry<"L0B_SIZE", 524288 : i32>, #dlti.dl_entry<"L0C_SIZE", 1048576 : i32>, #dlti.dl_entry<"UB_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L1_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L0C_ALIGN_SIZE", 4096 : i32>>>} {
+  func.func @triton_argmax_1d_bool(%arg0: memref<?xi8>, %arg1: memref<?xi8>, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, global_kernel = "local", mix_mode = "aiv", parallel_mode = "simd"} {
+    %c0 = arith.constant 0 : index
+    %c-1_i32 = arith.constant -1 : i32
+    %false = arith.constant false
+    %c0_i8 = arith.constant 0 : i8
+    %0 = tensor.empty() : tensor<256xi8>
+    %1 = linalg.fill ins(%c0_i8 : i8) outs(%0 : tensor<256xi8>) -> tensor<256xi8>
+    %2 = tensor.empty() : tensor<256xi32>
+    %c1 = arith.constant 1 : index
+    %c0_0 = arith.constant 0 : index
+    %3 = hfusion.arange offset[%c0_0] strides[%c1] outs(%2 : tensor<256xi32>) -> tensor<256xi32>
+    %4 = arith.index_cast %arg8 : i32 to index
+    %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%4], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+    %alloc = memref.alloc() : memref<256xi8>
+    memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+    %5 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+    %6 = tensor.empty() : tensor<256xi1>
+    %7 = hfusion.compare {compare_fn = #hfusion.compare_fn<vne>} ins(%5, %1 : tensor<256xi8>, tensor<256xi8>) outs(%6 : tensor<256xi1>) -> tensor<256xi1>
+    %8 = tensor.empty() : tensor<i1>
+    %9 = linalg.fill ins(%false : i1) outs(%8 : tensor<i1>) -> tensor<i1>
+    %10 = tensor.empty() : tensor<i32>
+    %11 = linalg.fill ins(%c-1_i32 : i32) outs(%10 : tensor<i32>) -> tensor<i32>
+    %reduced:2 = linalg.reduce ins(%7, %3 : tensor<256xi1>, tensor<256xi32>) outs(%9, %11 : tensor<i1>, tensor<i32>) dimensions = [0] 
+      (%in: i1, %in_2: i32, %init: i1, %init_3: i32) {
+        %13 = arith.cmpi ugt, %in, %init : i1
+        %14 = arith.cmpi eq, %in, %init : i1
+        %15 = arith.cmpi slt, %in_2, %init_3 : i32
+        %16 = arith.andi %14, %15 : i1
+        %17 = arith.ori %13, %16 : i1
+        %18 = arith.select %17, %in, %init : i1
+        %19 = arith.select %17, %in_2, %init_3 : i32
+        linalg.yield %18, %19 : i1, i32
+      }
+    %extracted = tensor.extract %reduced#1[] : tensor<i32>
+    %12 = tensor.empty() : tensor<1xi32>
+    %inserted = tensor.insert %extracted into %12[%c0] : tensor<1xi32>
+    %reinterpret_cast_1 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+    bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_1 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+    return
+  }
+}
+
+
+// -----// IR Dump After SymbolDCE (symbol-dce) //----- //
+module attributes {dlti.target_system_spec = #dlti.target_system_spec<"NPU" : #hacc.target_device_spec<#dlti.dl_entry<"AI_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"CUBE_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"VECTOR_CORE_COUNT", 48 : i32>, #dlti.dl_entry<"UB_SIZE", 1572864 : i32>, #dlti.dl_entry<"L1_SIZE", 4194304 : i32>, #dlti.dl_entry<"L0A_SIZE", 524288 : i32>, #dlti.dl_entry<"L0B_SIZE", 524288 : i32>, #dlti.dl_entry<"L0C_SIZE", 1048576 : i32>, #dlti.dl_entry<"UB_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L1_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L0C_ALIGN_SIZE", 4096 : i32>>>} {
+  func.func @triton_argmax_1d_bool(%arg0: memref<?xi8>, %arg1: memref<?xi8>, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, global_kernel = "local", mix_mode = "aiv", parallel_mode = "simd"} {
+    %c0 = arith.constant 0 : index
+    %c-1_i32 = arith.constant -1 : i32
+    %false = arith.constant false
+    %c0_i8 = arith.constant 0 : i8
+    %0 = tensor.empty() : tensor<256xi8>
+    %1 = linalg.fill ins(%c0_i8 : i8) outs(%0 : tensor<256xi8>) -> tensor<256xi8>
+    %2 = tensor.empty() : tensor<256xi32>
+    %c1 = arith.constant 1 : index
+    %c0_0 = arith.constant 0 : index
+    %3 = hfusion.arange offset[%c0_0] strides[%c1] outs(%2 : tensor<256xi32>) -> tensor<256xi32>
+    %4 = arith.index_cast %arg8 : i32 to index
+    %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%4], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+    %alloc = memref.alloc() : memref<256xi8>
+    memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+    %5 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+    %6 = tensor.empty() : tensor<256xi1>
+    %7 = hfusion.compare {compare_fn = #hfusion.compare_fn<vne>} ins(%5, %1 : tensor<256xi8>, tensor<256xi8>) outs(%6 : tensor<256xi1>) -> tensor<256xi1>
+    %8 = tensor.empty() : tensor<i1>
+    %9 = linalg.fill ins(%false : i1) outs(%8 : tensor<i1>) -> tensor<i1>
+    %10 = tensor.empty() : tensor<i32>
+    %11 = linalg.fill ins(%c-1_i32 : i32) outs(%10 : tensor<i32>) -> tensor<i32>
+    %reduced:2 = linalg.reduce ins(%7, %3 : tensor<256xi1>, tensor<256xi32>) outs(%9, %11 : tensor<i1>, tensor<i32>) dimensions = [0] 
+      (%in: i1, %in_2: i32, %init: i1, %init_3: i32) {
+        %13 = arith.cmpi ugt, %in, %init : i1
+        %14 = arith.cmpi eq, %in, %init : i1
+        %15 = arith.cmpi slt, %in_2, %init_3 : i32
+        %16 = arith.andi %14, %15 : i1
+        %17 = arith.ori %13, %16 : i1
+        %18 = arith.select %17, %in, %init : i1
+        %19 = arith.select %17, %in_2, %init_3 : i32
+        linalg.yield %18, %19 : i1, i32
+      }
+    %extracted = tensor.extract %reduced#1[] : tensor<i32>
+    %12 = tensor.empty() : tensor<1xi32>
+    %inserted = tensor.insert %extracted into %12[%c0] : tensor<1xi32>
+    %reinterpret_cast_1 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+    bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_1 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+    return
+  }
+}
+
+
+// -----// IR Dump After ConvertGPUToHFusion (convert-gpu-to-hfusion) //----- //
+module attributes {dlti.target_system_spec = #dlti.target_system_spec<"NPU" : #hacc.target_device_spec<#dlti.dl_entry<"AI_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"CUBE_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"VECTOR_CORE_COUNT", 48 : i32>, #dlti.dl_entry<"UB_SIZE", 1572864 : i32>, #dlti.dl_entry<"L1_SIZE", 4194304 : i32>, #dlti.dl_entry<"L0A_SIZE", 524288 : i32>, #dlti.dl_entry<"L0B_SIZE", 524288 : i32>, #dlti.dl_entry<"L0C_SIZE", 1048576 : i32>, #dlti.dl_entry<"UB_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L1_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L0C_ALIGN_SIZE", 4096 : i32>>>} {
+  func.func @triton_argmax_1d_bool(%arg0: memref<?xi8>, %arg1: memref<?xi8>, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, global_kernel = "local", mix_mode = "aiv", parallel_mode = "simd"} {
+    %c0 = arith.constant 0 : index
+    %c-1_i32 = arith.constant -1 : i32
+    %false = arith.constant false
+    %c0_i8 = arith.constant 0 : i8
+    %0 = tensor.empty() : tensor<256xi8>
+    %1 = linalg.fill ins(%c0_i8 : i8) outs(%0 : tensor<256xi8>) -> tensor<256xi8>
+    %2 = tensor.empty() : tensor<256xi32>
+    %c1 = arith.constant 1 : index
+    %c0_0 = arith.constant 0 : index
+    %3 = hfusion.arange offset[%c0_0] strides[%c1] outs(%2 : tensor<256xi32>) -> tensor<256xi32>
+    %4 = arith.index_cast %arg8 : i32 to index
+    %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%4], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+    %alloc = memref.alloc() : memref<256xi8>
+    memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+    %5 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+    %6 = tensor.empty() : tensor<256xi1>
+    %7 = hfusion.compare {compare_fn = #hfusion.compare_fn<vne>} ins(%5, %1 : tensor<256xi8>, tensor<256xi8>) outs(%6 : tensor<256xi1>) -> tensor<256xi1>
+    %8 = tensor.empty() : tensor<i1>
+    %9 = linalg.fill ins(%false : i1) outs(%8 : tensor<i1>) -> tensor<i1>
+    %10 = tensor.empty() : tensor<i32>
+    %11 = linalg.fill ins(%c-1_i32 : i32) outs(%10 : tensor<i32>) -> tensor<i32>
+    %reduced:2 = linalg.reduce ins(%7, %3 : tensor<256xi1>, tensor<256xi32>) outs(%9, %11 : tensor<i1>, tensor<i32>) dimensions = [0] 
+      (%in: i1, %in_2: i32, %init: i1, %init_3: i32) {
+        %13 = arith.cmpi ugt, %in, %init : i1
+        %14 = arith.cmpi eq, %in, %init : i1
+        %15 = arith.cmpi slt, %in_2, %init_3 : i32
+        %16 = arith.andi %14, %15 : i1
+        %17 = arith.ori %13, %16 : i1
+        %18 = arith.select %17, %in, %init : i1
+        %19 = arith.select %17, %in_2, %init_3 : i32
+        linalg.yield %18, %19 : i1, i32
+      }
+    %extracted = tensor.extract %reduced#1[] : tensor<i32>
+    %12 = tensor.empty() : tensor<1xi32>
+    %inserted = tensor.insert %extracted into %12[%c0] : tensor<1xi32>
+    %reinterpret_cast_1 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+    bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_1 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+    return
+  }
+}
+
+
+// -----// IR Dump After AdaptTritonKernel (adapt-triton-kernel) //----- //
+module attributes {dlti.target_system_spec = #dlti.target_system_spec<"NPU" : #hacc.target_device_spec<#dlti.dl_entry<"AI_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"CUBE_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"VECTOR_CORE_COUNT", 48 : i32>, #dlti.dl_entry<"UB_SIZE", 1572864 : i32>, #dlti.dl_entry<"L1_SIZE", 4194304 : i32>, #dlti.dl_entry<"L0A_SIZE", 524288 : i32>, #dlti.dl_entry<"L0B_SIZE", 524288 : i32>, #dlti.dl_entry<"L0C_SIZE", 1048576 : i32>, #dlti.dl_entry<"UB_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L1_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L0C_ALIGN_SIZE", 4096 : i32>>>, hacc.triton_kernel} {
+  func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+    %c1 = arith.constant 1 : index
+    %c0 = arith.constant 0 : index
+    %c-1_i32 = arith.constant -1 : i32
+    %false = arith.constant false
+    %c0_i8 = arith.constant 0 : i8
+    %0 = tensor.empty() : tensor<256xi8>
+    %1 = linalg.fill ins(%c0_i8 : i8) outs(%0 : tensor<256xi8>) -> tensor<256xi8>
+    %2 = tensor.empty() : tensor<256xi32>
+    %3 = hfusion.arange offset[%c0] strides[%c1] outs(%2 : tensor<256xi32>) -> tensor<256xi32>
+    %4 = arith.index_cast %arg8 : i32 to index
+    %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%4], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+    %alloc = memref.alloc() : memref<256xi8>
+    memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+    %5 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+    %6 = tensor.empty() : tensor<256xi1>
+    %7 = hfusion.compare {compare_fn = #hfusion.compare_fn<vne>} ins(%5, %1 : tensor<256xi8>, tensor<256xi8>) outs(%6 : tensor<256xi1>) -> tensor<256xi1>
+    %8 = tensor.empty() : tensor<i1>
+    %9 = linalg.fill ins(%false : i1) outs(%8 : tensor<i1>) -> tensor<i1>
+    %10 = tensor.empty() : tensor<i32>
+    %11 = linalg.fill ins(%c-1_i32 : i32) outs(%10 : tensor<i32>) -> tensor<i32>
+    %reduced:2 = linalg.reduce ins(%7, %3 : tensor<256xi1>, tensor<256xi32>) outs(%9, %11 : tensor<i1>, tensor<i32>) dimensions = [0] 
+      (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+        %13 = arith.cmpi ugt, %in, %init : i1
+        %14 = arith.cmpi eq, %in, %init : i1
+        %15 = arith.cmpi slt, %in_1, %init_2 : i32
+        %16 = arith.andi %14, %15 : i1
+        %17 = arith.ori %13, %16 : i1
+        %18 = arith.select %17, %in, %init : i1
+        %19 = arith.select %17, %in_1, %init_2 : i32
+        linalg.yield %18, %19 : i1, i32
+      }
+    %extracted = tensor.extract %reduced#1[] : tensor<i32>
+    %12 = tensor.empty() : tensor<1xi32>
+    %inserted = tensor.insert %extracted into %12[%c0] : tensor<1xi32>
+    %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+    bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+    return
+  }
+}
+
+
+// -----// IR Dump After ConvertTensorToHFusion (convert-tensor-to-hfusion) //----- //
+module attributes {dlti.target_system_spec = #dlti.target_system_spec<"NPU" : #hacc.target_device_spec<#dlti.dl_entry<"AI_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"CUBE_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"VECTOR_CORE_COUNT", 48 : i32>, #dlti.dl_entry<"UB_SIZE", 1572864 : i32>, #dlti.dl_entry<"L1_SIZE", 4194304 : i32>, #dlti.dl_entry<"L0A_SIZE", 524288 : i32>, #dlti.dl_entry<"L0B_SIZE", 524288 : i32>, #dlti.dl_entry<"L0C_SIZE", 1048576 : i32>, #dlti.dl_entry<"UB_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L1_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L0C_ALIGN_SIZE", 4096 : i32>>>, hacc.triton_kernel} {
+  func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+    %c1 = arith.constant 1 : index
+    %c0 = arith.constant 0 : index
+    %c-1_i32 = arith.constant -1 : i32
+    %false = arith.constant false
+    %c0_i8 = arith.constant 0 : i8
+    %0 = tensor.empty() : tensor<256xi8>
+    %1 = linalg.fill ins(%c0_i8 : i8) outs(%0 : tensor<256xi8>) -> tensor<256xi8>
+    %2 = tensor.empty() : tensor<256xi32>
+    %3 = hfusion.arange offset[%c0] strides[%c1] outs(%2 : tensor<256xi32>) -> tensor<256xi32>
+    %4 = arith.index_cast %arg8 : i32 to index
+    %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%4], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+    %alloc = memref.alloc() : memref<256xi8>
+    memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+    %5 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+    %6 = tensor.empty() : tensor<256xi1>
+    %7 = hfusion.compare {compare_fn = #hfusion.compare_fn<vne>} ins(%5, %1 : tensor<256xi8>, tensor<256xi8>) outs(%6 : tensor<256xi1>) -> tensor<256xi1>
+    %8 = tensor.empty() : tensor<i1>
+    %9 = linalg.fill ins(%false : i1) outs(%8 : tensor<i1>) -> tensor<i1>
+    %10 = tensor.empty() : tensor<i32>
+    %11 = linalg.fill ins(%c-1_i32 : i32) outs(%10 : tensor<i32>) -> tensor<i32>
+    %reduced:2 = linalg.reduce ins(%7, %3 : tensor<256xi1>, tensor<256xi32>) outs(%9, %11 : tensor<i1>, tensor<i32>) dimensions = [0] 
+      (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+        %13 = arith.cmpi ugt, %in, %init : i1
+        %14 = arith.cmpi eq, %in, %init : i1
+        %15 = arith.cmpi slt, %in_1, %init_2 : i32
+        %16 = arith.andi %14, %15 : i1
+        %17 = arith.ori %13, %16 : i1
+        %18 = arith.select %17, %in, %init : i1
+        %19 = arith.select %17, %in_1, %init_2 : i32
+        linalg.yield %18, %19 : i1, i32
+      }
+    %extracted = tensor.extract %reduced#1[] : tensor<i32>
+    %12 = tensor.empty() : tensor<1xi32>
+    %inserted = tensor.insert %extracted into %12[%c0] : tensor<1xi32>
+    %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+    bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+    return
+  }
+}
+
+
+// -----// IR Dump After CanonicalizeTensorReshape (canonicalize-tensor-reshape) //----- //
+func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c-1_i32 = arith.constant -1 : i32
+  %false = arith.constant false
+  %c0_i8 = arith.constant 0 : i8
+  %0 = tensor.empty() : tensor<256xi8>
+  %1 = linalg.fill ins(%c0_i8 : i8) outs(%0 : tensor<256xi8>) -> tensor<256xi8>
+  %2 = tensor.empty() : tensor<256xi32>
+  %3 = hfusion.arange offset[%c0] strides[%c1] outs(%2 : tensor<256xi32>) -> tensor<256xi32>
+  %4 = arith.index_cast %arg8 : i32 to index
+  %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%4], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+  %alloc = memref.alloc() : memref<256xi8>
+  memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+  %5 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+  %6 = tensor.empty() : tensor<256xi1>
+  %7 = hfusion.compare {compare_fn = #hfusion.compare_fn<vne>} ins(%5, %1 : tensor<256xi8>, tensor<256xi8>) outs(%6 : tensor<256xi1>) -> tensor<256xi1>
+  %8 = tensor.empty() : tensor<i1>
+  %9 = linalg.fill ins(%false : i1) outs(%8 : tensor<i1>) -> tensor<i1>
+  %10 = tensor.empty() : tensor<i32>
+  %11 = linalg.fill ins(%c-1_i32 : i32) outs(%10 : tensor<i32>) -> tensor<i32>
+  %reduced:2 = linalg.reduce ins(%7, %3 : tensor<256xi1>, tensor<256xi32>) outs(%9, %11 : tensor<i1>, tensor<i32>) dimensions = [0] 
+    (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+      %13 = arith.cmpi ugt, %in, %init : i1
+      %14 = arith.cmpi eq, %in, %init : i1
+      %15 = arith.cmpi slt, %in_1, %init_2 : i32
+      %16 = arith.andi %14, %15 : i1
+      %17 = arith.ori %13, %16 : i1
+      %18 = arith.select %17, %in, %init : i1
+      %19 = arith.select %17, %in_1, %init_2 : i32
+      linalg.yield %18, %19 : i1, i32
+    }
+  %extracted = tensor.extract %reduced#1[] : tensor<i32>
+  %12 = tensor.empty() : tensor<1xi32>
+  %inserted = tensor.insert %extracted into %12[%c0] : tensor<1xi32>
+  %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+  bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+  return
+}
+
+// -----// IR Dump After CSE (cse) //----- //
+module attributes {dlti.target_system_spec = #dlti.target_system_spec<"NPU" : #hacc.target_device_spec<#dlti.dl_entry<"AI_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"CUBE_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"VECTOR_CORE_COUNT", 48 : i32>, #dlti.dl_entry<"UB_SIZE", 1572864 : i32>, #dlti.dl_entry<"L1_SIZE", 4194304 : i32>, #dlti.dl_entry<"L0A_SIZE", 524288 : i32>, #dlti.dl_entry<"L0B_SIZE", 524288 : i32>, #dlti.dl_entry<"L0C_SIZE", 1048576 : i32>, #dlti.dl_entry<"UB_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L1_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L0C_ALIGN_SIZE", 4096 : i32>>>, hacc.triton_kernel} {
+  func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+    %c1 = arith.constant 1 : index
+    %c0 = arith.constant 0 : index
+    %c-1_i32 = arith.constant -1 : i32
+    %false = arith.constant false
+    %c0_i8 = arith.constant 0 : i8
+    %0 = tensor.empty() : tensor<256xi8>
+    %1 = linalg.fill ins(%c0_i8 : i8) outs(%0 : tensor<256xi8>) -> tensor<256xi8>
+    %2 = tensor.empty() : tensor<256xi32>
+    %3 = hfusion.arange offset[%c0] strides[%c1] outs(%2 : tensor<256xi32>) -> tensor<256xi32>
+    %4 = arith.index_cast %arg8 : i32 to index
+    %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%4], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+    %alloc = memref.alloc() : memref<256xi8>
+    memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+    %5 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+    %6 = tensor.empty() : tensor<256xi1>
+    %7 = hfusion.compare {compare_fn = #hfusion.compare_fn<vne>} ins(%5, %1 : tensor<256xi8>, tensor<256xi8>) outs(%6 : tensor<256xi1>) -> tensor<256xi1>
+    %8 = tensor.empty() : tensor<i1>
+    %9 = linalg.fill ins(%false : i1) outs(%8 : tensor<i1>) -> tensor<i1>
+    %10 = tensor.empty() : tensor<i32>
+    %11 = linalg.fill ins(%c-1_i32 : i32) outs(%10 : tensor<i32>) -> tensor<i32>
+    %reduced:2 = linalg.reduce ins(%7, %3 : tensor<256xi1>, tensor<256xi32>) outs(%9, %11 : tensor<i1>, tensor<i32>) dimensions = [0] 
+      (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+        %13 = arith.cmpi ugt, %in, %init : i1
+        %14 = arith.cmpi eq, %in, %init : i1
+        %15 = arith.cmpi slt, %in_1, %init_2 : i32
+        %16 = arith.andi %14, %15 : i1
+        %17 = arith.ori %13, %16 : i1
+        %18 = arith.select %17, %in, %init : i1
+        %19 = arith.select %17, %in_1, %init_2 : i32
+        linalg.yield %18, %19 : i1, i32
+      }
+    %extracted = tensor.extract %reduced#1[] : tensor<i32>
+    %12 = tensor.empty() : tensor<1xi32>
+    %inserted = tensor.insert %extracted into %12[%c0] : tensor<1xi32>
+    %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+    bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+    return
+  }
+}
+
+
+// -----// IR Dump After ExtendedCanonicalizer (canonicalize-ext) //----- //
+module attributes {dlti.target_system_spec = #dlti.target_system_spec<"NPU" : #hacc.target_device_spec<#dlti.dl_entry<"AI_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"CUBE_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"VECTOR_CORE_COUNT", 48 : i32>, #dlti.dl_entry<"UB_SIZE", 1572864 : i32>, #dlti.dl_entry<"L1_SIZE", 4194304 : i32>, #dlti.dl_entry<"L0A_SIZE", 524288 : i32>, #dlti.dl_entry<"L0B_SIZE", 524288 : i32>, #dlti.dl_entry<"L0C_SIZE", 1048576 : i32>, #dlti.dl_entry<"UB_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L1_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L0C_ALIGN_SIZE", 4096 : i32>>>, hacc.triton_kernel} {
+  func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+    %c1 = arith.constant 1 : index
+    %c0 = arith.constant 0 : index
+    %c-1_i32 = arith.constant -1 : i32
+    %false = arith.constant false
+    %c0_i8 = arith.constant 0 : i8
+    %0 = tensor.empty() : tensor<256xi8>
+    %1 = linalg.fill ins(%c0_i8 : i8) outs(%0 : tensor<256xi8>) -> tensor<256xi8>
+    %2 = tensor.empty() : tensor<256xi32>
+    %3 = hfusion.arange offset[%c0] strides[%c1] outs(%2 : tensor<256xi32>) -> tensor<256xi32>
+    %4 = arith.index_cast %arg8 : i32 to index
+    %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%4], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+    %alloc = memref.alloc() : memref<256xi8>
+    memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+    %5 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+    %6 = tensor.empty() : tensor<256xi1>
+    %7 = hfusion.compare {compare_fn = #hfusion.compare_fn<vne>} ins(%5, %1 : tensor<256xi8>, tensor<256xi8>) outs(%6 : tensor<256xi1>) -> tensor<256xi1>
+    %8 = tensor.empty() : tensor<i1>
+    %9 = linalg.fill ins(%false : i1) outs(%8 : tensor<i1>) -> tensor<i1>
+    %10 = tensor.empty() : tensor<i32>
+    %11 = linalg.fill ins(%c-1_i32 : i32) outs(%10 : tensor<i32>) -> tensor<i32>
+    %reduced:2 = linalg.reduce ins(%7, %3 : tensor<256xi1>, tensor<256xi32>) outs(%9, %11 : tensor<i1>, tensor<i32>) dimensions = [0] 
+      (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+        %13 = arith.cmpi ugt, %in, %init : i1
+        %14 = arith.cmpi eq, %in, %init : i1
+        %15 = arith.cmpi slt, %in_1, %init_2 : i32
+        %16 = arith.andi %14, %15 : i1
+        %17 = arith.ori %13, %16 : i1
+        %18 = arith.select %17, %in, %init : i1
+        %19 = arith.select %17, %in_1, %init_2 : i32
+        linalg.yield %18, %19 : i1, i32
+      }
+    %extracted = tensor.extract %reduced#1[] : tensor<i32>
+    %12 = tensor.empty() : tensor<1xi32>
+    %inserted = tensor.insert %extracted into %12[%c0] : tensor<1xi32>
+    %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+    bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+    return
+  }
+}
+
+
+// -----// IR Dump After NormalizeTensorOps (normalize-tensor-ops) //----- //
+func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c-1_i32 = arith.constant -1 : i32
+  %false = arith.constant false
+  %c0_i8 = arith.constant 0 : i8
+  %0 = tensor.empty() : tensor<256xi8>
+  %1 = linalg.fill ins(%c0_i8 : i8) outs(%0 : tensor<256xi8>) -> tensor<256xi8>
+  %2 = tensor.empty() : tensor<256xi32>
+  %3 = hfusion.arange offset[%c0] strides[%c1] outs(%2 : tensor<256xi32>) -> tensor<256xi32>
+  %4 = arith.index_cast %arg8 : i32 to index
+  %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%4], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+  %alloc = memref.alloc() : memref<256xi8>
+  memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+  %5 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+  %6 = tensor.empty() : tensor<256xi1>
+  %7 = hfusion.compare {compare_fn = #hfusion.compare_fn<vne>} ins(%5, %1 : tensor<256xi8>, tensor<256xi8>) outs(%6 : tensor<256xi1>) -> tensor<256xi1>
+  %8 = tensor.empty() : tensor<i1>
+  %9 = linalg.fill ins(%false : i1) outs(%8 : tensor<i1>) -> tensor<i1>
+  %10 = tensor.empty() : tensor<i32>
+  %11 = linalg.fill ins(%c-1_i32 : i32) outs(%10 : tensor<i32>) -> tensor<i32>
+  %reduced:2 = linalg.reduce ins(%7, %3 : tensor<256xi1>, tensor<256xi32>) outs(%9, %11 : tensor<i1>, tensor<i32>) dimensions = [0] 
+    (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+      %13 = arith.cmpi ugt, %in, %init : i1
+      %14 = arith.cmpi eq, %in, %init : i1
+      %15 = arith.cmpi slt, %in_1, %init_2 : i32
+      %16 = arith.andi %14, %15 : i1
+      %17 = arith.ori %13, %16 : i1
+      %18 = arith.select %17, %in, %init : i1
+      %19 = arith.select %17, %in_1, %init_2 : i32
+      linalg.yield %18, %19 : i1, i32
+    }
+  %extracted = tensor.extract %reduced#1[] : tensor<i32>
+  %12 = tensor.empty() : tensor<1xi32>
+  %inserted = tensor.insert %extracted into %12[%c0] : tensor<1xi32>
+  %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+  bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+  return
+}
+
+// -----// IR Dump After ConvertArithToHFusion (convert-arith-to-hfusion) //----- //
+module attributes {dlti.target_system_spec = #dlti.target_system_spec<"NPU" : #hacc.target_device_spec<#dlti.dl_entry<"AI_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"CUBE_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"VECTOR_CORE_COUNT", 48 : i32>, #dlti.dl_entry<"UB_SIZE", 1572864 : i32>, #dlti.dl_entry<"L1_SIZE", 4194304 : i32>, #dlti.dl_entry<"L0A_SIZE", 524288 : i32>, #dlti.dl_entry<"L0B_SIZE", 524288 : i32>, #dlti.dl_entry<"L0C_SIZE", 1048576 : i32>, #dlti.dl_entry<"UB_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L1_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L0C_ALIGN_SIZE", 4096 : i32>>>, hacc.triton_kernel} {
+  func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+    %c1 = arith.constant 1 : index
+    %c0 = arith.constant 0 : index
+    %c-1_i32 = arith.constant -1 : i32
+    %false = arith.constant false
+    %c0_i8 = arith.constant 0 : i8
+    %0 = tensor.empty() : tensor<256xi8>
+    %1 = linalg.fill ins(%c0_i8 : i8) outs(%0 : tensor<256xi8>) -> tensor<256xi8>
+    %2 = tensor.empty() : tensor<256xi32>
+    %3 = hfusion.arange offset[%c0] strides[%c1] outs(%2 : tensor<256xi32>) -> tensor<256xi32>
+    %4 = arith.index_cast %arg8 : i32 to index
+    %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%4], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+    %alloc = memref.alloc() : memref<256xi8>
+    memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+    %5 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+    %6 = tensor.empty() : tensor<256xi1>
+    %7 = hfusion.compare {compare_fn = #hfusion.compare_fn<vne>} ins(%5, %1 : tensor<256xi8>, tensor<256xi8>) outs(%6 : tensor<256xi1>) -> tensor<256xi1>
+    %8 = tensor.empty() : tensor<i1>
+    %9 = linalg.fill ins(%false : i1) outs(%8 : tensor<i1>) -> tensor<i1>
+    %10 = tensor.empty() : tensor<i32>
+    %11 = linalg.fill ins(%c-1_i32 : i32) outs(%10 : tensor<i32>) -> tensor<i32>
+    %reduced:2 = linalg.reduce ins(%7, %3 : tensor<256xi1>, tensor<256xi32>) outs(%9, %11 : tensor<i1>, tensor<i32>) dimensions = [0] 
+      (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+        %13 = arith.cmpi ugt, %in, %init : i1
+        %14 = arith.cmpi eq, %in, %init : i1
+        %15 = arith.cmpi slt, %in_1, %init_2 : i32
+        %16 = arith.andi %14, %15 : i1
+        %17 = arith.ori %13, %16 : i1
+        %18 = arith.select %17, %in, %init : i1
+        %19 = arith.select %17, %in_1, %init_2 : i32
+        linalg.yield %18, %19 : i1, i32
+      }
+    %extracted = tensor.extract %reduced#1[] : tensor<i32>
+    %12 = tensor.empty() : tensor<1xi32>
+    %inserted = tensor.insert %extracted into %12[%c0] : tensor<1xi32>
+    %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+    bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+    return
+  }
+}
+
+
+// -----// IR Dump After ConvertGenericToNamedOp (hfusion-convert-generic-to-named) //----- //
+func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c-1_i32 = arith.constant -1 : i32
+  %false = arith.constant false
+  %c0_i8 = arith.constant 0 : i8
+  %0 = tensor.empty() : tensor<256xi8>
+  %1 = linalg.fill ins(%c0_i8 : i8) outs(%0 : tensor<256xi8>) -> tensor<256xi8>
+  %2 = tensor.empty() : tensor<256xi32>
+  %3 = hfusion.arange offset[%c0] strides[%c1] outs(%2 : tensor<256xi32>) -> tensor<256xi32>
+  %4 = arith.index_cast %arg8 : i32 to index
+  %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%4], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+  %alloc = memref.alloc() : memref<256xi8>
+  memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+  %5 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+  %6 = tensor.empty() : tensor<256xi1>
+  %7 = hfusion.compare {compare_fn = #hfusion.compare_fn<vne>} ins(%5, %1 : tensor<256xi8>, tensor<256xi8>) outs(%6 : tensor<256xi1>) -> tensor<256xi1>
+  %8 = tensor.empty() : tensor<i1>
+  %9 = linalg.fill ins(%false : i1) outs(%8 : tensor<i1>) -> tensor<i1>
+  %10 = tensor.empty() : tensor<i32>
+  %11 = linalg.fill ins(%c-1_i32 : i32) outs(%10 : tensor<i32>) -> tensor<i32>
+  %reduced:2 = linalg.reduce ins(%7, %3 : tensor<256xi1>, tensor<256xi32>) outs(%9, %11 : tensor<i1>, tensor<i32>) dimensions = [0] 
+    (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+      %13 = arith.cmpi ugt, %in, %init : i1
+      %14 = arith.cmpi eq, %in, %init : i1
+      %15 = arith.cmpi slt, %in_1, %init_2 : i32
+      %16 = arith.andi %14, %15 : i1
+      %17 = arith.ori %13, %16 : i1
+      %18 = arith.select %17, %in, %init : i1
+      %19 = arith.select %17, %in_1, %init_2 : i32
+      linalg.yield %18, %19 : i1, i32
+    }
+  %extracted = tensor.extract %reduced#1[] : tensor<i32>
+  %12 = tensor.empty() : tensor<1xi32>
+  %inserted = tensor.insert %extracted into %12[%c0] : tensor<1xi32>
+  %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+  bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+  return
+}
+
+// -----// IR Dump After LegalizeBF16Pass (hfusion-legalize-bf16) //----- //
+func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c-1_i32 = arith.constant -1 : i32
+  %false = arith.constant false
+  %c0_i8 = arith.constant 0 : i8
+  %0 = tensor.empty() : tensor<256xi8>
+  %1 = linalg.fill ins(%c0_i8 : i8) outs(%0 : tensor<256xi8>) -> tensor<256xi8>
+  %2 = tensor.empty() : tensor<256xi32>
+  %3 = hfusion.arange offset[%c0] strides[%c1] outs(%2 : tensor<256xi32>) -> tensor<256xi32>
+  %4 = arith.index_cast %arg8 : i32 to index
+  %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%4], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+  %alloc = memref.alloc() : memref<256xi8>
+  memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+  %5 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+  %6 = tensor.empty() : tensor<256xi1>
+  %7 = hfusion.compare {compare_fn = #hfusion.compare_fn<vne>} ins(%5, %1 : tensor<256xi8>, tensor<256xi8>) outs(%6 : tensor<256xi1>) -> tensor<256xi1>
+  %8 = tensor.empty() : tensor<i1>
+  %9 = linalg.fill ins(%false : i1) outs(%8 : tensor<i1>) -> tensor<i1>
+  %10 = tensor.empty() : tensor<i32>
+  %11 = linalg.fill ins(%c-1_i32 : i32) outs(%10 : tensor<i32>) -> tensor<i32>
+  %reduced:2 = linalg.reduce ins(%7, %3 : tensor<256xi1>, tensor<256xi32>) outs(%9, %11 : tensor<i1>, tensor<i32>) dimensions = [0] 
+    (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+      %13 = arith.cmpi ugt, %in, %init : i1
+      %14 = arith.cmpi eq, %in, %init : i1
+      %15 = arith.cmpi slt, %in_1, %init_2 : i32
+      %16 = arith.andi %14, %15 : i1
+      %17 = arith.ori %13, %16 : i1
+      %18 = arith.select %17, %in, %init : i1
+      %19 = arith.select %17, %in_1, %init_2 : i32
+      linalg.yield %18, %19 : i1, i32
+    }
+  %extracted = tensor.extract %reduced#1[] : tensor<i32>
+  %12 = tensor.empty() : tensor<1xi32>
+  %inserted = tensor.insert %extracted into %12[%c0] : tensor<1xi32>
+  %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+  bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+  return
+}
+
+// -----// IR Dump After Decompose (hfusion-decompose) //----- //
+func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c-1_i32 = arith.constant -1 : i32
+  %false = arith.constant false
+  %c0_i8 = arith.constant 0 : i8
+  %0 = tensor.empty() : tensor<256xi8>
+  %1 = linalg.fill ins(%c0_i8 : i8) outs(%0 : tensor<256xi8>) -> tensor<256xi8>
+  %2 = tensor.empty() : tensor<256xi32>
+  %3 = hfusion.arange offset[%c0] strides[%c1] outs(%2 : tensor<256xi32>) -> tensor<256xi32>
+  %4 = arith.index_cast %arg8 : i32 to index
+  %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%4], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+  %alloc = memref.alloc() : memref<256xi8>
+  memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+  %5 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+  %6 = tensor.empty() : tensor<256xi1>
+  %7 = hfusion.compare {compare_fn = #hfusion.compare_fn<vne>} ins(%5, %1 : tensor<256xi8>, tensor<256xi8>) outs(%6 : tensor<256xi1>) -> tensor<256xi1>
+  %8 = tensor.empty() : tensor<i1>
+  %9 = linalg.fill ins(%false : i1) outs(%8 : tensor<i1>) -> tensor<i1>
+  %10 = tensor.empty() : tensor<i32>
+  %11 = linalg.fill ins(%c-1_i32 : i32) outs(%10 : tensor<i32>) -> tensor<i32>
+  %reduced:2 = linalg.reduce ins(%7, %3 : tensor<256xi1>, tensor<256xi32>) outs(%9, %11 : tensor<i1>, tensor<i32>) dimensions = [0] 
+    (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+      %13 = arith.cmpi ugt, %in, %init : i1
+      %14 = arith.cmpi eq, %in, %init : i1
+      %15 = arith.cmpi slt, %in_1, %init_2 : i32
+      %16 = arith.andi %14, %15 : i1
+      %17 = arith.ori %13, %16 : i1
+      %18 = arith.select %17, %in, %init : i1
+      %19 = arith.select %17, %in_1, %init_2 : i32
+      linalg.yield %18, %19 : i1, i32
+    }
+  %extracted = tensor.extract %reduced#1[] : tensor<i32>
+  %12 = tensor.empty() : tensor<1xi32>
+  %inserted = tensor.insert %extracted into %12[%c0] : tensor<1xi32>
+  %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+  bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+  return
+}
+
+// -----// IR Dump After NormalizeSliceOps (hfusion-normalize-slice-ops) //----- //
+func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c-1_i32 = arith.constant -1 : i32
+  %false = arith.constant false
+  %c0_i8 = arith.constant 0 : i8
+  %0 = tensor.empty() : tensor<256xi8>
+  %1 = linalg.fill ins(%c0_i8 : i8) outs(%0 : tensor<256xi8>) -> tensor<256xi8>
+  %2 = tensor.empty() : tensor<256xi32>
+  %3 = hfusion.arange offset[%c0] strides[%c1] outs(%2 : tensor<256xi32>) -> tensor<256xi32>
+  %4 = arith.index_cast %arg8 : i32 to index
+  %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%4], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+  %alloc = memref.alloc() : memref<256xi8>
+  memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+  %5 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+  %6 = tensor.empty() : tensor<256xi1>
+  %7 = hfusion.compare {compare_fn = #hfusion.compare_fn<vne>} ins(%5, %1 : tensor<256xi8>, tensor<256xi8>) outs(%6 : tensor<256xi1>) -> tensor<256xi1>
+  %8 = tensor.empty() : tensor<i1>
+  %9 = linalg.fill ins(%false : i1) outs(%8 : tensor<i1>) -> tensor<i1>
+  %10 = tensor.empty() : tensor<i32>
+  %11 = linalg.fill ins(%c-1_i32 : i32) outs(%10 : tensor<i32>) -> tensor<i32>
+  %reduced:2 = linalg.reduce ins(%7, %3 : tensor<256xi1>, tensor<256xi32>) outs(%9, %11 : tensor<i1>, tensor<i32>) dimensions = [0] 
+    (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+      %13 = arith.cmpi ugt, %in, %init : i1
+      %14 = arith.cmpi eq, %in, %init : i1
+      %15 = arith.cmpi slt, %in_1, %init_2 : i32
+      %16 = arith.andi %14, %15 : i1
+      %17 = arith.ori %13, %16 : i1
+      %18 = arith.select %17, %in, %init : i1
+      %19 = arith.select %17, %in_1, %init_2 : i32
+      linalg.yield %18, %19 : i1, i32
+    }
+  %extracted = tensor.extract %reduced#1[] : tensor<i32>
+  %12 = tensor.empty() : tensor<1xi32>
+  %inserted = tensor.insert %extracted into %12[%c0] : tensor<1xi32>
+  %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+  bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+  return
+}
+
+// -----// IR Dump After Normalize (hfusion-normalize-ops) //----- //
+func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+  %cst = arith.constant 0.000000e+00 : f16
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c-1_i32 = arith.constant -1 : i32
+  %false = arith.constant false
+  %0 = tensor.empty() : tensor<256xi32>
+  %1 = hfusion.arange offset[%c0] strides[%c1] outs(%0 : tensor<256xi32>) -> tensor<256xi32>
+  %2 = arith.index_cast %arg8 : i32 to index
+  %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%2], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+  %alloc = memref.alloc() : memref<256xi8>
+  memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+  %3 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+  %4 = tensor.empty() : tensor<256xf16>
+  %5 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%3 : tensor<256xi8>) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+  %6 = tensor.empty() : tensor<256xf16>
+  %7 = linalg.fill ins(%cst : f16) outs(%6 : tensor<256xf16>) -> tensor<256xf16>
+  %8 = tensor.empty() : tensor<256xi1>
+  %9 = tensor.empty() : tensor<256xi1>
+  %10 = hfusion.compare {compare_fn = #hfusion.compare_fn<veq>} ins(%5, %7 : tensor<256xf16>, tensor<256xf16>) outs(%9 : tensor<256xi1>) -> tensor<256xi1>
+  %11 = hfusion.elemwise_unary {fun = #hfusion.unary_fn<vnot>} ins(%10 : tensor<256xi1>) outs(%8 : tensor<256xi1>) -> tensor<256xi1>
+  %12 = tensor.empty() : tensor<i1>
+  %13 = linalg.fill ins(%false : i1) outs(%12 : tensor<i1>) -> tensor<i1>
+  %14 = tensor.empty() : tensor<i32>
+  %15 = linalg.fill ins(%c-1_i32 : i32) outs(%14 : tensor<i32>) -> tensor<i32>
+  %reduced:2 = linalg.reduce ins(%11, %1 : tensor<256xi1>, tensor<256xi32>) outs(%13, %15 : tensor<i1>, tensor<i32>) dimensions = [0] 
+    (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+      %17 = arith.cmpi ugt, %in, %init : i1
+      %18 = arith.cmpi eq, %in, %init : i1
+      %19 = arith.cmpi slt, %in_1, %init_2 : i32
+      %20 = arith.andi %18, %19 : i1
+      %21 = arith.ori %17, %20 : i1
+      %22 = arith.select %21, %in, %init : i1
+      %23 = arith.select %21, %in_1, %init_2 : i32
+      linalg.yield %22, %23 : i1, i32
+    }
+  %extracted = tensor.extract %reduced#1[] : tensor<i32>
+  %16 = tensor.empty() : tensor<1xi32>
+  %inserted = tensor.insert %extracted into %16[%c0] : tensor<1xi32>
+  %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+  bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+  return
+}
+
+// -----// IR Dump After LegalizeBoolPass (hfusion-legalize-bool) //----- //
+module attributes {dlti.target_system_spec = #dlti.target_system_spec<"NPU" : #hacc.target_device_spec<#dlti.dl_entry<"AI_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"CUBE_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"VECTOR_CORE_COUNT", 48 : i32>, #dlti.dl_entry<"UB_SIZE", 1572864 : i32>, #dlti.dl_entry<"L1_SIZE", 4194304 : i32>, #dlti.dl_entry<"L0A_SIZE", 524288 : i32>, #dlti.dl_entry<"L0B_SIZE", 524288 : i32>, #dlti.dl_entry<"L0C_SIZE", 1048576 : i32>, #dlti.dl_entry<"UB_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L1_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L0C_ALIGN_SIZE", 4096 : i32>>>, hacc.triton_kernel} {
+  func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+    %cst = arith.constant 0.000000e+00 : f16
+    %c1 = arith.constant 1 : index
+    %c0 = arith.constant 0 : index
+    %c-1_i32 = arith.constant -1 : i32
+    %false = arith.constant false
+    %0 = tensor.empty() : tensor<256xi32>
+    %1 = hfusion.arange offset[%c0] strides[%c1] outs(%0 : tensor<256xi32>) -> tensor<256xi32>
+    %2 = arith.index_cast %arg8 : i32 to index
+    %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%2], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+    %alloc = memref.alloc() : memref<256xi8>
+    memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+    %3 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+    %4 = tensor.empty() : tensor<256xf16>
+    %5 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%3 : tensor<256xi8>) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+    %6 = tensor.empty() : tensor<256xf16>
+    %7 = linalg.fill ins(%cst : f16) outs(%6 : tensor<256xf16>) -> tensor<256xf16>
+    %8 = tensor.empty() : tensor<256xi1>
+    %9 = tensor.empty() : tensor<256xi1>
+    %10 = hfusion.compare {compare_fn = #hfusion.compare_fn<veq>} ins(%5, %7 : tensor<256xf16>, tensor<256xf16>) outs(%9 : tensor<256xi1>) -> tensor<256xi1>
+    %11 = hfusion.elemwise_unary {fun = #hfusion.unary_fn<vnot>} ins(%10 : tensor<256xi1>) outs(%8 : tensor<256xi1>) -> tensor<256xi1>
+    %12 = tensor.empty() : tensor<i1>
+    %13 = linalg.fill ins(%false : i1) outs(%12 : tensor<i1>) -> tensor<i1>
+    %14 = tensor.empty() : tensor<i32>
+    %15 = linalg.fill ins(%c-1_i32 : i32) outs(%14 : tensor<i32>) -> tensor<i32>
+    %reduced:2 = linalg.reduce ins(%11, %1 : tensor<256xi1>, tensor<256xi32>) outs(%13, %15 : tensor<i1>, tensor<i32>) dimensions = [0] 
+      (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+        %17 = arith.cmpi ugt, %in, %init : i1
+        %18 = arith.cmpi eq, %in, %init : i1
+        %19 = arith.cmpi slt, %in_1, %init_2 : i32
+        %20 = arith.andi %18, %19 : i1
+        %21 = arith.ori %17, %20 : i1
+        %22 = arith.select %21, %in, %init : i1
+        %23 = arith.select %21, %in_1, %init_2 : i32
+        linalg.yield %22, %23 : i1, i32
+      }
+    %extracted = tensor.extract %reduced#1[] : tensor<i32>
+    %16 = tensor.empty() : tensor<1xi32>
+    %inserted = tensor.insert %extracted into %16[%c0] : tensor<1xi32>
+    %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+    bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+    return
+  }
+}
+
+
+// -----// IR Dump After SimplifyOps (hfusion-simplify-ops) //----- //
+func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+  %cst = arith.constant 0.000000e+00 : f16
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c-1_i32 = arith.constant -1 : i32
+  %false = arith.constant false
+  %0 = tensor.empty() : tensor<256xi32>
+  %1 = hfusion.arange offset[%c0] strides[%c1] outs(%0 : tensor<256xi32>) -> tensor<256xi32>
+  %2 = arith.index_cast %arg8 : i32 to index
+  %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%2], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+  %alloc = memref.alloc() : memref<256xi8>
+  memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+  %3 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+  %4 = tensor.empty() : tensor<256xf16>
+  %5 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%3 : tensor<256xi8>) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+  %6 = tensor.empty() : tensor<256xf16>
+  %7 = linalg.fill ins(%cst : f16) outs(%6 : tensor<256xf16>) -> tensor<256xf16>
+  %8 = tensor.empty() : tensor<256xi1>
+  %9 = tensor.empty() : tensor<256xi1>
+  %10 = hfusion.compare {compare_fn = #hfusion.compare_fn<veq>} ins(%5, %7 : tensor<256xf16>, tensor<256xf16>) outs(%9 : tensor<256xi1>) -> tensor<256xi1>
+  %11 = hfusion.elemwise_unary {fun = #hfusion.unary_fn<vnot>} ins(%10 : tensor<256xi1>) outs(%8 : tensor<256xi1>) -> tensor<256xi1>
+  %12 = tensor.empty() : tensor<i1>
+  %13 = linalg.fill ins(%false : i1) outs(%12 : tensor<i1>) -> tensor<i1>
+  %14 = tensor.empty() : tensor<i32>
+  %15 = linalg.fill ins(%c-1_i32 : i32) outs(%14 : tensor<i32>) -> tensor<i32>
+  %reduced:2 = linalg.reduce ins(%11, %1 : tensor<256xi1>, tensor<256xi32>) outs(%13, %15 : tensor<i1>, tensor<i32>) dimensions = [0] 
+    (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+      %17 = arith.cmpi ugt, %in, %init : i1
+      %18 = arith.cmpi eq, %in, %init : i1
+      %19 = arith.cmpi slt, %in_1, %init_2 : i32
+      %20 = arith.andi %18, %19 : i1
+      %21 = arith.ori %17, %20 : i1
+      %22 = arith.select %21, %in, %init : i1
+      %23 = arith.select %21, %in_1, %init_2 : i32
+      linalg.yield %22, %23 : i1, i32
+    }
+  %extracted = tensor.extract %reduced#1[] : tensor<i32>
+  %16 = tensor.empty() : tensor<1xi32>
+  %inserted = tensor.insert %extracted into %16[%c0] : tensor<1xi32>
+  %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+  bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+  return
+}
+
+// -----// IR Dump After HFusionInlineBrc (hfusion-inline-brc) //----- //
+func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+  %cst = arith.constant 0.000000e+00 : f16
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c-1_i32 = arith.constant -1 : i32
+  %false = arith.constant false
+  %0 = tensor.empty() : tensor<256xi32>
+  %1 = hfusion.arange offset[%c0] strides[%c1] outs(%0 : tensor<256xi32>) -> tensor<256xi32>
+  %2 = arith.index_cast %arg8 : i32 to index
+  %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%2], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+  %alloc = memref.alloc() : memref<256xi8>
+  memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+  %3 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+  %4 = tensor.empty() : tensor<256xf16>
+  %5 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%3 : tensor<256xi8>) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+  %6 = tensor.empty() : tensor<256xf16>
+  %7 = linalg.fill ins(%cst : f16) outs(%6 : tensor<256xf16>) -> tensor<256xf16>
+  %8 = tensor.empty() : tensor<256xi1>
+  %9 = tensor.empty() : tensor<256xi1>
+  %10 = hfusion.compare {compare_fn = #hfusion.compare_fn<veq>} ins(%5, %7 : tensor<256xf16>, tensor<256xf16>) outs(%9 : tensor<256xi1>) -> tensor<256xi1>
+  %11 = hfusion.elemwise_unary {fun = #hfusion.unary_fn<vnot>} ins(%10 : tensor<256xi1>) outs(%8 : tensor<256xi1>) -> tensor<256xi1>
+  %12 = tensor.empty() : tensor<i1>
+  %13 = linalg.fill ins(%false : i1) outs(%12 : tensor<i1>) -> tensor<i1>
+  %14 = tensor.empty() : tensor<i32>
+  %15 = linalg.fill ins(%c-1_i32 : i32) outs(%14 : tensor<i32>) -> tensor<i32>
+  %reduced:2 = linalg.reduce ins(%11, %1 : tensor<256xi1>, tensor<256xi32>) outs(%13, %15 : tensor<i1>, tensor<i32>) dimensions = [0] 
+    (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+      %17 = arith.cmpi ugt, %in, %init : i1
+      %18 = arith.cmpi eq, %in, %init : i1
+      %19 = arith.cmpi slt, %in_1, %init_2 : i32
+      %20 = arith.andi %18, %19 : i1
+      %21 = arith.ori %17, %20 : i1
+      %22 = arith.select %21, %in, %init : i1
+      %23 = arith.select %21, %in_1, %init_2 : i32
+      linalg.yield %22, %23 : i1, i32
+    }
+  %extracted = tensor.extract %reduced#1[] : tensor<i32>
+  %16 = tensor.empty() : tensor<1xi32>
+  %inserted = tensor.insert %extracted into %16[%c0] : tensor<1xi32>
+  %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+  bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+  return
+}
+
+// -----// IR Dump After Normalize (hfusion-normalize-ops) //----- //
+func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+  %cst = arith.constant 0.000000e+00 : f16
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c-1_i32 = arith.constant -1 : i32
+  %false = arith.constant false
+  %0 = tensor.empty() : tensor<256xi32>
+  %1 = hfusion.arange offset[%c0] strides[%c1] outs(%0 : tensor<256xi32>) -> tensor<256xi32>
+  %2 = arith.index_cast %arg8 : i32 to index
+  %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%2], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+  %alloc = memref.alloc() : memref<256xi8>
+  memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+  %3 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+  %4 = tensor.empty() : tensor<256xf16>
+  %5 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%3 : tensor<256xi8>) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+  %6 = tensor.empty() : tensor<256xf16>
+  %7 = linalg.fill ins(%cst : f16) outs(%6 : tensor<256xf16>) -> tensor<256xf16>
+  %8 = tensor.empty() : tensor<256xi1>
+  %9 = tensor.empty() : tensor<256xi1>
+  %10 = hfusion.compare {compare_fn = #hfusion.compare_fn<veq>} ins(%5, %7 : tensor<256xf16>, tensor<256xf16>) outs(%9 : tensor<256xi1>) -> tensor<256xi1>
+  %11 = hfusion.elemwise_unary {fun = #hfusion.unary_fn<vnot>} ins(%10 : tensor<256xi1>) outs(%8 : tensor<256xi1>) -> tensor<256xi1>
+  %12 = tensor.empty() : tensor<i1>
+  %13 = linalg.fill ins(%false : i1) outs(%12 : tensor<i1>) -> tensor<i1>
+  %14 = tensor.empty() : tensor<i32>
+  %15 = linalg.fill ins(%c-1_i32 : i32) outs(%14 : tensor<i32>) -> tensor<i32>
+  %reduced:2 = linalg.reduce ins(%11, %1 : tensor<256xi1>, tensor<256xi32>) outs(%13, %15 : tensor<i1>, tensor<i32>) dimensions = [0] 
+    (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+      %17 = arith.cmpi ugt, %in, %init : i1
+      %18 = arith.cmpi eq, %in, %init : i1
+      %19 = arith.cmpi slt, %in_1, %init_2 : i32
+      %20 = arith.andi %18, %19 : i1
+      %21 = arith.ori %17, %20 : i1
+      %22 = arith.select %21, %in, %init : i1
+      %23 = arith.select %21, %in_1, %init_2 : i32
+      linalg.yield %22, %23 : i1, i32
+    }
+  %extracted = tensor.extract %reduced#1[] : tensor<i32>
+  %16 = tensor.empty() : tensor<1xi32>
+  %inserted = tensor.insert %extracted into %16[%c0] : tensor<1xi32>
+  %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+  bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+  return
+}
+
+// -----// IR Dump After CSE (cse) //----- //
+module attributes {dlti.target_system_spec = #dlti.target_system_spec<"NPU" : #hacc.target_device_spec<#dlti.dl_entry<"AI_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"CUBE_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"VECTOR_CORE_COUNT", 48 : i32>, #dlti.dl_entry<"UB_SIZE", 1572864 : i32>, #dlti.dl_entry<"L1_SIZE", 4194304 : i32>, #dlti.dl_entry<"L0A_SIZE", 524288 : i32>, #dlti.dl_entry<"L0B_SIZE", 524288 : i32>, #dlti.dl_entry<"L0C_SIZE", 1048576 : i32>, #dlti.dl_entry<"UB_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L1_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L0C_ALIGN_SIZE", 4096 : i32>>>, hacc.triton_kernel} {
+  func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+    %cst = arith.constant 0.000000e+00 : f16
+    %c1 = arith.constant 1 : index
+    %c0 = arith.constant 0 : index
+    %c-1_i32 = arith.constant -1 : i32
+    %false = arith.constant false
+    %0 = tensor.empty() : tensor<256xi32>
+    %1 = hfusion.arange offset[%c0] strides[%c1] outs(%0 : tensor<256xi32>) -> tensor<256xi32>
+    %2 = arith.index_cast %arg8 : i32 to index
+    %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%2], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+    %alloc = memref.alloc() : memref<256xi8>
+    memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+    %3 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+    %4 = tensor.empty() : tensor<256xf16>
+    %5 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%3 : tensor<256xi8>) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+    %6 = linalg.fill ins(%cst : f16) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+    %7 = tensor.empty() : tensor<256xi1>
+    %8 = hfusion.compare {compare_fn = #hfusion.compare_fn<veq>} ins(%5, %6 : tensor<256xf16>, tensor<256xf16>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+    %9 = hfusion.elemwise_unary {fun = #hfusion.unary_fn<vnot>} ins(%8 : tensor<256xi1>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+    %10 = tensor.empty() : tensor<i1>
+    %11 = linalg.fill ins(%false : i1) outs(%10 : tensor<i1>) -> tensor<i1>
+    %12 = tensor.empty() : tensor<i32>
+    %13 = linalg.fill ins(%c-1_i32 : i32) outs(%12 : tensor<i32>) -> tensor<i32>
+    %reduced:2 = linalg.reduce ins(%9, %1 : tensor<256xi1>, tensor<256xi32>) outs(%11, %13 : tensor<i1>, tensor<i32>) dimensions = [0] 
+      (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+        %15 = arith.cmpi ugt, %in, %init : i1
+        %16 = arith.cmpi eq, %in, %init : i1
+        %17 = arith.cmpi slt, %in_1, %init_2 : i32
+        %18 = arith.andi %16, %17 : i1
+        %19 = arith.ori %15, %18 : i1
+        %20 = arith.select %19, %in, %init : i1
+        %21 = arith.select %19, %in_1, %init_2 : i32
+        linalg.yield %20, %21 : i1, i32
+      }
+    %extracted = tensor.extract %reduced#1[] : tensor<i32>
+    %14 = tensor.empty() : tensor<1xi32>
+    %inserted = tensor.insert %extracted into %14[%c0] : tensor<1xi32>
+    %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+    bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+    return
+  }
+}
+
+
+// -----// IR Dump After ExtendedCanonicalizer (canonicalize-ext) //----- //
+module attributes {dlti.target_system_spec = #dlti.target_system_spec<"NPU" : #hacc.target_device_spec<#dlti.dl_entry<"AI_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"CUBE_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"VECTOR_CORE_COUNT", 48 : i32>, #dlti.dl_entry<"UB_SIZE", 1572864 : i32>, #dlti.dl_entry<"L1_SIZE", 4194304 : i32>, #dlti.dl_entry<"L0A_SIZE", 524288 : i32>, #dlti.dl_entry<"L0B_SIZE", 524288 : i32>, #dlti.dl_entry<"L0C_SIZE", 1048576 : i32>, #dlti.dl_entry<"UB_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L1_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L0C_ALIGN_SIZE", 4096 : i32>>>, hacc.triton_kernel} {
+  func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+    %cst = arith.constant 0.000000e+00 : f16
+    %c1 = arith.constant 1 : index
+    %c0 = arith.constant 0 : index
+    %c-1_i32 = arith.constant -1 : i32
+    %false = arith.constant false
+    %0 = tensor.empty() : tensor<256xi32>
+    %1 = hfusion.arange offset[%c0] strides[%c1] outs(%0 : tensor<256xi32>) -> tensor<256xi32>
+    %2 = arith.index_cast %arg8 : i32 to index
+    %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%2], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+    %alloc = memref.alloc() : memref<256xi8>
+    memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+    %3 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+    %4 = tensor.empty() : tensor<256xf16>
+    %5 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%3 : tensor<256xi8>) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+    %6 = linalg.fill ins(%cst : f16) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+    %7 = tensor.empty() : tensor<256xi1>
+    %8 = hfusion.compare {compare_fn = #hfusion.compare_fn<veq>} ins(%5, %6 : tensor<256xf16>, tensor<256xf16>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+    %9 = hfusion.elemwise_unary {fun = #hfusion.unary_fn<vnot>} ins(%8 : tensor<256xi1>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+    %10 = tensor.empty() : tensor<i1>
+    %11 = linalg.fill ins(%false : i1) outs(%10 : tensor<i1>) -> tensor<i1>
+    %12 = tensor.empty() : tensor<i32>
+    %13 = linalg.fill ins(%c-1_i32 : i32) outs(%12 : tensor<i32>) -> tensor<i32>
+    %reduced:2 = linalg.reduce ins(%9, %1 : tensor<256xi1>, tensor<256xi32>) outs(%11, %13 : tensor<i1>, tensor<i32>) dimensions = [0] 
+      (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+        %15 = arith.cmpi ugt, %in, %init : i1
+        %16 = arith.cmpi eq, %in, %init : i1
+        %17 = arith.cmpi slt, %in_1, %init_2 : i32
+        %18 = arith.andi %16, %17 : i1
+        %19 = arith.ori %15, %18 : i1
+        %20 = arith.select %19, %in, %init : i1
+        %21 = arith.select %19, %in_1, %init_2 : i32
+        linalg.yield %20, %21 : i1, i32
+      }
+    %extracted = tensor.extract %reduced#1[] : tensor<i32>
+    %14 = tensor.empty() : tensor<1xi32>
+    %inserted = tensor.insert %extracted into %14[%c0] : tensor<1xi32>
+    %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+    bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+    return
+  }
+}
+
+
+// -----// IR Dump After NormalizeTensorOps (normalize-tensor-ops) //----- //
+func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+  %cst = arith.constant 0.000000e+00 : f16
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c-1_i32 = arith.constant -1 : i32
+  %false = arith.constant false
+  %0 = tensor.empty() : tensor<256xi32>
+  %1 = hfusion.arange offset[%c0] strides[%c1] outs(%0 : tensor<256xi32>) -> tensor<256xi32>
+  %2 = arith.index_cast %arg8 : i32 to index
+  %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%2], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+  %alloc = memref.alloc() : memref<256xi8>
+  memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+  %3 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+  %4 = tensor.empty() : tensor<256xf16>
+  %5 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%3 : tensor<256xi8>) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+  %6 = linalg.fill ins(%cst : f16) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+  %7 = tensor.empty() : tensor<256xi1>
+  %8 = hfusion.compare {compare_fn = #hfusion.compare_fn<veq>} ins(%5, %6 : tensor<256xf16>, tensor<256xf16>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+  %9 = hfusion.elemwise_unary {fun = #hfusion.unary_fn<vnot>} ins(%8 : tensor<256xi1>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+  %10 = tensor.empty() : tensor<i1>
+  %11 = linalg.fill ins(%false : i1) outs(%10 : tensor<i1>) -> tensor<i1>
+  %12 = tensor.empty() : tensor<i32>
+  %13 = linalg.fill ins(%c-1_i32 : i32) outs(%12 : tensor<i32>) -> tensor<i32>
+  %reduced:2 = linalg.reduce ins(%9, %1 : tensor<256xi1>, tensor<256xi32>) outs(%11, %13 : tensor<i1>, tensor<i32>) dimensions = [0] 
+    (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+      %15 = arith.cmpi ugt, %in, %init : i1
+      %16 = arith.cmpi eq, %in, %init : i1
+      %17 = arith.cmpi slt, %in_1, %init_2 : i32
+      %18 = arith.andi %16, %17 : i1
+      %19 = arith.ori %15, %18 : i1
+      %20 = arith.select %19, %in, %init : i1
+      %21 = arith.select %19, %in_1, %init_2 : i32
+      linalg.yield %20, %21 : i1, i32
+    }
+  %extracted = tensor.extract %reduced#1[] : tensor<i32>
+  %14 = tensor.empty() : tensor<1xi32>
+  %inserted = tensor.insert %extracted into %14[%c0] : tensor<1xi32>
+  %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+  bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+  return
+}
+
+// -----// IR Dump After CanonicalizeTensorReshape (canonicalize-tensor-reshape) //----- //
+func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+  %cst = arith.constant 0.000000e+00 : f16
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c-1_i32 = arith.constant -1 : i32
+  %false = arith.constant false
+  %0 = tensor.empty() : tensor<256xi32>
+  %1 = hfusion.arange offset[%c0] strides[%c1] outs(%0 : tensor<256xi32>) -> tensor<256xi32>
+  %2 = arith.index_cast %arg8 : i32 to index
+  %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%2], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+  %alloc = memref.alloc() : memref<256xi8>
+  memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+  %3 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+  %4 = tensor.empty() : tensor<256xf16>
+  %5 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%3 : tensor<256xi8>) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+  %6 = linalg.fill ins(%cst : f16) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+  %7 = tensor.empty() : tensor<256xi1>
+  %8 = hfusion.compare {compare_fn = #hfusion.compare_fn<veq>} ins(%5, %6 : tensor<256xf16>, tensor<256xf16>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+  %9 = hfusion.elemwise_unary {fun = #hfusion.unary_fn<vnot>} ins(%8 : tensor<256xi1>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+  %10 = tensor.empty() : tensor<i1>
+  %11 = linalg.fill ins(%false : i1) outs(%10 : tensor<i1>) -> tensor<i1>
+  %12 = tensor.empty() : tensor<i32>
+  %13 = linalg.fill ins(%c-1_i32 : i32) outs(%12 : tensor<i32>) -> tensor<i32>
+  %reduced:2 = linalg.reduce ins(%9, %1 : tensor<256xi1>, tensor<256xi32>) outs(%11, %13 : tensor<i1>, tensor<i32>) dimensions = [0] 
+    (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+      %15 = arith.cmpi ugt, %in, %init : i1
+      %16 = arith.cmpi eq, %in, %init : i1
+      %17 = arith.cmpi slt, %in_1, %init_2 : i32
+      %18 = arith.andi %16, %17 : i1
+      %19 = arith.ori %15, %18 : i1
+      %20 = arith.select %19, %in, %init : i1
+      %21 = arith.select %19, %in_1, %init_2 : i32
+      linalg.yield %20, %21 : i1, i32
+    }
+  %extracted = tensor.extract %reduced#1[] : tensor<i32>
+  %14 = tensor.empty() : tensor<1xi32>
+  %inserted = tensor.insert %extracted into %14[%c0] : tensor<1xi32>
+  %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+  bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+  return
+}
+
+// -----// IR Dump After PropagateReshape (propagate-reshape) //----- //
+func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+  %cst = arith.constant 0.000000e+00 : f16
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c-1_i32 = arith.constant -1 : i32
+  %false = arith.constant false
+  %0 = tensor.empty() : tensor<256xi32>
+  %1 = hfusion.arange offset[%c0] strides[%c1] outs(%0 : tensor<256xi32>) -> tensor<256xi32>
+  %2 = arith.index_cast %arg8 : i32 to index
+  %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%2], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+  %alloc = memref.alloc() : memref<256xi8>
+  memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+  %3 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+  %4 = tensor.empty() : tensor<256xf16>
+  %5 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%3 : tensor<256xi8>) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+  %6 = linalg.fill ins(%cst : f16) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+  %7 = tensor.empty() : tensor<256xi1>
+  %8 = hfusion.compare {compare_fn = #hfusion.compare_fn<veq>} ins(%5, %6 : tensor<256xf16>, tensor<256xf16>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+  %9 = hfusion.elemwise_unary {fun = #hfusion.unary_fn<vnot>} ins(%8 : tensor<256xi1>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+  %10 = tensor.empty() : tensor<i1>
+  %11 = linalg.fill ins(%false : i1) outs(%10 : tensor<i1>) -> tensor<i1>
+  %12 = tensor.empty() : tensor<i32>
+  %13 = linalg.fill ins(%c-1_i32 : i32) outs(%12 : tensor<i32>) -> tensor<i32>
+  %reduced:2 = linalg.reduce ins(%9, %1 : tensor<256xi1>, tensor<256xi32>) outs(%11, %13 : tensor<i1>, tensor<i32>) dimensions = [0] 
+    (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+      %15 = arith.cmpi ugt, %in, %init : i1
+      %16 = arith.cmpi eq, %in, %init : i1
+      %17 = arith.cmpi slt, %in_1, %init_2 : i32
+      %18 = arith.andi %16, %17 : i1
+      %19 = arith.ori %15, %18 : i1
+      %20 = arith.select %19, %in, %init : i1
+      %21 = arith.select %19, %in_1, %init_2 : i32
+      linalg.yield %20, %21 : i1, i32
+    }
+  %extracted = tensor.extract %reduced#1[] : tensor<i32>
+  %14 = tensor.empty() : tensor<1xi32>
+  %inserted = tensor.insert %extracted into %14[%c0] : tensor<1xi32>
+  %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+  bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+  return
+}
+
+// -----// IR Dump After FoldTensorEmpty (fold-tensor-empty) //----- //
+func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+  %cst = arith.constant 0.000000e+00 : f16
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c-1_i32 = arith.constant -1 : i32
+  %false = arith.constant false
+  %0 = tensor.empty() : tensor<256xi32>
+  %1 = hfusion.arange offset[%c0] strides[%c1] outs(%0 : tensor<256xi32>) -> tensor<256xi32>
+  %2 = arith.index_cast %arg8 : i32 to index
+  %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%2], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+  %alloc = memref.alloc() : memref<256xi8>
+  memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+  %3 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+  %4 = tensor.empty() : tensor<256xf16>
+  %5 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%3 : tensor<256xi8>) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+  %6 = linalg.fill ins(%cst : f16) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+  %7 = tensor.empty() : tensor<256xi1>
+  %8 = hfusion.compare {compare_fn = #hfusion.compare_fn<veq>} ins(%5, %6 : tensor<256xf16>, tensor<256xf16>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+  %9 = hfusion.elemwise_unary {fun = #hfusion.unary_fn<vnot>} ins(%8 : tensor<256xi1>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+  %10 = tensor.empty() : tensor<i1>
+  %11 = linalg.fill ins(%false : i1) outs(%10 : tensor<i1>) -> tensor<i1>
+  %12 = tensor.empty() : tensor<i32>
+  %13 = linalg.fill ins(%c-1_i32 : i32) outs(%12 : tensor<i32>) -> tensor<i32>
+  %reduced:2 = linalg.reduce ins(%9, %1 : tensor<256xi1>, tensor<256xi32>) outs(%11, %13 : tensor<i1>, tensor<i32>) dimensions = [0] 
+    (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+      %15 = arith.cmpi ugt, %in, %init : i1
+      %16 = arith.cmpi eq, %in, %init : i1
+      %17 = arith.cmpi slt, %in_1, %init_2 : i32
+      %18 = arith.andi %16, %17 : i1
+      %19 = arith.ori %15, %18 : i1
+      %20 = arith.select %19, %in, %init : i1
+      %21 = arith.select %19, %in_1, %init_2 : i32
+      linalg.yield %20, %21 : i1, i32
+    }
+  %extracted = tensor.extract %reduced#1[] : tensor<i32>
+  %14 = tensor.empty() : tensor<1xi32>
+  %inserted = tensor.insert %extracted into %14[%c0] : tensor<1xi32>
+  %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+  bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+  return
+}
+
+// -----// IR Dump After NormalizeLastDimUnalignedTensorOp (normalize-last-dim-unaligned-tensor-op) //----- //
+func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+  %cst = arith.constant 0.000000e+00 : f16
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c-1_i32 = arith.constant -1 : i32
+  %false = arith.constant false
+  %0 = tensor.empty() : tensor<256xi32>
+  %1 = hfusion.arange offset[%c0] strides[%c1] outs(%0 : tensor<256xi32>) -> tensor<256xi32>
+  %2 = arith.index_cast %arg8 : i32 to index
+  %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%2], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+  %alloc = memref.alloc() : memref<256xi8>
+  memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+  %3 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+  %4 = tensor.empty() : tensor<256xf16>
+  %5 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%3 : tensor<256xi8>) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+  %6 = linalg.fill ins(%cst : f16) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+  %7 = tensor.empty() : tensor<256xi1>
+  %8 = hfusion.compare {compare_fn = #hfusion.compare_fn<veq>} ins(%5, %6 : tensor<256xf16>, tensor<256xf16>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+  %9 = hfusion.elemwise_unary {fun = #hfusion.unary_fn<vnot>} ins(%8 : tensor<256xi1>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+  %10 = tensor.empty() : tensor<i1>
+  %11 = linalg.fill ins(%false : i1) outs(%10 : tensor<i1>) -> tensor<i1>
+  %12 = tensor.empty() : tensor<i32>
+  %13 = linalg.fill ins(%c-1_i32 : i32) outs(%12 : tensor<i32>) -> tensor<i32>
+  %reduced:2 = linalg.reduce ins(%9, %1 : tensor<256xi1>, tensor<256xi32>) outs(%11, %13 : tensor<i1>, tensor<i32>) dimensions = [0] 
+    (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+      %15 = arith.cmpi ugt, %in, %init : i1
+      %16 = arith.cmpi eq, %in, %init : i1
+      %17 = arith.cmpi slt, %in_1, %init_2 : i32
+      %18 = arith.andi %16, %17 : i1
+      %19 = arith.ori %15, %18 : i1
+      %20 = arith.select %19, %in, %init : i1
+      %21 = arith.select %19, %in_1, %init_2 : i32
+      linalg.yield %20, %21 : i1, i32
+    }
+  %extracted = tensor.extract %reduced#1[] : tensor<i32>
+  %14 = tensor.empty() : tensor<1xi32>
+  %inserted = tensor.insert %extracted into %14[%c0] : tensor<1xi32>
+  %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+  bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+  return
+}
+
+// -----// IR Dump After CSE (cse) //----- //
+module attributes {dlti.target_system_spec = #dlti.target_system_spec<"NPU" : #hacc.target_device_spec<#dlti.dl_entry<"AI_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"CUBE_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"VECTOR_CORE_COUNT", 48 : i32>, #dlti.dl_entry<"UB_SIZE", 1572864 : i32>, #dlti.dl_entry<"L1_SIZE", 4194304 : i32>, #dlti.dl_entry<"L0A_SIZE", 524288 : i32>, #dlti.dl_entry<"L0B_SIZE", 524288 : i32>, #dlti.dl_entry<"L0C_SIZE", 1048576 : i32>, #dlti.dl_entry<"UB_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L1_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L0C_ALIGN_SIZE", 4096 : i32>>>, hacc.triton_kernel} {
+  func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+    %cst = arith.constant 0.000000e+00 : f16
+    %c1 = arith.constant 1 : index
+    %c0 = arith.constant 0 : index
+    %c-1_i32 = arith.constant -1 : i32
+    %false = arith.constant false
+    %0 = tensor.empty() : tensor<256xi32>
+    %1 = hfusion.arange offset[%c0] strides[%c1] outs(%0 : tensor<256xi32>) -> tensor<256xi32>
+    %2 = arith.index_cast %arg8 : i32 to index
+    %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%2], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+    %alloc = memref.alloc() : memref<256xi8>
+    memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+    %3 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+    %4 = tensor.empty() : tensor<256xf16>
+    %5 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%3 : tensor<256xi8>) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+    %6 = linalg.fill ins(%cst : f16) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+    %7 = tensor.empty() : tensor<256xi1>
+    %8 = hfusion.compare {compare_fn = #hfusion.compare_fn<veq>} ins(%5, %6 : tensor<256xf16>, tensor<256xf16>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+    %9 = hfusion.elemwise_unary {fun = #hfusion.unary_fn<vnot>} ins(%8 : tensor<256xi1>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+    %10 = tensor.empty() : tensor<i1>
+    %11 = linalg.fill ins(%false : i1) outs(%10 : tensor<i1>) -> tensor<i1>
+    %12 = tensor.empty() : tensor<i32>
+    %13 = linalg.fill ins(%c-1_i32 : i32) outs(%12 : tensor<i32>) -> tensor<i32>
+    %reduced:2 = linalg.reduce ins(%9, %1 : tensor<256xi1>, tensor<256xi32>) outs(%11, %13 : tensor<i1>, tensor<i32>) dimensions = [0] 
+      (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+        %15 = arith.cmpi ugt, %in, %init : i1
+        %16 = arith.cmpi eq, %in, %init : i1
+        %17 = arith.cmpi slt, %in_1, %init_2 : i32
+        %18 = arith.andi %16, %17 : i1
+        %19 = arith.ori %15, %18 : i1
+        %20 = arith.select %19, %in, %init : i1
+        %21 = arith.select %19, %in_1, %init_2 : i32
+        linalg.yield %20, %21 : i1, i32
+      }
+    %extracted = tensor.extract %reduced#1[] : tensor<i32>
+    %14 = tensor.empty() : tensor<1xi32>
+    %inserted = tensor.insert %extracted into %14[%c0] : tensor<1xi32>
+    %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+    bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+    return
+  }
+}
+
+
+// -----// IR Dump After ExtendedCanonicalizer (canonicalize-ext) //----- //
+module attributes {dlti.target_system_spec = #dlti.target_system_spec<"NPU" : #hacc.target_device_spec<#dlti.dl_entry<"AI_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"CUBE_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"VECTOR_CORE_COUNT", 48 : i32>, #dlti.dl_entry<"UB_SIZE", 1572864 : i32>, #dlti.dl_entry<"L1_SIZE", 4194304 : i32>, #dlti.dl_entry<"L0A_SIZE", 524288 : i32>, #dlti.dl_entry<"L0B_SIZE", 524288 : i32>, #dlti.dl_entry<"L0C_SIZE", 1048576 : i32>, #dlti.dl_entry<"UB_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L1_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L0C_ALIGN_SIZE", 4096 : i32>>>, hacc.triton_kernel} {
+  func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+    %cst = arith.constant 0.000000e+00 : f16
+    %c1 = arith.constant 1 : index
+    %c0 = arith.constant 0 : index
+    %c-1_i32 = arith.constant -1 : i32
+    %false = arith.constant false
+    %0 = tensor.empty() : tensor<256xi32>
+    %1 = hfusion.arange offset[%c0] strides[%c1] outs(%0 : tensor<256xi32>) -> tensor<256xi32>
+    %2 = arith.index_cast %arg8 : i32 to index
+    %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%2], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+    %alloc = memref.alloc() : memref<256xi8>
+    memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+    %3 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+    %4 = tensor.empty() : tensor<256xf16>
+    %5 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%3 : tensor<256xi8>) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+    %6 = linalg.fill ins(%cst : f16) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+    %7 = tensor.empty() : tensor<256xi1>
+    %8 = hfusion.compare {compare_fn = #hfusion.compare_fn<veq>} ins(%5, %6 : tensor<256xf16>, tensor<256xf16>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+    %9 = hfusion.elemwise_unary {fun = #hfusion.unary_fn<vnot>} ins(%8 : tensor<256xi1>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+    %10 = tensor.empty() : tensor<i1>
+    %11 = linalg.fill ins(%false : i1) outs(%10 : tensor<i1>) -> tensor<i1>
+    %12 = tensor.empty() : tensor<i32>
+    %13 = linalg.fill ins(%c-1_i32 : i32) outs(%12 : tensor<i32>) -> tensor<i32>
+    %reduced:2 = linalg.reduce ins(%9, %1 : tensor<256xi1>, tensor<256xi32>) outs(%11, %13 : tensor<i1>, tensor<i32>) dimensions = [0] 
+      (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+        %15 = arith.cmpi ugt, %in, %init : i1
+        %16 = arith.cmpi eq, %in, %init : i1
+        %17 = arith.cmpi slt, %in_1, %init_2 : i32
+        %18 = arith.andi %16, %17 : i1
+        %19 = arith.ori %15, %18 : i1
+        %20 = arith.select %19, %in, %init : i1
+        %21 = arith.select %19, %in_1, %init_2 : i32
+        linalg.yield %20, %21 : i1, i32
+      }
+    %extracted = tensor.extract %reduced#1[] : tensor<i32>
+    %14 = tensor.empty() : tensor<1xi32>
+    %inserted = tensor.insert %extracted into %14[%c0] : tensor<1xi32>
+    %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+    bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+    return
+  }
+}
+
+
+// -----// IR Dump After NormalizeTensorOps (normalize-tensor-ops) //----- //
+func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+  %cst = arith.constant 0.000000e+00 : f16
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c-1_i32 = arith.constant -1 : i32
+  %false = arith.constant false
+  %0 = tensor.empty() : tensor<256xi32>
+  %1 = hfusion.arange offset[%c0] strides[%c1] outs(%0 : tensor<256xi32>) -> tensor<256xi32>
+  %2 = arith.index_cast %arg8 : i32 to index
+  %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%2], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+  %alloc = memref.alloc() : memref<256xi8>
+  memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+  %3 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+  %4 = tensor.empty() : tensor<256xf16>
+  %5 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%3 : tensor<256xi8>) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+  %6 = linalg.fill ins(%cst : f16) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+  %7 = tensor.empty() : tensor<256xi1>
+  %8 = hfusion.compare {compare_fn = #hfusion.compare_fn<veq>} ins(%5, %6 : tensor<256xf16>, tensor<256xf16>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+  %9 = hfusion.elemwise_unary {fun = #hfusion.unary_fn<vnot>} ins(%8 : tensor<256xi1>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+  %10 = tensor.empty() : tensor<i1>
+  %11 = linalg.fill ins(%false : i1) outs(%10 : tensor<i1>) -> tensor<i1>
+  %12 = tensor.empty() : tensor<i32>
+  %13 = linalg.fill ins(%c-1_i32 : i32) outs(%12 : tensor<i32>) -> tensor<i32>
+  %reduced:2 = linalg.reduce ins(%9, %1 : tensor<256xi1>, tensor<256xi32>) outs(%11, %13 : tensor<i1>, tensor<i32>) dimensions = [0] 
+    (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+      %15 = arith.cmpi ugt, %in, %init : i1
+      %16 = arith.cmpi eq, %in, %init : i1
+      %17 = arith.cmpi slt, %in_1, %init_2 : i32
+      %18 = arith.andi %16, %17 : i1
+      %19 = arith.ori %15, %18 : i1
+      %20 = arith.select %19, %in, %init : i1
+      %21 = arith.select %19, %in_1, %init_2 : i32
+      linalg.yield %20, %21 : i1, i32
+    }
+  %extracted = tensor.extract %reduced#1[] : tensor<i32>
+  %14 = tensor.empty() : tensor<1xi32>
+  %inserted = tensor.insert %extracted into %14[%c0] : tensor<1xi32>
+  %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+  bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+  return
+}
+
+// -----// IR Dump After HFusionInlineBrc (hfusion-inline-brc) //----- //
+func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+  %cst = arith.constant 0.000000e+00 : f16
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c-1_i32 = arith.constant -1 : i32
+  %false = arith.constant false
+  %0 = tensor.empty() : tensor<256xi32>
+  %1 = hfusion.arange offset[%c0] strides[%c1] outs(%0 : tensor<256xi32>) -> tensor<256xi32>
+  %2 = arith.index_cast %arg8 : i32 to index
+  %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%2], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+  %alloc = memref.alloc() : memref<256xi8>
+  memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+  %3 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+  %4 = tensor.empty() : tensor<256xf16>
+  %5 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%3 : tensor<256xi8>) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+  %6 = linalg.fill ins(%cst : f16) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+  %7 = tensor.empty() : tensor<256xi1>
+  %8 = hfusion.compare {compare_fn = #hfusion.compare_fn<veq>} ins(%5, %6 : tensor<256xf16>, tensor<256xf16>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+  %9 = hfusion.elemwise_unary {fun = #hfusion.unary_fn<vnot>} ins(%8 : tensor<256xi1>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+  %10 = tensor.empty() : tensor<i1>
+  %11 = linalg.fill ins(%false : i1) outs(%10 : tensor<i1>) -> tensor<i1>
+  %12 = tensor.empty() : tensor<i32>
+  %13 = linalg.fill ins(%c-1_i32 : i32) outs(%12 : tensor<i32>) -> tensor<i32>
+  %reduced:2 = linalg.reduce ins(%9, %1 : tensor<256xi1>, tensor<256xi32>) outs(%11, %13 : tensor<i1>, tensor<i32>) dimensions = [0] 
+    (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+      %15 = arith.cmpi ugt, %in, %init : i1
+      %16 = arith.cmpi eq, %in, %init : i1
+      %17 = arith.cmpi slt, %in_1, %init_2 : i32
+      %18 = arith.andi %16, %17 : i1
+      %19 = arith.ori %15, %18 : i1
+      %20 = arith.select %19, %in, %init : i1
+      %21 = arith.select %19, %in_1, %init_2 : i32
+      linalg.yield %20, %21 : i1, i32
+    }
+  %extracted = tensor.extract %reduced#1[] : tensor<i32>
+  %14 = tensor.empty() : tensor<1xi32>
+  %inserted = tensor.insert %extracted into %14[%c0] : tensor<1xi32>
+  %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+  bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+  return
+}
+
+// -----// IR Dump After Normalize (hfusion-normalize-ops) //----- //
+func.func @triton_argmax_1d_bool(%arg0: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg2: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg4: i32 {tt.divisibility = 16 : i32}, %arg5: i32, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+  %cst = arith.constant 0.000000e+00 : f16
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c-1_i32 = arith.constant -1 : i32
+  %false = arith.constant false
+  %0 = tensor.empty() : tensor<256xi32>
+  %1 = hfusion.arange offset[%c0] strides[%c1] outs(%0 : tensor<256xi32>) -> tensor<256xi32>
+  %2 = arith.index_cast %arg8 : i32 to index
+  %reinterpret_cast = memref.reinterpret_cast %arg2 to offset: [%2], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+  %alloc = memref.alloc() : memref<256xi8>
+  memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+  %3 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+  %4 = tensor.empty() : tensor<256xf16>
+  %5 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%3 : tensor<256xi8>) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+  %6 = linalg.fill ins(%cst : f16) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+  %7 = tensor.empty() : tensor<256xi1>
+  %8 = hfusion.compare {compare_fn = #hfusion.compare_fn<veq>} ins(%5, %6 : tensor<256xf16>, tensor<256xf16>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+  %9 = hfusion.elemwise_unary {fun = #hfusion.unary_fn<vnot>} ins(%8 : tensor<256xi1>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+  %10 = tensor.empty() : tensor<i1>
+  %11 = linalg.fill ins(%false : i1) outs(%10 : tensor<i1>) -> tensor<i1>
+  %12 = tensor.empty() : tensor<i32>
+  %13 = linalg.fill ins(%c-1_i32 : i32) outs(%12 : tensor<i32>) -> tensor<i32>
+  %reduced:2 = linalg.reduce ins(%9, %1 : tensor<256xi1>, tensor<256xi32>) outs(%11, %13 : tensor<i1>, tensor<i32>) dimensions = [0] 
+    (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+      %15 = arith.cmpi ugt, %in, %init : i1
+      %16 = arith.cmpi eq, %in, %init : i1
+      %17 = arith.cmpi slt, %in_1, %init_2 : i32
+      %18 = arith.andi %16, %17 : i1
+      %19 = arith.ori %15, %18 : i1
+      %20 = arith.select %19, %in, %init : i1
+      %21 = arith.select %19, %in_1, %init_2 : i32
+      linalg.yield %20, %21 : i1, i32
+    }
+  %extracted = tensor.extract %reduced#1[] : tensor<i32>
+  %14 = tensor.empty() : tensor<1xi32>
+  %inserted = tensor.insert %extracted into %14[%c0] : tensor<1xi32>
+  %reinterpret_cast_0 = memref.reinterpret_cast %arg3 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+  bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+  return
+}
+
+// -----// IR Dump After AddFFTSAddr (hfusion-add-ffts-addr) //----- //
+module attributes {dlti.target_system_spec = #dlti.target_system_spec<"NPU" : #hacc.target_device_spec<#dlti.dl_entry<"AI_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"CUBE_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"VECTOR_CORE_COUNT", 48 : i32>, #dlti.dl_entry<"UB_SIZE", 1572864 : i32>, #dlti.dl_entry<"L1_SIZE", 4194304 : i32>, #dlti.dl_entry<"L0A_SIZE", 524288 : i32>, #dlti.dl_entry<"L0B_SIZE", 524288 : i32>, #dlti.dl_entry<"L0C_SIZE", 1048576 : i32>, #dlti.dl_entry<"UB_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L1_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L0C_ALIGN_SIZE", 4096 : i32>>>, hacc.triton_kernel} {
+  func.func @triton_argmax_1d_bool(%arg0: i64 {hacc.arg_type = #hacc.arg_type<ffts_base_address>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg2: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg3: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg4: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg5: i32 {tt.divisibility = 16 : i32}, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32, %arg11: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+    %cst = arith.constant 0.000000e+00 : f16
+    %c1 = arith.constant 1 : index
+    %c0 = arith.constant 0 : index
+    %c-1_i32 = arith.constant -1 : i32
+    %false = arith.constant false
+    %0 = tensor.empty() : tensor<256xi32>
+    %1 = hfusion.arange offset[%c0] strides[%c1] outs(%0 : tensor<256xi32>) -> tensor<256xi32>
+    %2 = arith.index_cast %arg9 : i32 to index
+    %reinterpret_cast = memref.reinterpret_cast %arg3 to offset: [%2], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+    %alloc = memref.alloc() : memref<256xi8>
+    memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+    %3 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+    %4 = tensor.empty() : tensor<256xf16>
+    %5 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%3 : tensor<256xi8>) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+    %6 = linalg.fill ins(%cst : f16) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+    %7 = tensor.empty() : tensor<256xi1>
+    %8 = hfusion.compare {compare_fn = #hfusion.compare_fn<veq>} ins(%5, %6 : tensor<256xf16>, tensor<256xf16>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+    %9 = hfusion.elemwise_unary {fun = #hfusion.unary_fn<vnot>} ins(%8 : tensor<256xi1>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+    %10 = tensor.empty() : tensor<i1>
+    %11 = linalg.fill ins(%false : i1) outs(%10 : tensor<i1>) -> tensor<i1>
+    %12 = tensor.empty() : tensor<i32>
+    %13 = linalg.fill ins(%c-1_i32 : i32) outs(%12 : tensor<i32>) -> tensor<i32>
+    %reduced:2 = linalg.reduce ins(%9, %1 : tensor<256xi1>, tensor<256xi32>) outs(%11, %13 : tensor<i1>, tensor<i32>) dimensions = [0] 
+      (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+        %15 = arith.cmpi ugt, %in, %init : i1
+        %16 = arith.cmpi eq, %in, %init : i1
+        %17 = arith.cmpi slt, %in_1, %init_2 : i32
+        %18 = arith.andi %16, %17 : i1
+        %19 = arith.ori %15, %18 : i1
+        %20 = arith.select %19, %in, %init : i1
+        %21 = arith.select %19, %in_1, %init_2 : i32
+        linalg.yield %20, %21 : i1, i32
+      }
+    %extracted = tensor.extract %reduced#1[] : tensor<i32>
+    %14 = tensor.empty() : tensor<1xi32>
+    %inserted = tensor.insert %extracted into %14[%c0] : tensor<1xi32>
+    %reinterpret_cast_0 = memref.reinterpret_cast %arg4 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+    bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+    return
+  }
+}
+
+
+// -----// IR Dump After HoistTensorEmpty (hfusion-hoist-tensor-empty) //----- //
+module attributes {dlti.target_system_spec = #dlti.target_system_spec<"NPU" : #hacc.target_device_spec<#dlti.dl_entry<"AI_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"CUBE_CORE_COUNT", 24 : i32>, #dlti.dl_entry<"VECTOR_CORE_COUNT", 48 : i32>, #dlti.dl_entry<"UB_SIZE", 1572864 : i32>, #dlti.dl_entry<"L1_SIZE", 4194304 : i32>, #dlti.dl_entry<"L0A_SIZE", 524288 : i32>, #dlti.dl_entry<"L0B_SIZE", 524288 : i32>, #dlti.dl_entry<"L0C_SIZE", 1048576 : i32>, #dlti.dl_entry<"UB_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L1_ALIGN_SIZE", 256 : i32>, #dlti.dl_entry<"L0C_ALIGN_SIZE", 4096 : i32>>>, hacc.triton_kernel} {
+  func.func @triton_argmax_1d_bool(%arg0: i64 {hacc.arg_type = #hacc.arg_type<ffts_base_address>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg2: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg3: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg4: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg5: i32 {tt.divisibility = 16 : i32}, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32, %arg11: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+    %cst = arith.constant 0.000000e+00 : f16
+    %c1 = arith.constant 1 : index
+    %c0 = arith.constant 0 : index
+    %c-1_i32 = arith.constant -1 : i32
+    %false = arith.constant false
+    %0 = tensor.empty() : tensor<256xi32>
+    %1 = hfusion.arange offset[%c0] strides[%c1] outs(%0 : tensor<256xi32>) -> tensor<256xi32>
+    %2 = arith.index_cast %arg9 : i32 to index
+    %reinterpret_cast = memref.reinterpret_cast %arg3 to offset: [%2], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+    %alloc = memref.alloc() : memref<256xi8>
+    memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+    %3 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+    %4 = tensor.empty() : tensor<256xf16>
+    %5 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%3 : tensor<256xi8>) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+    %6 = linalg.fill ins(%cst : f16) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+    %7 = tensor.empty() : tensor<256xi1>
+    %8 = hfusion.compare {compare_fn = #hfusion.compare_fn<veq>} ins(%5, %6 : tensor<256xf16>, tensor<256xf16>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+    %9 = hfusion.elemwise_unary {fun = #hfusion.unary_fn<vnot>} ins(%8 : tensor<256xi1>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+    %10 = tensor.empty() : tensor<i1>
+    %11 = linalg.fill ins(%false : i1) outs(%10 : tensor<i1>) -> tensor<i1>
+    %12 = tensor.empty() : tensor<i32>
+    %13 = linalg.fill ins(%c-1_i32 : i32) outs(%12 : tensor<i32>) -> tensor<i32>
+    %reduced:2 = linalg.reduce ins(%9, %1 : tensor<256xi1>, tensor<256xi32>) outs(%11, %13 : tensor<i1>, tensor<i32>) dimensions = [0] 
+      (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+        %15 = arith.cmpi ugt, %in, %init : i1
+        %16 = arith.cmpi eq, %in, %init : i1
+        %17 = arith.cmpi slt, %in_1, %init_2 : i32
+        %18 = arith.andi %16, %17 : i1
+        %19 = arith.ori %15, %18 : i1
+        %20 = arith.select %19, %in, %init : i1
+        %21 = arith.select %19, %in_1, %init_2 : i32
+        linalg.yield %20, %21 : i1, i32
+      }
+    %extracted = tensor.extract %reduced#1[] : tensor<i32>
+    %14 = tensor.empty() : tensor<1xi32>
+    %inserted = tensor.insert %extracted into %14[%c0] : tensor<1xi32>
+    %reinterpret_cast_0 = memref.reinterpret_cast %arg4 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+    bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+    return
+  }
+}
+
+
+// -----// IR Dump After Decompose (hfusion-decompose) //----- //
+func.func @triton_argmax_1d_bool(%arg0: i64 {hacc.arg_type = #hacc.arg_type<ffts_base_address>}, %arg1: memref<?xi8> {hacc.arg_type = #hacc.arg_type<sync_block_lock>}, %arg2: memref<?xi8> {hacc.arg_type = #hacc.arg_type<workspace>}, %arg3: memref<?xi8> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg4: memref<?xi32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg5: i32 {tt.divisibility = 16 : i32}, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32, %arg11: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, hacc.entry, hacc.function_kind = #hacc.function_kind<DEVICE>, mix_mode = "aiv", parallel_mode = "simd"} {
+  %cst = arith.constant 0.000000e+00 : f16
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c-1_i32 = arith.constant -1 : i32
+  %false = arith.constant false
+  %0 = tensor.empty() : tensor<256xi32>
+  %1 = hfusion.arange offset[%c0] strides[%c1] outs(%0 : tensor<256xi32>) -> tensor<256xi32>
+  %2 = arith.index_cast %arg9 : i32 to index
+  %reinterpret_cast = memref.reinterpret_cast %arg3 to offset: [%2], sizes: [256], strides: [1] : memref<?xi8> to memref<256xi8, strided<[1], offset: ?>>
+  %alloc = memref.alloc() : memref<256xi8>
+  memref.copy %reinterpret_cast, %alloc : memref<256xi8, strided<[1], offset: ?>> to memref<256xi8>
+  %3 = bufferization.to_tensor %alloc restrict writable : memref<256xi8>
+  %4 = tensor.empty() : tensor<256xf16>
+  %5 = hfusion.cast {enable_overflow = true, round_mode = #hfusion.round_mode<rint>} ins(%3 : tensor<256xi8>) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+  %6 = linalg.fill ins(%cst : f16) outs(%4 : tensor<256xf16>) -> tensor<256xf16>
+  %7 = tensor.empty() : tensor<256xi1>
+  %8 = hfusion.compare {compare_fn = #hfusion.compare_fn<veq>} ins(%5, %6 : tensor<256xf16>, tensor<256xf16>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+  %9 = hfusion.elemwise_unary {fun = #hfusion.unary_fn<vnot>} ins(%8 : tensor<256xi1>) outs(%7 : tensor<256xi1>) -> tensor<256xi1>
+  %10 = tensor.empty() : tensor<i1>
+  %11 = linalg.fill ins(%false : i1) outs(%10 : tensor<i1>) -> tensor<i1>
+  %12 = tensor.empty() : tensor<i32>
+  %13 = linalg.fill ins(%c-1_i32 : i32) outs(%12 : tensor<i32>) -> tensor<i32>
+  %reduced:2 = linalg.reduce ins(%9, %1 : tensor<256xi1>, tensor<256xi32>) outs(%11, %13 : tensor<i1>, tensor<i32>) dimensions = [0] 
+    (%in: i1, %in_1: i32, %init: i1, %init_2: i32) {
+      %15 = arith.cmpi ugt, %in, %init : i1
+      %16 = arith.cmpi eq, %in, %init : i1
+      %17 = arith.cmpi slt, %in_1, %init_2 : i32
+      %18 = arith.andi %16, %17 : i1
+      %19 = arith.ori %15, %18 : i1
+      %20 = arith.select %19, %in, %init : i1
+      %21 = arith.select %19, %in_1, %init_2 : i32
+      linalg.yield %20, %21 : i1, i32
+    }
+  %extracted = tensor.extract %reduced#1[] : tensor<i32>
+  %14 = tensor.empty() : tensor<1xi32>
+  %inserted = tensor.insert %extracted into %14[%c0] : tensor<1xi32>
+  %reinterpret_cast_0 = memref.reinterpret_cast %arg4 to offset: [0], sizes: [1], strides: [1] : memref<?xi32> to memref<1xi32, strided<[1]>>
+  bufferization.materialize_in_destination %inserted in writable %reinterpret_cast_0 : (tensor<1xi32>, memref<1xi32, strided<[1]>>) -> ()
+  return
+}
+
+unsupport variadic reduce
+UNREACHABLE executed at /home/c00930404/AscendNPU-IR/bishengir/lib/Conversion/HFusionToHIVM/Reduction.cpp:115!
+PLEASE submit a bug report to https://github.com/llvm/llvm-project/issues/ and include the crash backtrace.
+Stack dump:
+0.	Program arguments: bishengir-compile --enable-hfusion-compile=true --enable-hivm-compile=true --enable-triton-kernel-compile=true --enable-auto-multi-buffer=true --mlir-print-ir-after-all --hivm-compile-args=mlir-print-ir-before-all --hivm-compile-args=mlir-print-ir-after-all kernel.ttadapter.mlir
+ #0 0x0000aaaae0b4cb9c llvm::sys::PrintStackTrace(llvm::raw_ostream&, int) /home/c00930404/AscendNPU-IR/third-party/llvm-project/llvm/lib/Support/Unix/Signals.inc:723:11
+ #1 0x0000aaaae0b4d0ac PrintStackTraceSignalHandler(void*) /home/c00930404/AscendNPU-IR/third-party/llvm-project/llvm/lib/Support/Unix/Signals.inc:798:1
+ #2 0x0000aaaae0b4b2f4 llvm::sys::RunSignalHandlers() /home/c00930404/AscendNPU-IR/third-party/llvm-project/llvm/lib/Support/Signals.cpp:105:5
+ #3 0x0000aaaae0b4d814 SignalHandler(int) /home/c00930404/AscendNPU-IR/third-party/llvm-project/llvm/lib/Support/Unix/Signals.inc:413:1
+ #4 0x0000ffffb290c7e0 (linux-vdso.so.1+0x7e0)
+ #5 0x0000ffffb246f1f0 __pthread_kill_implementation ./nptl/pthread_kill.c:44:76
+ #6 0x0000ffffb242a67c gsignal ./signal/../sysdeps/posix/raise.c:27:6
+ #7 0x0000ffffb2417130 abort ./stdlib/abort.c:81:7
+ #8 0x0000aaaae0a67f00 llvm::install_out_of_memory_new_handler() /home/c00930404/AscendNPU-IR/third-party/llvm-project/llvm/lib/Support/ErrorHandling.cpp:194:0
+ #9 0x0000aaaad7010760 (anonymous namespace)::LinalgToHIVMReduceLikeOp<mlir::linalg::ReduceOp>::matchAndRewrite(mlir::linalg::ReduceOp, mlir::PatternRewriter&) const /home/c00930404/AscendNPU-IR/bishengir/lib/Conversion/HFusionToHIVM/Reduction.cpp:0:7
+#10 0x0000aaaad7012e38 mlir::detail::OpOrInterfaceRewritePatternBase<mlir::linalg::ReduceOp>::matchAndRewrite(mlir::Operation*, mlir::PatternRewriter&) const /home/c00930404/AscendNPU-IR/third-party/llvm-project/llvm/../mlir/include/mlir/IR/PatternMatch.h:331:12
+#11 0x0000aaaade8830a4 mlir::PatternApplicator::matchAndRewrite(mlir::Operation*, mlir::PatternRewriter&, llvm::function_ref<bool (mlir::Pattern const&)>, llvm::function_ref<void (mlir::Pattern const&)>, llvm::function_ref<llvm::LogicalResult (mlir::Pattern const&)>)::$_1::operator()() const /home/c00930404/AscendNPU-IR/third-party/llvm-project/mlir/lib/Rewrite/PatternApplicator.cpp:212:31
+#12 0x0000aaaade882eec void llvm::function_ref<void ()>::callback_fn<mlir::PatternApplicator::matchAndRewrite(mlir::Operation*, mlir::PatternRewriter&, llvm::function_ref<bool (mlir::Pattern const&)>, llvm::function_ref<void (mlir::Pattern const&)>, llvm::function_ref<llvm::LogicalResult (mlir::Pattern const&)>)::$_1>(long) /home/c00930404/AscendNPU-IR/third-party/llvm-project/llvm/include/llvm/ADT/STLFunctionalExtras.h:45:5
+#13 0x0000aaaaddc3a698 llvm::function_ref<void ()>::operator()() const /home/c00930404/AscendNPU-IR/third-party/llvm-project/llvm/include/llvm/ADT/STLFunctionalExtras.h:68:5
+#14 0x0000aaaade8849e4 void mlir::MLIRContext::executeAction<mlir::ApplyPatternAction, mlir::Pattern const&>(llvm::function_ref<void ()>, llvm::ArrayRef<mlir::IRUnit>, mlir::Pattern const&) /home/c00930404/AscendNPU-IR/third-party/llvm-project/mlir/include/mlir/IR/MLIRContext.h:275:7
+#15 0x0000aaaade881868 mlir::PatternApplicator::matchAndRewrite(mlir::Operation*, mlir::PatternRewriter&, llvm::function_ref<bool (mlir::Pattern const&)>, llvm::function_ref<void (mlir::Pattern const&)>, llvm::function_ref<llvm::LogicalResult (mlir::Pattern const&)>) /home/c00930404/AscendNPU-IR/third-party/llvm-project/mlir/lib/Rewrite/PatternApplicator.cpp:233:9
+#16 0x0000aaaade7f4300 (anonymous namespace)::OperationLegalizer::legalizeWithPattern(mlir::Operation*, mlir::ConversionPatternRewriter&) /home/c00930404/AscendNPU-IR/third-party/llvm-project/mlir/lib/Transforms/Utils/DialectConversion.cpp:2001:21
+#17 0x0000aaaade7ecb8c (anonymous namespace)::OperationLegalizer::legalize(mlir::Operation*, mlir::ConversionPatternRewriter&) /home/c00930404/AscendNPU-IR/third-party/llvm-project/mlir/lib/Transforms/Utils/DialectConversion.cpp:1893:17
+#18 0x0000aaaade7ec580 mlir::OperationConverter::convert(mlir::ConversionPatternRewriter&, mlir::Operation*) /home/c00930404/AscendNPU-IR/third-party/llvm-project/mlir/lib/Transforms/Utils/DialectConversion.cpp:2427:26
+#19 0x0000aaaade7ece88 mlir::OperationConverter::convertOperations(llvm::ArrayRef<mlir::Operation*>) /home/c00930404/AscendNPU-IR/third-party/llvm-project/mlir/lib/Transforms/Utils/DialectConversion.cpp:2479:16
+#20 0x0000aaaade7f1380 mlir::applyPartialConversion(llvm::ArrayRef<mlir::Operation*>, mlir::ConversionTarget const&, mlir::FrozenRewritePatternSet const&, mlir::ConversionConfig) /home/c00930404/AscendNPU-IR/third-party/llvm-project/mlir/lib/Transforms/Utils/DialectConversion.cpp:3464:22
+#21 0x0000aaaade7f146c mlir::applyPartialConversion(mlir::Operation*, mlir::ConversionTarget const&, mlir::FrozenRewritePatternSet const&, mlir::ConversionConfig) /home/c00930404/AscendNPU-IR/third-party/llvm-project/mlir/lib/Transforms/Utils/DialectConversion.cpp:3470:10
+#22 0x0000aaaad6fab680 (anonymous namespace)::ConvertHFusionToHIVMPass::runOnOperation() /home/c00930404/AscendNPU-IR/bishengir/lib/Conversion/HFusionToHIVM/HFusionToHIVM.cpp:1044:16
+#23 0x0000aaaade93fc2c mlir::detail::OpToOpPassAdaptor::run(mlir::Pass*, mlir::Operation*, mlir::AnalysisManager, bool, unsigned int)::$_7::operator()() const /home/c00930404/AscendNPU-IR/third-party/llvm-project/mlir/lib/Pass/Pass.cpp:527:17
+#24 0x0000aaaade93fbb0 void llvm::function_ref<void ()>::callback_fn<mlir::detail::OpToOpPassAdaptor::run(mlir::Pass*, mlir::Operation*, mlir::AnalysisManager, bool, unsigned int)::$_7>(long) /home/c00930404/AscendNPU-IR/third-party/llvm-project/llvm/include/llvm/ADT/STLFunctionalExtras.h:45:5
+#25 0x0000aaaaddc3a698 llvm::function_ref<void ()>::operator()() const /home/c00930404/AscendNPU-IR/third-party/llvm-project/llvm/include/llvm/ADT/STLFunctionalExtras.h:68:5
+#26 0x0000aaaade942988 void mlir::MLIRContext::executeAction<mlir::PassExecutionAction, mlir::Pass&>(llvm::function_ref<void ()>, llvm::ArrayRef<mlir::IRUnit>, mlir::Pass&) /home/c00930404/AscendNPU-IR/third-party/llvm-project/mlir/include/mlir/IR/MLIRContext.h:275:7
+#27 0x0000aaaade93b5c8 mlir::detail::OpToOpPassAdaptor::run(mlir::Pass*, mlir::Operation*, mlir::AnalysisManager, bool, unsigned int) /home/c00930404/AscendNPU-IR/third-party/llvm-project/mlir/lib/Pass/Pass.cpp:521:21
+#28 0x0000aaaade93bb70 mlir::detail::OpToOpPassAdaptor::runPipeline(mlir::OpPassManager&, mlir::Operation*, mlir::AnalysisManager, bool, unsigned int, mlir::PassInstrumentor*, mlir::PassInstrumentation::PipelineParentInfo const*) /home/c00930404/AscendNPU-IR/third-party/llvm-project/mlir/lib/Pass/Pass.cpp:593:16
+#29 0x0000aaaade93d384 mlir::PassManager::runPasses(mlir::Operation*, mlir::AnalysisManager) /home/c00930404/AscendNPU-IR/third-party/llvm-project/mlir/lib/Pass/Pass.cpp:904:10
+#30 0x0000aaaade93d2b4 mlir::PassManager::run(mlir::Operation*) /home/c00930404/AscendNPU-IR/third-party/llvm-project/mlir/lib/Pass/Pass.cpp:884:60
+#31 0x0000aaaad6f0ac14 bishengir::BiShengIRPassManager::run(mlir::Operation*) /home/c00930404/AscendNPU-IR/bishengir/lib/Pass/PassManager.cpp:204:25
+#32 0x0000aaaad6f2ba70 bishengir::runPipeline(mlir::ModuleOp, std::function<void (mlir::PassManager&)> const&, bishengir::BiShengIRCompileConfigBase const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> const&) /home/c00930404/AscendNPU-IR/bishengir/lib/Tools/Utils/Utils.cpp:53:26
+#33 0x0000aaaad6f0eab4 bishengir::runBiShengIRPipeline(mlir::ModuleOp, bishengir::BiShengIRCompileMainConfig) /home/c00930404/AscendNPU-IR/bishengir/lib/Tools/bishengir-compile/BiShengIRCompileMain.cpp:173:9
+#34 0x0000aaaad6d72660 main /home/c00930404/AscendNPU-IR/bishengir/tools/bishengir-compile/bishengir-compile.cpp:114:14
+#35 0x0000ffffb24173fc __libc_start_call_main ./csu/../sysdeps/nptl/libc_start_call_main.h:74:3
+#36 0x0000ffffb24174cc call_init ./csu/../csu/libc-start.c:128:20
+#37 0x0000ffffb24174cc __libc_start_main ./csu/../csu/libc-start.c:379:5
+#38 0x0000aaaad6d720b0 _start (/home/c00930404/AscendNPU-IR/build/bin/bishengir-compile+0x62020b0)
