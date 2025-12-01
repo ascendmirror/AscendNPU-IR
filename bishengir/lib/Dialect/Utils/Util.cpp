@@ -57,6 +57,7 @@ SmallVector<Value> tracebackImpl(Value memrefVal) {
             dyn_cast<scf::ForOp>(arg.getParentRegion()->getParentOp())) {
       if (arg.getArgNumber() > 0 &&
           forOp.getInitArgs().size() > arg.getArgNumber() - 1) {
+
         result.emplace_back(forOp.getInitArgs()[arg.getArgNumber() - 1]);
         result.emplace_back(forOp.getYieldedValues()[arg.getArgNumber() - 1]);
       }
@@ -265,8 +266,89 @@ checkUsersAllWithCondition(Value v, Operation *rootOp,
       assert(parentOp && "parent op cannot be nullptr");
       auto resCheck = checkUsersAllWithCondition(parentOp->getResult(resNum),
                                                  rootOp, condFn, skipFn);
+      scf::ForOp forOp = cast<scf::ForOp>(parentOp);
+      std::optional<bool> regionIterArgCheck = std::nullopt;
+      if (forOp) {
+        DenseSet<Value> visited;
+        regionIterArgCheck = checkUsersAllWithConditionIterArgsFirst(
+            forOp.getRegionIterArg(resNum), rootOp, condFn, skipFn, visited);
+      }
+      if (!resCheck.has_value()) {
+        if (!regionIterArgCheck.has_value())
+          continue;
+        if (!regionIterArgCheck.value())
+          return false;
+        flag = true;
+        continue;
+      }
+
+      if (!resCheck.value())
+        return false;
+
+      flag = true;
+    }
+  }
+
+  return flag;
+}
+
+std::optional<bool>
+checkUsersAllWithConditionIterArgsFirst(Value v, Operation *rootOp,
+                           const std::function<bool(Operation *op)> &condFn,
+                           const std::function<bool(Operation *op)> &skipFn,
+                           DenseSet<Value> &visited) {
+  if (!visited.insert(v).second)
+    return std::nullopt;
+  // Flag initialization is nullopt which means we can't infer flag now
+  std::optional<bool> flag = std::nullopt;
+
+  for (auto &use : v.getUses()) {
+    auto *op = use.getOwner();
+    LLVM_DEBUG(llvm::dbgs() << "[TRACING USERS]" << *op << "\n";);
+    if (op == rootOp)
+      // When meet rootOp, just ignore it and keep original state
+      continue;
+
+    if (condFn(op)) {
+      // When meet satisfied op, enable flag to true
+      flag = true;
+      continue;
+    }
+
+    // If op can't satisfy condition and can't be skipped, return false directly
+    if (!skipFn(op))
+      return false;
+
+    // For all skipped ops, just continue searching its result
+    for (auto opRes : op->getResults()) {
+      auto resCheck = checkUsersAllWithConditionIterArgsFirst(opRes, rootOp, condFn, skipFn, visited);
       if (!resCheck.has_value())
         continue;
+
+      if (!resCheck.value())
+        return false;
+
+      flag = true;
+    }
+    if (isa<scf::YieldOp>(op)) {
+      auto resNum = use.getOperandNumber();
+      Operation *parentOp = op->getParentOp();
+      assert(parentOp && "parent op cannot be nullptr");
+      auto resCheck = checkUsersAllWithConditionIterArgsFirst(parentOp->getResult(resNum),
+                                                 rootOp, condFn, skipFn, visited);
+      scf::ForOp forOp = cast<scf::ForOp>(parentOp);
+      std::optional<bool> regionIterArgCheck = std::nullopt;
+      if (forOp) 
+        regionIterArgCheck = checkUsersAllWithConditionIterArgsFirst(
+            forOp.getRegionIterArg(resNum), rootOp, condFn, skipFn, visited);
+      if (!resCheck.has_value()) {
+        if (!regionIterArgCheck.has_value())
+          continue;
+        if (!regionIterArgCheck.value())
+          return false;
+        flag = true;
+        continue;
+      }
 
       if (!resCheck.value())
         return false;
@@ -886,12 +968,22 @@ Value utils::tracebackMemRef(Value memrefVal) {
   return memrefValues[0];
 }
 
+SmallVector<Value> utils::tracebackMemRefs(Value memrefVal) {
+  SmallVector<Value> memrefValues = utils::tracebackMemRefVec(memrefVal);
+  if (memrefValues.empty()) {
+    return {memrefVal};
+  }
+  return memrefValues;
+}
+
 SmallVector<Value>
 utils::tracebackMemRefVecByTargetFn(Value memrefVal,
                                     std::function<bool(Value)> targetFn) {
   SmallVector<Value> memrefValues;
   memrefValues.push_back(memrefVal);
   int loopBound = 256;
+  DenseSet<Value> alreadyChecked;
+  alreadyChecked.insert(memrefVal);
   while (!memrefValues.empty() &&
          std::any_of(memrefValues.begin(), memrefValues.end(),
                      [&targetFn](Value &val) { return !targetFn(val); })) {
@@ -908,7 +1000,12 @@ utils::tracebackMemRefVecByTargetFn(Value memrefVal,
     }
     auto it = std::find(memrefValues.begin(), memrefValues.end(), allocVal);
     memrefValues.erase(it);
-    memrefValues.append(upward.begin(), upward.end());
+    for (Value &v : upward) {
+      if (!alreadyChecked.insert(v).second) {
+        continue;
+      }
+      memrefValues.push_back(v);
+    }
 
     // avoid infinite loop
     if (loopBound-- < 0) {
@@ -925,6 +1022,17 @@ std::optional<memref::AllocOp> utils::tracebackMemRefToAlloc(Value memrefVal) {
   return utils::isAllocLikeOp(tracedValue)
              ? tracedValue.getDefiningOp<memref::AllocOp>()
              : std::optional<memref::AllocOp>();
+}
+
+std::optional<SmallVector<memref::AllocOp>> 
+utils::tracebackMemRefsToAlloc(Value memrefVal) {
+  auto tracedValue = utils::tracebackMemRefs(memrefVal);
+  return llvm::all_of(tracedValue,
+                      [&](Value &val) { return utils::isAllocLikeOp(val); })
+             ? SmallVector<memref::AllocOp>(llvm::map_range(
+                   tracedValue,
+                   [](Value v) { return v.getDefiningOp<memref::AllocOp>(); }))
+             : std::optional<SmallVector<memref::AllocOp>>();
 }
 
 namespace reshape_utils {
