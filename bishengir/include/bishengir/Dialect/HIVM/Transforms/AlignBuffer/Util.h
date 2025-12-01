@@ -123,7 +123,8 @@ LogicalResult replaceAndPropagateMemRefType(RewriterBase &rewriter,
                                             Value to);
 std::optional<int>
 getLastNotUnitDim(const SmallVectorImpl<MemRefType> &memRefTypes,
-                  ReassociationIndices reassociations);
+                  const llvm::ArrayRef<ReassociationIndices> &continuousReassociations,
+                  int64_t startIdx);
 std::optional<int32_t> adjustAlignDim(Operation *op, Value operand,
                                       std::optional<int32_t> alignDim);
 std::pair<llvm::SmallVector<int32_t>, llvm::SmallVector<int32_t>>
