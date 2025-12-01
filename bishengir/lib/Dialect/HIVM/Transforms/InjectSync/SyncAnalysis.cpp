@@ -21,6 +21,7 @@
 #include "bishengir/Dialect/HIVM/Transforms/InjectSync/SyncCommon.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/Interfaces/LoopLikeInterface.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
@@ -120,8 +121,8 @@ void SyncAnalyzer::InsertLastPipeAll() {
   assert(syncOperations.size() == syncIndex);
 }
 
-bool SyncAnalyzer::isParallelLoop(scf::ForOp forOp) const {
-  return forOp->hasAttrOfType<UnitAttr>(hivm::ParallelLoopAttr::name);
+bool SyncAnalyzer::isParallelLoop(LoopLikeOpInterface loopLikeOp) const {
+  return loopLikeOp->hasAttrOfType<UnitAttr>(hivm::ParallelLoopAttr::name);
 }
 
 bool SyncAnalyzer::checkUnderParallelLoop(
@@ -130,12 +131,10 @@ bool SyncAnalyzer::checkUnderParallelLoop(
   auto loopOp1 = nowCompound->elementOp->getParentOfType<LoopLikeOpInterface>();
   auto loopOp2 =
       frontCompound->elementOp->getParentOfType<LoopLikeOpInterface>();
-  auto forOp1 = llvm::dyn_cast_if_present<scf::ForOp>(loopOp1.getOperation());
-  auto forOp2 = llvm::dyn_cast_if_present<scf::ForOp>(loopOp2.getOperation());
-  if (!forOp1 || !forOp2 || forOp1 != forOp2) {
+  if (!loopOp1 || !loopOp2 || loopOp1 != loopOp2) {
     return false;
   }
-  return isParallelLoop(forOp1);
+  return isParallelLoop(loopOp1);
 }
 
 void SyncAnalyzer::DealWithLoopSync(LoopInstanceElement *nowElement) {
@@ -1009,23 +1008,26 @@ SyncAnalyzer::checkMmadl1FixpipeSingleForLoopUnitFlagPattern(
   if (fixpipeOp.getSrc() != mmadl1Op.getC()) {
     return {};
   }
-  auto mmadl1ForOp = dyn_cast<scf::ForOp>(mmadl1Op->getParentOp());
-  auto fixpipeOpForOp = dyn_cast<scf::ForOp>(fixpipeOp->getParentOp());
-  if (mmadl1ForOp && fixpipeOpForOp) {
-    if (mmadl1ForOp->getParentRegion() == fixpipeOpForOp->getParentRegion()) {
+  auto mmadl1LoopLikeOp =
+      dyn_cast<LoopLikeOpInterface>(mmadl1Op->getParentOp());
+  auto fixpipeOpLoopLikeOp =
+      dyn_cast<LoopLikeOpInterface>(fixpipeOp->getParentOp());
+  if (mmadl1LoopLikeOp && fixpipeOpLoopLikeOp) {
+    if (mmadl1LoopLikeOp->getParentRegion() ==
+        fixpipeOpLoopLikeOp->getParentRegion()) {
       return std::make_pair(UNIT_FLAG::ENABLED_ONLY_LAST_ITER,
                             UNIT_FLAG::ENABLED_ONLY_FIRST_ITER);
     }
-  } else if (mmadl1ForOp) {
-    if (mmadl1ForOp->getParentRegion() == fixpipeOp->getParentRegion()) {
+  } else if (mmadl1LoopLikeOp) {
+    if (mmadl1LoopLikeOp->getParentRegion() == fixpipeOp->getParentRegion()) {
       return op1IsFrontCompound
                  ? std::make_pair(UNIT_FLAG::ENABLED_ONLY_LAST_ITER,
                                   UNIT_FLAG::ENABLED_WITH_UPDATE)
                  : std::make_pair(UNIT_FLAG::ENABLED_WITH_UPDATE,
                                   UNIT_FLAG::ENABLED_ONLY_FIRST_ITER);
     }
-  } else if (fixpipeOpForOp) {
-    if (fixpipeOpForOp->getParentRegion() == mmadl1Op->getParentRegion()) {
+  } else if (fixpipeOpLoopLikeOp) {
+    if (fixpipeOpLoopLikeOp->getParentRegion() == mmadl1Op->getParentRegion()) {
       return op1IsFrontCompound
                  ? std::make_pair(UNIT_FLAG::ENABLED_WITH_UPDATE,
                                   UNIT_FLAG::ENABLED_ONLY_FIRST_ITER)
@@ -1183,7 +1185,8 @@ Value SyncAnalyzer::GetLowestCommonAncestorBuffer(
   return selectedBuffer;
 }
 
-std::optional<std::pair<Value, scf::ForOp>> SyncAnalyzer::GetCommonParentLoop(
+std::optional<std::pair<Value, LoopLikeOpInterface>>
+SyncAnalyzer::GetCommonParentLoop(
     const DepBaseMemInfoPairVec &depBaseMemInfosVec, int eventIdNum) {
   if (eventIdNum != 2) {
     // Not a 2buffer, just return directly.
@@ -1199,7 +1202,8 @@ std::optional<std::pair<Value, scf::ForOp>> SyncAnalyzer::GetCommonParentLoop(
   if (allocOp == nullptr) {
     return {};
   }
-  scf::ForOp retParentLoop = allocOp->getParentOfType<scf::ForOp>();
+  LoopLikeOpInterface retParentLoop =
+      allocOp->getParentOfType<LoopLikeOpInterface>();
   if (!retParentLoop) {
     return {};
   }
@@ -1207,7 +1211,7 @@ std::optional<std::pair<Value, scf::ForOp>> SyncAnalyzer::GetCommonParentLoop(
     auto *curAllocOp = buffer.getDefiningOp();
     assert(curAllocOp != nullptr);
     assert(IsMemAllocOp(curAllocOp));
-    auto curParentLoop = curAllocOp->getParentOfType<scf::ForOp>();
+    auto curParentLoop = curAllocOp->getParentOfType<LoopLikeOpInterface>();
     if (curParentLoop == nullptr || retParentLoop != curParentLoop) {
       return {};
     }
