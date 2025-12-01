@@ -119,15 +119,9 @@ llvm::SmallVector<Value> Solver::collectPointerOps(Value val) {
     return collectedOps;
   }
 
-  if (auto forOp = dyn_cast<scf::ForOp>(op)) {
+  if (auto loopLikeOp = dyn_cast<LoopLikeOpInterface>(op)) {
     auto resultNum = dyn_cast<OpResult>(val).getResultNumber();
-    auto yieldedVal = forOp.getYieldedValues()[resultNum];
-    return collectPointerOps(yieldedVal);
-  }
-
-  if (auto whileOp = dyn_cast<scf::WhileOp>(op)) {
-    auto resultNum = dyn_cast<OpResult>(val).getResultNumber();
-    auto yieldedVal = whileOp.getYieldedValues()[resultNum];
+    auto yieldedVal = loopLikeOp.getYieldedValues()[resultNum];
     return collectPointerOps(yieldedVal);
   }
 

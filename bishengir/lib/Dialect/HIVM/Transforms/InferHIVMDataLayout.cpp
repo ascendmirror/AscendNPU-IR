@@ -36,6 +36,7 @@
 #include "mlir/IR/TypeRange.h"
 #include "mlir/IR/Value.h"
 #include "mlir/IR/ValueRange.h"
+#include "mlir/Interfaces/LoopLikeInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 
@@ -540,7 +541,7 @@ DataLayoutInferAndPropagateHelper::propagateDataLayoutToUsers(
   auto propagateFn = [&](OpOperand &user) -> void {
     Operation *userDefiningOp = user.getOwner();
     return TypeSwitch<Operation *, void>(userDefiningOp)
-        .Case<scf::ForOp>([&](scf::ForOp op) {
+        .Case<LoopLikeOpInterface>([&](LoopLikeOpInterface op) {
           Value arg = op.getTiedLoopRegionIterArg(&user);
           Value result = op.getTiedLoopResult(&user);
           updateLayout({arg, result}, info, changed);
