@@ -51,17 +51,17 @@ class OutlineScopeOp : public OpRewritePattern<scope::ScopeOp> {
     scopeOp.walk<WalkOrder::PreOrder>([&inputs, &scopeOp](Operation *op) {
       for (auto &opr : op->getOpOperands()) {
         auto val = opr.get();
+
+        // Skip if defined within scope
         if (auto blockArg = dyn_cast<BlockArgument>(val)) {
           if (scopeOp->isAncestor(blockArg.getParentRegion()->getParentOp()))
             continue;
-          inputs.insert(opr.get());
-          continue;
+        } else if (auto defOp = val.getDefiningOp()) {
+          if (scopeOp->isAncestor(defOp))
+            continue;
         }
-        auto defOp = val.getDefiningOp();
-        if (scopeOp->isAncestor(defOp))
-          continue;
 
-        inputs.insert(opr.get());
+        inputs.insert(val);
       }
     });
     return inputs.takeVector();
@@ -109,7 +109,7 @@ class OutlineScopeOp : public OpRewritePattern<scope::ScopeOp> {
     // Clone operations and replace usages
     LDBG("pushing outlined operations\n");
     IRMapping currentMap;
-    for (auto [oldIn, newIn] : llvm::zip(inputs, entryBB->getArguments()))
+    for (auto [oldIn, newIn] : llvm::zip_equal(inputs, entryBB->getArguments()))
       currentMap.map(oldIn, newIn);
 
     SetVector<Operation *> newOps;
