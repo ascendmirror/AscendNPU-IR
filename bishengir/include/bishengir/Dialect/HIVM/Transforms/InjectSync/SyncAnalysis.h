@@ -21,6 +21,7 @@
 #include "bishengir/Dialect/HIVM/Transforms/InjectSync/MemoryDependentAnalyzer.h"
 #include "bishengir/Dialect/HIVM/Transforms/InjectSync/SyncCommon.h"
 #include "bishengir/Dialect/HIVM/Transforms/Passes.h"
+#include "mlir/Interfaces/LoopLikeInterface.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir {
@@ -223,7 +224,7 @@ private:
 
   /// When given multiple pointer_cast operations, get their parent loop if it
   /// exists and they all under it's scope.
-  std::optional<std::pair<Value, scf::ForOp>>
+  std::optional<std::pair<Value, LoopLikeOpInterface>>
   GetCommonParentLoop(const DepBaseMemInfoPairVec &depBaseMemInfosVec,
                       int eventIdNum);
 
@@ -287,7 +288,7 @@ private:
       CompoundInstanceElement *frontCompound,
       const std::optional<unsigned> &forEndIndex);
 
-  bool isParallelLoop(scf::ForOp forOp) const;
+  bool isParallelLoop(LoopLikeOpInterface loopLikeOp) const;
 
   bool
   checkUnderParallelLoop(const CompoundInstanceElement *nowCompound,

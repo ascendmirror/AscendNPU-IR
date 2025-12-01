@@ -728,22 +728,25 @@ Solver::checkMmadl1FixpipeSingleForLoopUnitFlagPattern(RWOperation *rwOp1,
   if (fixpipeOp->getParentRegion() == mmadl1Op->getParentRegion()) {
     return {};
   }
-  auto mmadl1ForOp = dyn_cast<scf::ForOp>(mmadl1Op->getParentOp());
-  auto fixpipeOpForOp = dyn_cast<scf::ForOp>(fixpipeOp->getParentOp());
-  if (mmadl1ForOp && fixpipeOpForOp) {
-    if (mmadl1ForOp->getParentRegion() == fixpipeOpForOp->getParentRegion()) {
+  auto mmadl1LoopLikeOp =
+      dyn_cast<LoopLikeOpInterface>(mmadl1Op->getParentOp());
+  auto fixpipeOpLoopLikeOp =
+      dyn_cast<LoopLikeOpInterface>(fixpipeOp->getParentOp());
+  if (mmadl1LoopLikeOp && fixpipeOpLoopLikeOp) {
+    if (mmadl1LoopLikeOp->getParentRegion() ==
+        fixpipeOpLoopLikeOp->getParentRegion()) {
       return std::make_pair(UNIT_FLAG::ENABLED_ONLY_LAST_ITER,
                             UNIT_FLAG::ENABLED_ONLY_FIRST_ITER);
     }
-  } else if (mmadl1ForOp) {
-    if (mmadl1ForOp->getParentRegion() == fixpipeOp->getParentRegion()) {
+  } else if (mmadl1LoopLikeOp) {
+    if (mmadl1LoopLikeOp->getParentRegion() == fixpipeOp->getParentRegion()) {
       return op1IsFrontOcc ? std::make_pair(UNIT_FLAG::ENABLED_ONLY_LAST_ITER,
                                             UNIT_FLAG::ENABLED_WITH_UPDATE)
                            : std::make_pair(UNIT_FLAG::ENABLED_WITH_UPDATE,
                                             UNIT_FLAG::ENABLED_ONLY_FIRST_ITER);
     }
-  } else if (fixpipeOpForOp) {
-    if (fixpipeOpForOp->getParentRegion() == mmadl1Op->getParentRegion()) {
+  } else if (fixpipeOpLoopLikeOp) {
+    if (fixpipeOpLoopLikeOp->getParentRegion() == mmadl1Op->getParentRegion()) {
       return op1IsFrontOcc ? std::make_pair(UNIT_FLAG::ENABLED_WITH_UPDATE,
                                             UNIT_FLAG::ENABLED_ONLY_FIRST_ITER)
                            : std::make_pair(UNIT_FLAG::ENABLED_ONLY_LAST_ITER,
