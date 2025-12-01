@@ -372,19 +372,19 @@ LogicalResult propagateAlignDown(
 }
 
 LogicalResult propagateAlignDown(
-    PatternRewriter &rewriter, scf::ForOp scfForOp, Value v,
+    PatternRewriter &rewriter, LoopLikeOpInterface loopOp, Value v,
     ArrayRef<int32_t> alignDims, ArrayRef<int32_t> alignBytes,
     std::string alignDimAttrName = hivm::StrideAlignDimsAttr::name.str(),
     std::string alignBytesAttrName =
         hivm::StrideAlignValueInByteAttr::name.str()) {
-  auto inits = scfForOp.getInitArgs();
+  auto inits = loopOp.getInits();
   auto it = std::find(inits.begin(), inits.end(), v);
   assert(it != inits.end() && "only support scf for init as users");
   unsigned initIndx = static_cast<unsigned>(it - inits.begin());
   auto mayResultBeAnnotateOpWithAttr = utils::getAnnotateOpWithAttr(
-      scfForOp.getResult(initIndx), hivm::StrideAlignDimsAttr::name);
+      loopOp->getResult(initIndx), hivm::StrideAlignDimsAttr::name);
   auto mayIterArgBeAnnotateOpWithAttr = utils::getAnnotateOpWithAttr(
-      scfForOp.getRegionIterArgs()[initIndx], hivm::StrideAlignDimsAttr::name);
+      loopOp.getRegionIterArgs()[initIndx], hivm::StrideAlignDimsAttr::name);
   if (mayResultBeAnnotateOpWithAttr.has_value() &&
       mayIterArgBeAnnotateOpWithAttr.has_value()) {
     // already propagate down
@@ -393,12 +393,12 @@ LogicalResult propagateAlignDown(
   if (alignDims.empty()) {
     return failure();
   }
-  createAlignMarkOp(rewriter, scfForOp.getLoc(), scfForOp.getResult(initIndx),
+  createAlignMarkOp(rewriter, loopOp.getLoc(), loopOp->getResult(initIndx),
                     alignDims, alignBytes, alignDimAttrName,
                     alignBytesAttrName);
-  createAlignMarkOp(rewriter, scfForOp.getLoc(),
-                    scfForOp.getRegionIterArgs()[initIndx], alignDims,
-                    alignBytes, alignDimAttrName, alignBytesAttrName);
+  createAlignMarkOp(rewriter, loopOp.getLoc(),
+                    loopOp.getRegionIterArgs()[initIndx], alignDims, alignBytes,
+                    alignDimAttrName, alignBytesAttrName);
   return success();
 }
 
@@ -435,21 +435,22 @@ LogicalResult propagateAlignDown(
   auto [unionAlignDims, unionAlignBytes] = unionAlignInfo(
       alreadyAlignDims, alreadyAlignBytes, alignDims, alignBytes);
 
-  if (AlignInfo(alignDims, alignBytes) == AlignInfo(unionAlignDims, unionAlignBytes)) {
+  if (AlignInfo(alignDims, alignBytes) ==
+      AlignInfo(unionAlignDims, unionAlignBytes)) {
     return failure();
   }
-  rewriter.modifyOpInPlace(alreadyAnnotateOp, [&rewriter, &alreadyAnnotateOp,
-                                               &alignDimAttrName,
-                                               &alignBytesAttrName,
-                                               unionAlignDims = unionAlignDims,
-                                               unionAlignBytes = unionAlignBytes]() {
-    alreadyAnnotateOp->setAttr(
-        alignDimAttrName, DenseI32ArrayAttr::get(rewriter.getContext(),
-                                                 ArrayRef(unionAlignDims)));
-    alreadyAnnotateOp->setAttr(
-        alignBytesAttrName, DenseI32ArrayAttr::get(rewriter.getContext(),
-                                                   ArrayRef(unionAlignBytes)));
-  });
+  rewriter.modifyOpInPlace(
+      alreadyAnnotateOp,
+      [&rewriter, &alreadyAnnotateOp, &alignDimAttrName, &alignBytesAttrName,
+       unionAlignDims = unionAlignDims, unionAlignBytes = unionAlignBytes]() {
+        alreadyAnnotateOp->setAttr(
+            alignDimAttrName, DenseI32ArrayAttr::get(rewriter.getContext(),
+                                                     ArrayRef(unionAlignDims)));
+        alreadyAnnotateOp->setAttr(
+            alignBytesAttrName,
+            DenseI32ArrayAttr::get(rewriter.getContext(),
+                                   ArrayRef(unionAlignBytes)));
+      });
   return success();
 }
 
@@ -501,8 +502,8 @@ LogicalResult propagateDownAlignInfo(
                                         alignBytesAttrName);
             })
             .Case([&rewriter, &v, &alignDims, &alignBytes, &alignDimAttrName,
-                   &alignBytesAttrName](scf::ForOp scfForOp) {
-              return propagateAlignDown(rewriter, scfForOp, v, alignDims,
+                   &alignBytesAttrName](LoopLikeOpInterface loopOp) {
+              return propagateAlignDown(rewriter, loopOp, v, alignDims,
                                         alignBytes, alignDimAttrName,
                                         alignBytesAttrName);
             })
@@ -623,41 +624,41 @@ mlir::LogicalResult propagateAlignUp(
 }
 
 mlir::LogicalResult propagateAlignUp(
-    mlir::PatternRewriter &rewriter, scf::ForOp scfForOp, OpResult result,
-    ArrayRef<int32_t> alignDims, ArrayRef<int32_t> alignBytes,
+    mlir::PatternRewriter &rewriter, LoopLikeOpInterface loopOp,
+    OpResult result, ArrayRef<int32_t> alignDims, ArrayRef<int32_t> alignBytes,
     std::string alignDimAttrName = hivm::StrideAlignDimsAttr::name.str(),
     std::string alignBytesAttrName =
         hivm::StrideAlignValueInByteAttr::name.str()) {
   auto resultIndx = result.getResultNumber();
-  assert(scfForOp.getTiedLoopInit(result) != nullptr);
-  auto tiedIterArg = scfForOp.getTiedLoopInit(result)->get();
-  auto tiedYieldArg = scfForOp.getYieldedValues()[resultIndx];
+  assert(loopOp.getTiedLoopInit(result) != nullptr);
+  auto tiedIterArg = loopOp.getTiedLoopInit(result)->get();
+  auto tiedYieldArg = loopOp.getYieldedValues()[resultIndx];
   auto [adjustAlignDims, adjustAlignBytes] = adjustAlignInfo(
-      scfForOp.getOperation(), tiedIterArg, alignDims, alignBytes);
+      loopOp.getOperation(), tiedIterArg, alignDims, alignBytes);
   if (adjustAlignDims.empty()) {
     return failure();
   }
-  createAlignMarkOp(rewriter, scfForOp.getLoc(), tiedIterArg, adjustAlignDims,
+  createAlignMarkOp(rewriter, loopOp.getLoc(), tiedIterArg, adjustAlignDims,
                     adjustAlignBytes, alignDimAttrName, alignBytesAttrName);
-  createAlignMarkOp(rewriter, scfForOp.getLoc(), tiedYieldArg, adjustAlignDims,
+  createAlignMarkOp(rewriter, loopOp.getLoc(), tiedYieldArg, adjustAlignDims,
                     adjustAlignBytes, alignDimAttrName, alignBytesAttrName);
   return success();
 }
 
 mlir::LogicalResult propagateAlignUp(
-    mlir::PatternRewriter &rewriter, scf::ForOp scfForOp,
+    mlir::PatternRewriter &rewriter, LoopLikeOpInterface loopOp,
     BlockArgument blockArgument, ArrayRef<int32_t> alignDims,
     ArrayRef<int32_t> alignBytes,
     std::string alignDimAttrName = hivm::StrideAlignDimsAttr::name.str(),
     std::string alignBytesAttrName =
         hivm::StrideAlignValueInByteAttr::name.str()) {
-  auto tiedInitArg = scfForOp.getTiedLoopInit(blockArgument)->get();
+  auto tiedInitArg = loopOp.getTiedLoopInit(blockArgument)->get();
   auto [adjustAlignDims, adjustAlignBytes] = adjustAlignInfo(
-      scfForOp.getOperation(), tiedInitArg, alignDims, alignBytes);
+      loopOp.getOperation(), tiedInitArg, alignDims, alignBytes);
   if (adjustAlignDims.empty()) {
     return failure();
   }
-  createAlignMarkOp(rewriter, scfForOp.getLoc(), tiedInitArg, adjustAlignDims,
+  createAlignMarkOp(rewriter, loopOp.getLoc(), tiedInitArg, adjustAlignDims,
                     adjustAlignBytes, alignDimAttrName, alignBytesAttrName);
   return success();
 }
@@ -1066,10 +1067,9 @@ mlir::LogicalResult propagateAlignUpFromResult(
         return propagateAlignUp(rewriter, bitcastOp, alignDims, alignBytes,
                                 alignDimAttrName, alignBytesAttrName);
       })
-      .Case([&](scf::ForOp scfForOp) {
-        return propagateAlignUp(rewriter, scfForOp, result, alignDims,
-                                alignBytes, alignDimAttrName,
-                                alignBytesAttrName);
+      .Case([&](LoopLikeOpInterface loopOp) {
+        return propagateAlignUp(rewriter, loopOp, result, alignDims, alignBytes,
+                                alignDimAttrName, alignBytesAttrName);
       })
       .Case([&](scf::IfOp scfIfOp) {
         return propagateAlignUp(rewriter, scfIfOp, result, alignDims,
@@ -1327,7 +1327,8 @@ mlir::LogicalResult PropagateAlignUpToRootAllocationPattern::matchAndRewrite(
     return markOp.emitError() << "Mismatched storage align marks";
   auto markSrc = markOp.getSrc();
   if (isa<BlockArgument>(markSrc) &&
-      !isa<scf::ForOp>(cast<BlockArgument>(markSrc).getOwner()->getParentOp()))
+      !isa<LoopLikeOpInterface>(
+          cast<BlockArgument>(markSrc).getOwner()->getParentOp()))
     return markOp.emitError()
            << "Cannot align " << markSrc << " across blocks.";
   if (isa<UnrankedMemRefType>(markSrc.getType()))
@@ -1339,11 +1340,12 @@ mlir::LogicalResult PropagateAlignUpToRootAllocationPattern::matchAndRewrite(
                                         markOp, alignDims, alignBytes,
                                         alignDimAttrName_, alignBytesAttrName_);
   } else if (isa<BlockArgument>(markSrc) &&
-             isa<scf::ForOp>(
+             isa<LoopLikeOpInterface>(
                  cast<BlockArgument>(markSrc).getOwner()->getParentOp())) {
     auto blockArgument = cast<BlockArgument>(markSrc);
-    auto scfForOp = cast<scf::ForOp>(blockArgument.getOwner()->getParentOp());
-    result = propagateAlignUp(rewriter, scfForOp, blockArgument, alignDims,
+    auto loopOp =
+        cast<LoopLikeOpInterface>(blockArgument.getOwner()->getParentOp());
+    result = propagateAlignUp(rewriter, loopOp, blockArgument, alignDims,
                               alignBytes);
   }
 

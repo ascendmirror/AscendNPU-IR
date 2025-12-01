@@ -288,17 +288,17 @@ struct InsertLoadStoreOpBetweenCrossLoopVectorAndCube
         continue;
       }
 
-      auto scfForOp = dyn_cast<scf::ForOp>(op->getParentOp());
-      if (!scfForOp) {
+      auto loopOp = dyn_cast<LoopLikeOpInterface>(op->getParentOp());
+      if (!loopOp) {
         continue;
       }
 
       auto blockArg = cast<BlockArgument>(operand.get());
-      auto *yield = scfForOp.getTiedLoopYieldedValue(blockArg);
+      auto *yield = loopOp.getTiedLoopYieldedValue(blockArg);
       if (!yield) {
         continue;
       }
-      
+
       if (traceDefOp<OpType>(yield->get()).has_value()) {
         consumerOperands.push_back(&operand);
       }
@@ -330,7 +330,7 @@ struct InsertLoadStoreOpBetweenCrossLoopVectorAndCube
 /// mmadl1(l1_dst)
 /// ```
 template <>
-struct InsertLoadStoreOpBetweenVectorAndCube<scf::ForOp>
+struct InsertLoadStoreOpBetweenVectorAndCube<LoopLikeOpInterface>
     : public OpRewritePattern<hivm::MmadL1Op> {
   using OpRewritePattern<hivm::MmadL1Op>::OpRewritePattern;
 
@@ -338,10 +338,10 @@ struct InsertLoadStoreOpBetweenVectorAndCube<scf::ForOp>
                                 PatternRewriter &rewriter) const override {
     llvm::SmallVector<OpOperand *> consumerOperands;
     for (OpOperand &operand : op->getOpOperands()) {
-      auto scfForDef = traceDefOp<scf::ForOp>(operand.get());
-      if (scfForDef.has_value()) {
-        auto forOp = llvm::cast<scf::ForOp>(scfForDef.value());
-        if (forOp->getAttr("ExtractedLoadOrStore") != nullptr) {
+      auto loopOpDef = traceDefOp<LoopLikeOpInterface>(operand.get());
+      if (loopOpDef.has_value()) {
+        auto loopOp = llvm::cast<LoopLikeOpInterface>(loopOpDef.value());
+        if (loopOp->getAttr("ExtractedLoadOrStore") != nullptr) {
           consumerOperands.push_back(&operand);
         }
       }
@@ -594,7 +594,7 @@ struct DuplicateTensorExtractForCube
         } else {
           // the op need eraseLabel only if when the bufferization is from load
           allocOp->setAttr(cubeErasureLabel, rewriter.getI32IntegerAttr(1));
-          for (auto op: tmpOps) {
+          for (auto op : tmpOps) {
             op->setAttr(cubeErasureLabel, rewriter.getI32IntegerAttr(1));
           }
         }
@@ -657,7 +657,7 @@ void populateInsertLoadStorePattern(RewritePatternSet &patterns) {
       patterns.getContext());
   patterns.add<InsertLoadOpBetweenStoreLikeAndVectorOrCube<hivm::StoreOp>>(
       patterns.getContext());
-  patterns.add<InsertLoadStoreOpBetweenVectorAndCube<scf::ForOp>>(
+  patterns.add<InsertLoadStoreOpBetweenVectorAndCube<LoopLikeOpInterface>>(
       patterns.getContext());
   patterns
       .add<InsertLoadStoreOpBetweenVectorAndCube<bufferization::ToTensorOp>>(
