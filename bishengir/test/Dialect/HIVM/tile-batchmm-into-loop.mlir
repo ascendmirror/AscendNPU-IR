@@ -74,3 +74,32 @@ module {
     return
   }
 }
+
+// -----
+module {
+  // CHECK-LABEL: func.func @test_tile_continuous_bmm
+  func.func @test_tile_continuous_bmm(%arg0: memref<?xf16>, %arg1: memref<?xf16>, %dst : memref<3x16x16xf32>) {
+    %c32 = arith.constant 32 : index
+    %c16 = arith.constant 16 : index
+    %true = arith.constant true
+    hivm.hir.set_mask_norm
+    %reinterpret_cast = memref.reinterpret_cast %arg0 to offset: [0], sizes: [3, 16, 32], strides: [512, 32, 1] : memref<?xf16> to memref<3x16x32xf16, strided<[512, 32, 1]>>
+    %alloc = memref.alloc() : memref<3x16x32xf16>
+    hivm.hir.load ins(%reinterpret_cast : memref<3x16x32xf16, strided<[512, 32, 1]>>) outs(%alloc : memref<3x16x32xf16>)
+    %0 = bufferization.to_tensor %alloc restrict writable : memref<3x16x32xf16>
+    %reinterpret_cast_0 = memref.reinterpret_cast %arg1 to offset: [0], sizes: [3, 32, 16], strides: [512, 16, 1] : memref<?xf16> to memref<3x32x16xf16, strided<[512, 16, 1]>>
+    %alloc_1 = memref.alloc() : memref<3x32x16xf16>
+    hivm.hir.load ins(%reinterpret_cast_0 : memref<3x32x16xf16, strided<[512, 16, 1]>>) outs(%alloc_1 : memref<3x32x16xf16>)
+    %1 = bufferization.to_tensor %alloc_1 restrict writable : memref<3x32x16xf16>
+    // CHECK: scf.for %{{.*}} = %c0 to %c3 step %c1
+    %3 = tensor.empty() : tensor<3x16x16xf32>
+    %4 = hivm.hir.batchMmadL1 ins(%0, %1, %true, %c16, %c32, %c16 : tensor<3x16x32xf16>, tensor<3x32x16xf16>, i1, index, index, index) outs(%3 : tensor<3x16x16xf32>) -> tensor<3x16x16xf32>
+    %5 = tensor.empty() : tensor<3x16x16xf32>
+    %6 = hivm.hir.fixpipe {enable_nz2nd} ins(%4 : tensor<3x16x16xf32>) outs(%5 : tensor<3x16x16xf32>) -> tensor<3x16x16xf32>
+    // CHECK: scf.for %{{.*}} = %c0 to %c3 step %c1
+    %7 = tensor.empty() : tensor<3x16x16xf32>
+    %8 = hivm.hir.batchMmadL1 ins(%6, %6, %true, %c16, %c32, %c16 : tensor<3x16x16xf32>, tensor<3x16x16xf32>, i1, index, index, index) outs(%3 : tensor<3x16x16xf32>) -> tensor<3x16x16xf32>
+    hivm.hir.fixpipe {enable_nz2nd} ins(%8 : tensor<3x16x16xf32>) outs(%dst : memref<3x16x16xf32>)
+    return
+  }
+}
