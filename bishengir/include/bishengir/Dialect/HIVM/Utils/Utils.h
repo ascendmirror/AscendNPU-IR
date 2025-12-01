@@ -287,7 +287,8 @@ std::vector<std::pair<Value, Value>> getOperationAliasInfo(Operation *op);
 /// Get buffer static size.
 std::optional<uint32_t> GetBufferSize(Value buffer);
 
-// get is operation aligned according to the broadcast/reduce dim and rank
+/// get alignment according to the broadcast/reduce dim and rank.
+/// \note for scalar broadcast, alignment kind is considered as unknow.
 AlignKind isBrcOpAligned(VBrcOp vbrcOp, int dim, int rank);
 
 // set bind sub block attr
